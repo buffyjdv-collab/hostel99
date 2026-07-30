@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,7 @@ import {
   Building,
   Users,
   Warehouse,
+  Trash2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -229,6 +230,10 @@ function StatCardSkeleton() {
 
 export function PropertiesPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'properties:create')
+  const canUpdate = hasPermission(role, 'properties:update')
+  const canDelete = hasPermission(role, 'properties:delete')
 
   // ── State ────────────────────────────────────────────────────────────────
   const [properties, setProperties] = useState<PropertyData[]>([])
@@ -356,6 +361,18 @@ export function PropertiesPage() {
     })
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this property?')) return
+    try {
+      const res = await fetch(`/api/properties/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setProperties((prev) => prev.filter((p) => p.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete property:', error)
+    }
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <ScrollArea className="h-full">
@@ -371,12 +388,14 @@ export function PropertiesPage() {
             </p>
           </div>
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
+            {canCreate && (
             <DialogTrigger asChild>
               <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
                 <Plus className="mr-2 h-4 w-4" />
                 Add Property
               </Button>
             </DialogTrigger>
+            )}
             <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Property</DialogTitle>
@@ -654,7 +673,7 @@ export function PropertiesPage() {
                   ? 'Try adjusting your search or filters to find what you\'re looking for.'
                   : 'Get started by adding your first property to the system.'}
               </p>
-              {!searchQuery && typeFilter === 'all' && (
+              {!searchQuery && typeFilter === 'all' && canCreate && (
                 <Button
                   className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white"
                   onClick={() => setDialogOpen(true)}
@@ -668,13 +687,13 @@ export function PropertiesPage() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProperties.map((property) => (
-              <PropertyCard key={property.id} property={property} />
+              <PropertyCard key={property.id} property={property} onDelete={handleDelete} />
             ))}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredProperties.map((property) => (
-              <PropertyListItem key={property.id} property={property} />
+              <PropertyListItem key={property.id} property={property} onDelete={handleDelete} />
             ))}
           </div>
         )}
@@ -685,7 +704,11 @@ export function PropertiesPage() {
 
 // ── Property Card (Grid View) ────────────────────────────────────────────────
 
-function PropertyCard({ property }: { property: PropertyData }) {
+function PropertyCard({ property, onDelete }: { property: PropertyData; onDelete: (id: string) => void }) {
+  const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canUpdate = hasPermission(role, 'properties:update')
+  const canDelete = hasPermission(role, 'properties:delete')
   const typeConfig = PROPERTY_TYPE_CONFIG[property.type] || PROPERTY_TYPE_CONFIG.pg
   const amenities = parseAmenities(property.amenities)
   const occupancyPct = property.occupancyPercentage ?? (property.totalBeds > 0 ? Math.round((property.occupancy / property.totalBeds) * 100) : 0)
@@ -777,10 +800,18 @@ function PropertyCard({ property }: { property: PropertyData }) {
           <Eye className="mr-1.5 h-3.5 w-3.5" />
           View
         </Button>
+        {canUpdate && (
         <Button variant="outline" size="sm" className="flex-1">
           <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Edit
         </Button>
+        )}
+        {canDelete && (
+        <Button variant="outline" size="sm" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={() => onDelete(property.id)}>
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+          Delete
+        </Button>
+        )}
         <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50">
           <DoorOpen className="mr-1.5 h-3.5 w-3.5" />
           Rooms
@@ -792,7 +823,11 @@ function PropertyCard({ property }: { property: PropertyData }) {
 
 // ── Property List Item (List View) ──────────────────────────────────────────
 
-function PropertyListItem({ property }: { property: PropertyData }) {
+function PropertyListItem({ property, onDelete }: { property: PropertyData; onDelete: (id: string) => void }) {
+  const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canUpdate = hasPermission(role, 'properties:update')
+  const canDelete = hasPermission(role, 'properties:delete')
   const typeConfig = PROPERTY_TYPE_CONFIG[property.type] || PROPERTY_TYPE_CONFIG.pg
   const amenities = parseAmenities(property.amenities)
   const occupancyPct = property.occupancyPercentage ?? (property.totalBeds > 0 ? Math.round((property.occupancy / property.totalBeds) * 100) : 0)
@@ -850,7 +885,8 @@ function PropertyListItem({ property }: { property: PropertyData }) {
             </div>
             <div className="flex gap-1.5">
               <Button variant="outline" size="sm"><Eye className="h-3.5 w-3.5" /></Button>
-              <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+              {canUpdate && <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>}
+              {canDelete && <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={() => onDelete(property.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
               <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50">
                 <DoorOpen className="h-3.5 w-3.5" />
               </Button>

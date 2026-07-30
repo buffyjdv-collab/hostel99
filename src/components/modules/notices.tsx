@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -46,6 +46,8 @@ import {
   Mail,
   Speaker,
   Search,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -125,6 +127,10 @@ function isExpired(expiryDate: string | null) {
 
 export function NoticesPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'notices:create')
+  const canUpdate = hasPermission(role, 'notices:update')
+  const canDelete = hasPermission(role, 'notices:delete')
   const [loading, setLoading] = useState(true)
   const [notices, setNotices] = useState<Notice[]>([])
   const [properties, setProperties] = useState<Property[]>([])
@@ -264,6 +270,18 @@ export function NoticesPage() {
     } catch { /* ignore */ }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this notice?')) return
+    try {
+      const res = await fetch(`/api/notices/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setNotices((prev) => prev.filter((n) => n.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete notice:', error)
+    }
+  }
+
   // ── Loading Skeleton ────────────────────────────────────────────────────
 
   if (loading) {
@@ -300,10 +318,12 @@ export function NoticesPage() {
           <p className="text-muted-foreground mt-1">Manage notices and communicate with tenants and staff</p>
         </div>
         <div className="flex gap-2">
+          {canCreate && (
           <Button onClick={() => setCreateNoticeOpen(true)} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
             <Plus className="h-4 w-4" />
             Create Notice
           </Button>
+          )}
           <Button onClick={() => setSendMessageOpen(true)} variant="outline" className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
             <Send className="h-4 w-4" />
             Send Message
@@ -408,7 +428,7 @@ export function NoticesPage() {
                         ) : (
                           <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
                         )}
-                        {notice.isActive && (
+                        {notice.isActive && canUpdate && (
                           <Button
                             variant="ghost"
                             size="sm"
@@ -416,6 +436,27 @@ export function NoticesPage() {
                             onClick={() => handleExpireNotice(notice.id)}
                           >
                             Expire
+                          </Button>
+                        )}
+                        {canUpdate && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7"
+                          >
+                            <Pencil className="h-3 w-3 mr-1" />
+                            Edit
+                          </Button>
+                        )}
+                        {canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 h-7"
+                            onClick={() => handleDelete(notice.id)}
+                          >
+                            <Trash2 className="h-3 w-3 mr-1" />
+                            Delete
                           </Button>
                         )}
                       </div>

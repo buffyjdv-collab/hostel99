@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -83,6 +83,8 @@ import {
   XCircle,
   CircleDot,
   Timer,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -695,6 +697,10 @@ function RaiseComplaintDialog({
 
 export function ComplaintsPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'complaints:create')
+  const canUpdate = hasPermission(role, 'complaints:update')
+  const canDelete = hasPermission(role, 'complaints:delete')
 
   // Data
   const [complaints, setComplaints] = useState<ComplaintData[]>([])
@@ -927,6 +933,18 @@ export function ComplaintsPage() {
     }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this complaint?')) return
+    try {
+      const res = await fetch(`/api/complaints/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setComplaints((prev) => prev.filter((c) => c.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete complaint:', error)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -959,10 +977,12 @@ export function ComplaintsPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Track and manage tenant complaints and resolutions</p>
         </div>
+        {canCreate && (
         <Button onClick={() => setShowRaiseDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
           <Plus className="w-4 h-4 mr-2" />
           Raise Complaint
         </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -1201,6 +1221,16 @@ export function ComplaintsPage() {
                               {['open', 'assigned', 'in_progress'].includes(complaint.status) && (
                                 <DropdownMenuItem onClick={() => { setSelectedComplaint(complaint); setShowDetailDialog(true) }}>
                                   <ArrowUpDown className="w-4 h-4 mr-2" /> Update Status
+                                </DropdownMenuItem>
+                              )}
+                              {canUpdate && (
+                                <DropdownMenuItem onClick={() => { setSelectedComplaint(complaint); setShowDetailDialog(true) }}>
+                                  <Pencil className="w-4 h-4 mr-2" /> Edit
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(complaint.id)}>
+                                  <Trash2 className="w-4 h-4 mr-2" /> Delete
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -92,6 +92,8 @@ import {
   FileText,
   XCircle,
   CircleDot,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -736,6 +738,10 @@ function RecordPaymentDialog({
 
 export function PaymentsPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'payments:create')
+  const canUpdate = hasPermission(role, 'payments:update')
+  const canDelete = hasPermission(role, 'payments:delete')
 
   // Data
   const [payments, setPayments] = useState<PaymentData[]>([])
@@ -949,6 +955,18 @@ export function PaymentsPage() {
     }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this payment?')) return
+    try {
+      const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setPayments((prev) => prev.filter((p) => p.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete payment:', error)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -981,10 +999,12 @@ export function PaymentsPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Track rent collections, dues, and payment history</p>
         </div>
+        {canCreate && (
         <Button onClick={() => setShowRecordDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
           <Plus className="w-4 h-4 mr-2" />
           Record Payment
         </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -1226,6 +1246,16 @@ export function PaymentsPage() {
                               {(payment.status === 'pending' || payment.status === 'overdue') && (
                                 <DropdownMenuItem onClick={() => handleSendReminder(payment)}>
                                   <Send className="w-4 h-4 mr-2" /> Send Reminder
+                                </DropdownMenuItem>
+                              )}
+                              {canUpdate && (
+                                <DropdownMenuItem onClick={() => { setSelectedPayment(payment); setShowMarkPaidDialog(true) }}>
+                                  <Pencil className="w-4 h-4 mr-2" /> Edit
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(payment.id)}>
+                                  <Trash2 className="w-4 h-4 mr-2" /> Delete
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>

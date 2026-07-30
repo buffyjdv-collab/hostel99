@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -53,6 +53,7 @@ import {
   ChevronUp,
   ArrowUpDown,
   Grid3X3,
+  Trash2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -343,6 +344,10 @@ function VacancyMap({ rooms }: { rooms: RoomData[] }) {
 
 export function RoomsPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'rooms:create')
+  const canUpdate = hasPermission(role, 'rooms:update')
+  const canDelete = hasPermission(role, 'rooms:delete')
 
   // ── State ────────────────────────────────────────────────────────────────
   const [rooms, setRooms] = useState<RoomData[]>([])
@@ -542,6 +547,18 @@ export function RoomsPage() {
     })
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this room?')) return
+    try {
+      const res = await fetch(`/api/rooms/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setRooms((prev) => prev.filter((r) => r.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete room:', error)
+    }
+  }
+
   function clearFilters() {
     setFilterProperty('all')
     setFilterFloor('all')
@@ -578,12 +595,14 @@ export function RoomsPage() {
               Vacancy Map
             </Button>
             <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
+              {canCreate && (
               <DialogTrigger asChild>
                 <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
                   <Plus className="mr-2 h-4 w-4" />
                   Add Room
                 </Button>
               </DialogTrigger>
+              )}
               <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Add New Room</DialogTitle>
@@ -1006,7 +1025,7 @@ export function RoomsPage() {
                   ? 'Try adjusting your filters to find what you\'re looking for.'
                   : 'Get started by adding your first room to the system.'}
               </p>
-              {!hasActiveFilters && (
+              {!hasActiveFilters && canCreate && (
                 <Button
                   className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white"
                   onClick={() => setDialogOpen(true)}
@@ -1020,13 +1039,13 @@ export function RoomsPage() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredRooms.map((room) => (
-              <RoomCard key={room.id} room={room} />
+              <RoomCard key={room.id} room={room} onDelete={handleDelete} />
             ))}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredRooms.map((room) => (
-              <RoomListItem key={room.id} room={room} />
+              <RoomListItem key={room.id} room={room} onDelete={handleDelete} />
             ))}
           </div>
         )}
@@ -1037,7 +1056,11 @@ export function RoomsPage() {
 
 // ── Room Card (Grid View) ────────────────────────────────────────────────────
 
-function RoomCard({ room }: { room: RoomData }) {
+function RoomCard({ room, onDelete }: { room: RoomData; onDelete: (id: string) => void }) {
+  const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canUpdate = hasPermission(role, 'rooms:update')
+  const canDelete = hasPermission(role, 'rooms:delete')
   const roomTypeConfig = ROOM_TYPE_CONFIG[room.roomType] || ROOM_TYPE_CONFIG.non_ac
   const sharingConfig = SHARING_TYPE_CONFIG[room.sharingType] || SHARING_TYPE_CONFIG.single
   const statusConfig = STATUS_CONFIG[room.status] || STATUS_CONFIG.available
@@ -1140,10 +1163,18 @@ function RoomCard({ room }: { room: RoomData }) {
           <Eye className="mr-1.5 h-3.5 w-3.5" />
           View
         </Button>
+        {canUpdate && (
         <Button variant="outline" size="sm" className="flex-1">
           <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Edit
         </Button>
+        )}
+        {canDelete && (
+        <Button variant="outline" size="sm" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={() => onDelete(room.id)}>
+          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+          Delete
+        </Button>
+        )}
         <Button variant="outline" size="sm" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50">
           <Ban className="mr-1.5 h-3.5 w-3.5" />
           Block
@@ -1155,7 +1186,11 @@ function RoomCard({ room }: { room: RoomData }) {
 
 // ── Room List Item (List View) ──────────────────────────────────────────────
 
-function RoomListItem({ room }: { room: RoomData }) {
+function RoomListItem({ room, onDelete }: { room: RoomData; onDelete: (id: string) => void }) {
+  const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canUpdate = hasPermission(role, 'rooms:update')
+  const canDelete = hasPermission(role, 'rooms:delete')
   const roomTypeConfig = ROOM_TYPE_CONFIG[room.roomType] || ROOM_TYPE_CONFIG.non_ac
   const sharingConfig = SHARING_TYPE_CONFIG[room.sharingType] || SHARING_TYPE_CONFIG.single
   const statusConfig = STATUS_CONFIG[room.status] || STATUS_CONFIG.available
@@ -1224,7 +1259,8 @@ function RoomListItem({ room }: { room: RoomData }) {
             </div>
             <div className="flex gap-1.5">
               <Button variant="outline" size="sm"><Eye className="h-3.5 w-3.5" /></Button>
-              <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+              {canUpdate && <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>}
+              {canDelete && <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={() => onDelete(room.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
               <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50">
                 <Ban className="h-3.5 w-3.5" />
               </Button>

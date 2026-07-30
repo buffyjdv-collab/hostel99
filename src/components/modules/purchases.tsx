@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -325,6 +325,11 @@ function StatusBadge({ config }: { config: { label: string; bgClass: string; tex
 export function PurchasesPage() {
   const { selectedPropertyId, currentUser } = useAppStore()
   const { toast } = useToast()
+
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'purchases:create')
+  const canUpdate = hasPermission(role, 'purchases:update')
+  const canDelete = hasPermission(role, 'purchases:delete')
 
   // ── Tab state ──────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('orders')
@@ -907,17 +912,17 @@ export function PurchasesPage() {
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage purchase orders, requisitions & goods received</p>
         </div>
         <div className="flex gap-2">
-          {activeTab === 'orders' && (
+          {activeTab === 'orders' && canCreate && (
             <Button onClick={() => { resetPOForm(); setShowCreatePO(true) }} className="gap-2">
               <Plus className="h-4 w-4" /> New PO
             </Button>
           )}
-          {activeTab === 'requisitions' && (
+          {activeTab === 'requisitions' && canCreate && (
             <Button onClick={() => { resetPRForm(); setShowCreatePR(true) }} className="gap-2">
               <Plus className="h-4 w-4" /> New Requisition
             </Button>
           )}
-          {activeTab === 'grns' && (
+          {activeTab === 'grns' && canCreate && (
             <Button onClick={() => { resetGRNForm(); setShowCreateGRN(true) }} className="gap-2">
               <Plus className="h-4 w-4" /> New GRN
             </Button>
@@ -1068,27 +1073,27 @@ export function PurchasesPage() {
                                 <DropdownMenuItem onClick={() => openPODetail(order)}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
-                                {order.status === 'draft' && (
+                                {order.status === 'draft' && canUpdate && (
                                   <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'submitted')}>
                                     <ArrowRight className="h-4 w-4 mr-2" /> Submit
                                   </DropdownMenuItem>
                                 )}
-                                {order.status === 'submitted' && (
+                                {order.status === 'submitted' && canUpdate && (
                                   <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'approved')}>
                                     <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
                                   </DropdownMenuItem>
                                 )}
-                                {order.status === 'approved' && (
+                                {order.status === 'approved' && canCreate && (
                                   <DropdownMenuItem onClick={() => { resetGRNForm(); setGrnPurchaseOrderId(order.id); const po = orders.find(o => o.id === order.id); if (po) { setGrnItems(po.items.map(item => ({ poItemId: item.id, itemName: item.itemName, orderedQty: item.quantity, receivedQty: '', acceptedQty: '', rejectedQty: '', unitPrice: item.unitPrice, batchNumber: '' }))); } setShowCreateGRN(true); }}>
                                     <PackageCheck className="h-4 w-4 mr-2" /> Create GRN
                                   </DropdownMenuItem>
                                 )}
-                                {['draft', 'submitted'].includes(order.status) && (
+                                {['draft', 'submitted'].includes(order.status) && canDelete && (
                                   <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'cancelled')} className="text-red-600">
                                     <XCircle className="h-4 w-4 mr-2" /> Cancel
                                   </DropdownMenuItem>
                                 )}
-                                {order.paymentStatus === 'unpaid' && order.status === 'received' && (
+                                {order.paymentStatus === 'unpaid' && order.status === 'received' && canUpdate && (
                                   <DropdownMenuItem onClick={() => updatePOStatus(order.id, order.status, { paymentStatus: 'paid' })}>
                                     <CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Paid
                                   </DropdownMenuItem>
@@ -1177,7 +1182,7 @@ export function PurchasesPage() {
                                 <DropdownMenuItem onClick={() => openPRDetail(pr)}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
-                                {pr.status === 'submitted' && (
+                                {pr.status === 'submitted' && canUpdate && (
                                   <>
                                     <DropdownMenuItem onClick={() => updatePRStatus(pr.id, 'approved')}>
                                       <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
@@ -1266,7 +1271,7 @@ export function PurchasesPage() {
                                 <DropdownMenuItem onClick={() => openGRNDetail(grn)}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
-                                {grn.status === 'pending_inspection' && (
+                                {grn.status === 'pending_inspection' && canUpdate && (
                                   <>
                                     <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'accepted')}>
                                       <CheckCircle2 className="h-4 w-4 mr-2" /> Accept

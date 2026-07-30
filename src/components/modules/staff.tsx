@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -70,6 +70,8 @@ import {
   Wrench,
   ChefHat,
   Briefcase,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -843,6 +845,10 @@ function MarkAttendanceDialog({
 
 export function StaffPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'staff:create')
+  const canUpdate = hasPermission(role, 'staff:update')
+  const canDelete = hasPermission(role, 'staff:delete')
 
   // Data
   const [staff, setStaff] = useState<StaffData[]>([])
@@ -970,6 +976,18 @@ export function StaffPage() {
     setShowDetailDialog(true)
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this staff member?')) return
+    try {
+      const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setStaff((prev) => prev.filter((s) => s.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete staff member:', error)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -1003,10 +1021,12 @@ export function StaffPage() {
             <Calendar className="w-4 h-4 mr-2" />
             Mark Attendance
           </Button>
+          {canCreate && (
           <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
             <UserPlus className="w-4 h-4 mr-2" />
             Add Staff
           </Button>
+          )}
         </div>
       </div>
 
@@ -1116,10 +1136,12 @@ export function StaffPage() {
                 ? 'Try adjusting your filters or search query'
                 : 'Add your first staff member to get started'}
             </p>
+            {canCreate && (
             <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
               <UserPlus className="w-4 h-4 mr-2" />
               Add Staff
             </Button>
+            )}
           </CardContent>
         </Card>
       ) : viewMode === 'cards' ? (
@@ -1150,6 +1172,16 @@ export function StaffPage() {
                             <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewStaff(s) }}>
                               <Eye className="h-4 w-4 mr-2" /> View Details
                             </DropdownMenuItem>
+                            {canUpdate && (
+                            <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewStaff(s) }}>
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                            <DropdownMenuItem className="text-red-600" onClick={e => { e.stopPropagation(); handleDelete(s.id) }}>
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -1252,6 +1284,16 @@ export function StaffPage() {
                             <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewStaff(s) }}>
                               <Eye className="h-4 w-4 mr-2" /> View Details
                             </DropdownMenuItem>
+                            {canUpdate && (
+                            <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewStaff(s) }}>
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                            <DropdownMenuItem className="text-red-600" onClick={e => { e.stopPropagation(); handleDelete(s.id) }}>
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>

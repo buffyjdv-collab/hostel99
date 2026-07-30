@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -336,6 +336,11 @@ function getSubCategoryLabel(sub: string): string {
 export function AssetsPage() {
   const { selectedPropertyId, currentUser } = useAppStore()
   const { toast } = useToast()
+
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'assets:create')
+  const canUpdate = hasPermission(role, 'assets:update')
+  const canDelete = hasPermission(role, 'assets:delete')
 
   // Active tab
   const [activeTab, setActiveTab] = useState<string>('assets')
@@ -1222,10 +1227,12 @@ export function AssetsPage() {
                   className="pl-9 h-9"
                 />
               </div>
-              <Button onClick={openAddAssetDialog} size="sm" className="h-9 gap-1.5">
-                <Plus className="h-4 w-4" />
-                Add Asset
-              </Button>
+              {canCreate && (
+                <Button onClick={openAddAssetDialog} size="sm" className="h-9 gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  Add Asset
+                </Button>
+              )}
             </div>
           </div>
 
@@ -1321,17 +1328,21 @@ export function AssetsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditAssetDialog(asset)}>
-                                  <Edit3 className="h-4 w-4 mr-2" />
-                                  Edit Asset
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => openDeleteDialog('asset', asset.id, asset.name)}
-                                  className="text-red-600 dark:text-red-400"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Dispose Asset
-                                </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => openEditAssetDialog(asset)}>
+                                    <Edit3 className="h-4 w-4 mr-2" />
+                                    Edit Asset
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteDialog('asset', asset.id, asset.name)}
+                                    className="text-red-600 dark:text-red-400"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Dispose Asset
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1422,10 +1433,12 @@ export function AssetsPage() {
                 className="pl-9 h-9"
               />
             </div>
-            <Button onClick={openAddLaundryDialog} size="sm" className="h-9 gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
+            {canCreate && (
+              <Button onClick={openAddLaundryDialog} size="sm" className="h-9 gap-1.5">
+                <Plus className="h-4 w-4" />
+                Add Item
+              </Button>
+            )}
           </div>
 
           {/* Laundry Table */}
@@ -1502,29 +1515,39 @@ export function AssetsPage() {
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => openEditLaundryDialog(item)}>
-                                  <Edit3 className="h-4 w-4 mr-2" />
-                                  Edit Item
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleSendToLaundry(item)} disabled={item.issuedQuantity <= 0}>
-                                  <ArrowDownToLine className="h-4 w-4 mr-2" />
-                                  Send to Laundry
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleReturnFromLaundry(item)} disabled={item.inLaundry <= 0}>
-                                  <ArrowUpFromLine className="h-4 w-4 mr-2" />
-                                  Return from Laundry
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleMarkDamaged(item)} disabled={item.issuedQuantity <= 0 && item.inLaundry <= 0}>
-                                  <AlertTriangle className="h-4 w-4 mr-2" />
-                                  Mark Damaged
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => openDeleteDialog('laundry', item.id, item.name)}
-                                  className="text-red-600 dark:text-red-400"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Dispose Item
-                                </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => openEditLaundryDialog(item)}>
+                                    <Edit3 className="h-4 w-4 mr-2" />
+                                    Edit Item
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => handleSendToLaundry(item)} disabled={item.issuedQuantity <= 0}>
+                                    <ArrowDownToLine className="h-4 w-4 mr-2" />
+                                    Send to Laundry
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => handleReturnFromLaundry(item)} disabled={item.inLaundry <= 0}>
+                                    <ArrowUpFromLine className="h-4 w-4 mr-2" />
+                                    Return from Laundry
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => handleMarkDamaged(item)} disabled={item.issuedQuantity <= 0 && item.inLaundry <= 0}>
+                                    <AlertTriangle className="h-4 w-4 mr-2" />
+                                    Mark Damaged
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteDialog('laundry', item.id, item.name)}
+                                    className="text-red-600 dark:text-red-400"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Dispose Item
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1600,10 +1623,12 @@ export function AssetsPage() {
                 className="pl-9 h-9"
               />
             </div>
-            <Button onClick={openAddHousekeepingDialog} size="sm" className="h-9 gap-1.5">
-              <Plus className="h-4 w-4" />
-              Add Item
-            </Button>
+            {canCreate && (
+              <Button onClick={openAddHousekeepingDialog} size="sm" className="h-9 gap-1.5">
+                <Plus className="h-4 w-4" />
+                Add Item
+              </Button>
+            )}
           </div>
 
           {/* Housekeeping Table */}
@@ -1677,17 +1702,21 @@ export function AssetsPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => openRestockDialog(item)}>
-                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                    Restock
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => openDeleteDialog('housekeeping', item.id, item.name)}
-                                    className="text-red-600 dark:text-red-400"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Remove Item
-                                  </DropdownMenuItem>
+                                  {canUpdate && (
+                                    <DropdownMenuItem onClick={() => openRestockDialog(item)}>
+                                      <RefreshCw className="h-4 w-4 mr-2" />
+                                      Restock
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canDelete && (
+                                    <DropdownMenuItem
+                                      onClick={() => openDeleteDialog('housekeeping', item.id, item.name)}
+                                      className="text-red-600 dark:text-red-400"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Remove Item
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>

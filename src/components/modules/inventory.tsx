@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -1000,6 +1000,11 @@ export function InventoryPage() {
   const { selectedPropertyId, currentUser } = useAppStore()
   const { toast } = useToast()
 
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'inventory:create')
+  const canUpdate = hasPermission(role, 'inventory:update')
+  const canDelete = hasPermission(role, 'inventory:delete')
+
   // Data
   const [items, setItems] = useState<InventoryItem[]>([])
   const [categories, setCategories] = useState<InventoryCategory[]>([])
@@ -1288,10 +1293,12 @@ export function InventoryPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Manage stock items, track quantities, and monitor inventory levels</p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
-          <Plus className="w-4 h-4 mr-2" />
-          Add Item
-        </Button>
+        {canCreate && (
+          <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+            <Plus className="w-4 h-4 mr-2" />
+            Add Item
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -1418,10 +1425,12 @@ export function InventoryPage() {
                 ? 'Try adjusting your filters or search query'
                 : 'Add your first inventory item to get started'}
             </p>
-            <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Item
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Item
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
@@ -1549,9 +1558,11 @@ export function InventoryPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleEditClick(item)}>
-                                <Edit3 className="h-4 w-4 mr-2" /> Edit Item
-                              </DropdownMenuItem>
+                              {canUpdate && (
+                                <DropdownMenuItem onClick={() => handleEditClick(item)}>
+                                  <Edit3 className="h-4 w-4 mr-2" /> Edit Item
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleAdjustClick(item)}>
                                 <ArrowUpDown className="h-4 w-4 mr-2" /> Adjust Stock
                               </DropdownMenuItem>

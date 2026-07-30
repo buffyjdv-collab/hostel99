@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -209,6 +209,11 @@ function MealTypeIcon({ mealType, className }: { mealType: string; className?: s
 export function KitchenPage() {
   const { selectedPropertyId, currentUser } = useAppStore()
   const { toast } = useToast()
+
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'kitchen:create')
+  const canUpdate = hasPermission(role, 'kitchen:update')
+  const canDelete = hasPermission(role, 'kitchen:delete')
 
   // Data state
   const [data, setData] = useState<KitchenData | null>(null)
@@ -715,10 +720,12 @@ export function KitchenPage() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setIssueDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Issue to Kitchen
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setIssueDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Issue to Kitchen
+              </Button>
+            )}
           </div>
 
           <Card>
@@ -807,10 +814,12 @@ export function KitchenPage() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setMenuDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Menu Plan
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setMenuDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Menu Plan
+              </Button>
+            )}
           </div>
 
           {/* Calendar View */}
@@ -914,10 +923,12 @@ export function KitchenPage() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setRecipeDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Recipe
-            </Button>
+            {canCreate && (
+              <Button onClick={() => setRecipeDialogOpen(true)} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Recipe
+              </Button>
+            )}
           </div>
 
           {filteredRecipes.length === 0 ? (

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -145,6 +145,11 @@ function renderStars(rating: number) {
 export function VendorsPage() {
   const { selectedPropertyId, currentUser } = useAppStore()
   const { toast } = useToast()
+
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'vendors:create')
+  const canUpdate = hasPermission(role, 'vendors:update')
+  const canDelete = hasPermission(role, 'vendors:delete')
 
   const [vendors, setVendors] = useState<VendorData[]>([])
   const [stats, setStats] = useState<VendorStats>({ totalVendors: 0, activeVendors: 0, avgRating: '0' })
@@ -349,9 +354,11 @@ export function VendorsPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Vendor Management</h1>
           <p className="text-slate-500 dark:text-slate-400 mt-1">Manage suppliers, track purchase history, and vendor performance</p>
         </div>
-        <Button onClick={() => { resetForm(); setAddDialogOpen(true) }} className="bg-emerald-600 hover:bg-emerald-700">
-          <Plus className="h-4 w-4 mr-2" /> Add Vendor
-        </Button>
+        {canCreate && (
+          <Button onClick={() => { resetForm(); setAddDialogOpen(true) }} className="bg-emerald-600 hover:bg-emerald-700">
+            <Plus className="h-4 w-4 mr-2" /> Add Vendor
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -507,9 +514,11 @@ export function VendorsPage() {
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDetail(vendor) }}>
                               <Eye className="h-4 w-4 mr-2" /> View Details
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(vendor) }}>
-                              <Edit className="h-4 w-4 mr-2" /> Edit
-                            </DropdownMenuItem>
+                            {canUpdate && (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(vendor) }}>
+                                <Edit className="h-4 w-4 mr-2" /> Edit
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
                               <ShoppingCart className="h-4 w-4 mr-2" /> Create PO
                             </DropdownMenuItem>
@@ -905,9 +914,11 @@ export function VendorsPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>Close</Button>
-            <Button onClick={() => { setDetailDialogOpen(false); if (selectedVendor) openEdit(selectedVendor) }} className="bg-emerald-600 hover:bg-emerald-700">
-              <Edit className="h-4 w-4 mr-2" /> Edit Vendor
-            </Button>
+            {canUpdate && (
+              <Button onClick={() => { setDetailDialogOpen(false); if (selectedVendor) openEdit(selectedVendor) }} className="bg-emerald-600 hover:bg-emerald-700">
+                <Edit className="h-4 w-4 mr-2" /> Edit Vendor
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

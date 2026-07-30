@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -222,6 +222,11 @@ function getDisposalLabel(method: string) {
 export function MessPage() {
   const { selectedPropertyId, currentUser } = useAppStore()
   const { toast } = useToast()
+
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'mess:create')
+  const canUpdate = hasPermission(role, 'mess:update')
+  const canDelete = hasPermission(role, 'mess:delete')
 
   // ─── State ─────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState('attendance')
@@ -896,10 +901,12 @@ export function MessPage() {
                     />
                   </div>
                 </div>
-                <Button onClick={() => setShowConsumptionDialog(true)} className="gap-2">
-                  <Plus className="size-4" />
-                  Add Consumption Log
-                </Button>
+                {canCreate && (
+                  <Button onClick={() => setShowConsumptionDialog(true)} className="gap-2">
+                    <Plus className="size-4" />
+                    Add Consumption Log
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1092,10 +1099,12 @@ export function MessPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button onClick={() => setShowWasteDialog(true)} className="gap-2">
-                  <Plus className="size-4" />
-                  Add Waste Record
-                </Button>
+                {canCreate && (
+                  <Button onClick={() => setShowWasteDialog(true)} className="gap-2">
+                    <Plus className="size-4" />
+                    Add Waste Record
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1191,14 +1200,18 @@ export function MessPage() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem className="gap-2 text-slate-600 dark:text-slate-400">
-                                    <Edit3 className="size-3.5" />
-                                    View Details
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem className="gap-2 text-red-600 dark:text-red-400">
-                                    <Trash className="size-3.5" />
-                                    Delete
-                                  </DropdownMenuItem>
+                                  {canUpdate && (
+                                    <DropdownMenuItem className="gap-2 text-slate-600 dark:text-slate-400">
+                                      <Edit3 className="size-3.5" />
+                                      View Details
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canDelete && (
+                                    <DropdownMenuItem className="gap-2 text-red-600 dark:text-red-400">
+                                      <Trash className="size-3.5" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>

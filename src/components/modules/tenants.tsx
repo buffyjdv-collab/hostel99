@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -77,6 +77,7 @@ import {
   FileCheck,
   FileX,
   FileClock,
+  Trash2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -657,6 +658,10 @@ function TenantDetailDialog({
 
 export function TenantsPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'tenants:create')
+  const canUpdate = hasPermission(role, 'tenants:update')
+  const canDelete = hasPermission(role, 'tenants:delete')
 
   // Data state
   const [tenants, setTenants] = useState<TenantData[]>([])
@@ -933,6 +938,18 @@ export function TenantsPage() {
     setShowDetailDialog(true)
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this tenant?')) return
+    try {
+      const res = await fetch(`/api/tenants/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTenants((prev) => prev.filter((t) => t.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete tenant:', error)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -945,6 +962,7 @@ export function TenantsPage() {
             Manage tenant profiles, KYC, and room assignments
           </p>
         </div>
+        {canCreate && (
         <Button
           onClick={() => setShowAddDialog(true)}
           className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
@@ -952,6 +970,7 @@ export function TenantsPage() {
           <UserPlus className="h-4 w-4 mr-2" />
           Add Tenant
         </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -1171,10 +1190,12 @@ export function TenantsPage() {
                                 <Eye className="h-4 w-4 mr-2" />
                                 View Details
                               </DropdownMenuItem>
+                              {canUpdate && (
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openTenantDetail(tenant) }}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
+                              )}
                               {tenant.status === 'active' && (
                                 <DropdownMenuItem
                                   className="text-red-600"
@@ -1182,6 +1203,15 @@ export function TenantsPage() {
                                 >
                                   <Ban className="h-4 w-4 mr-2" />
                                   Deactivate
+                                </DropdownMenuItem>
+                              )}
+                              {canDelete && (
+                                <DropdownMenuItem
+                                  className="text-red-600"
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(tenant.id) }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
                                 </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>

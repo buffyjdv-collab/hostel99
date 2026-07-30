@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -78,6 +78,8 @@ import {
   Clock,
   StickyNote,
   X,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -496,6 +498,10 @@ function LeadDetailDialog({
 
 export function LeadsPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'leads:create')
+  const canUpdate = hasPermission(role, 'leads:update')
+  const canDelete = hasPermission(role, 'leads:delete')
 
   // Data state
   const [leads, setLeads] = useState<LeadData[]>([])
@@ -688,6 +694,18 @@ export function LeadsPage() {
     }
   }
 
+  async function handleDelete(id: string) {
+    if (!confirm('Are you sure you want to delete this lead?')) return
+    try {
+      const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setLeads((prev) => prev.filter((l) => l.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete lead:', error)
+    }
+  }
+
   async function handleStageChange(leadId: string, newStage: LeadStage) {
     const stageIdx = STAGE_INDEX[newStage] ?? 0
     try {
@@ -723,6 +741,7 @@ export function LeadsPage() {
             Track and manage leads through the sales pipeline
           </p>
         </div>
+        {canCreate && (
         <Button
           onClick={() => setShowAddDialog(true)}
           className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
@@ -730,6 +749,7 @@ export function LeadsPage() {
           <UserPlus className="h-4 w-4 mr-2" />
           Add Lead
         </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -1018,6 +1038,18 @@ export function LeadsPage() {
                                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStageChange(lead.id, PIPELINE_STAGES[STAGE_INDEX[lead.status] - 1].key) }}>
                                     <ArrowLeft className="h-4 w-4 mr-2" />
                                     Move Back
+                                  </DropdownMenuItem>
+                                )}
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openLeadDetail(lead) }}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleDelete(lead.id) }}>
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
                                   </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>

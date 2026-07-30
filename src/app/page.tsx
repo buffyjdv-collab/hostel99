@@ -24,6 +24,7 @@ import { AssetsPage } from '@/components/modules/assets'
 import { LoginPage } from '@/components/modules/login'
 import { UsersPage } from '@/components/modules/users'
 import { MyProfilePage } from '@/components/modules/my-profile'
+import { RoleManagementPage } from '@/components/modules/role-management'
 import { useRef, useEffect } from 'react'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -77,6 +78,7 @@ export default function Home() {
       case 'assets': return <AssetsPage />
       case 'users': return <UsersPage />
       case 'my-profile': return <MyProfilePage />
+      case 'role-management': return <RoleManagementPage />
       default: return <DashboardPage />
     }
   }

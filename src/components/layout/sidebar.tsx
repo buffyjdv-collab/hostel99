@@ -1,6 +1,6 @@
 'use client'
 
-import { useAppStore, type Page, canAccessPage } from '@/lib/store'
+import { useAppStore, type Page, canAccessPage, type UserRole } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -29,6 +29,9 @@ import {
   LogOut,
   UserCircle,
   UsersRound,
+  ShieldCheck,
+  AlertTriangle,
+  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -45,7 +48,24 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useState } from 'react'
 
 const navItems: { page: Page; label: string; icon: React.ElementType; badge?: string; section?: string }[] = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
@@ -58,6 +78,7 @@ const navItems: { page: Page; label: string; icon: React.ElementType; badge?: st
   { page: 'staff', label: 'Staff', icon: UserCog, section: 'main' },
   { page: 'expenses', label: 'Accounting', icon: Receipt, section: 'main' },
   { page: 'users', label: 'User Management', icon: UsersRound, section: 'main' },
+  { page: 'role-management', label: 'Role & Access', icon: ShieldCheck, section: 'main' },
 
   // Inventory Section
   { page: 'inventory', label: 'Inventory', icon: Package, section: 'inventory' },
@@ -73,9 +94,26 @@ const navItems: { page: Page; label: string; icon: React.ElementType; badge?: st
   { page: 'settings', label: 'Settings', icon: Settings, section: 'main' },
 ]
 
+const roleLabels: Record<UserRole, string> = {
+  super_admin: 'Super Admin',
+  owner: 'Owner',
+  manager: 'Manager',
+  staff: 'Staff',
+  tenant: 'Tenant',
+}
+
+const roleColors: Record<UserRole, string> = {
+  super_admin: 'text-red-400',
+  owner: 'text-purple-400',
+  manager: 'text-blue-400',
+  staff: 'text-amber-400',
+  tenant: 'text-emerald-400',
+}
+
 export function Sidebar() {
-  const { currentPage, setCurrentPage, currentUser, sidebarCollapsed, setSidebarCollapsed, logout } = useAppStore()
+  const { currentPage, setCurrentPage, currentUser, sidebarCollapsed, setSidebarCollapsed, logout, switchRole, restoreOriginalRole } = useAppStore()
   const role = currentUser?.role || 'manager'
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   // Filter nav items based on RBAC permissions
   const filteredItems = navItems.filter(item => canAccessPage(role, item.page))
@@ -83,6 +121,18 @@ export function Sidebar() {
   // Group items by section
   const mainItems = filteredItems.filter(item => item.section === 'main')
   const inventoryItems = filteredItems.filter(item => item.section === 'inventory')
+
+  // Only super_admin can switch roles
+  const canSwitchRoles = currentUser?.originalRole === 'super_admin' || currentUser?.role === 'super_admin'
+
+  const handleLogout = () => {
+    setShowLogoutConfirm(true)
+  }
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false)
+    logout()
+  }
 
   const renderNavButton = (item: typeof navItems[0]) => {
     const isActive = currentPage === item.page
@@ -132,6 +182,22 @@ export function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* Impersonation Banner */}
+        {currentUser?.isImpersonating && !sidebarCollapsed && (
+          <div className="mx-2 mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <div className="flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span className="text-[11px] text-amber-300 font-medium">Viewing as {roleLabels[role]}</span>
+            </div>
+            <button
+              onClick={restoreOriginalRole}
+              className="text-[10px] text-amber-400 hover:text-amber-300 underline mt-0.5"
+            >
+              Back to {roleLabels[currentUser.originalRole as UserRole]}
+            </button>
+          </div>
+        )}
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
@@ -222,8 +288,36 @@ export function Sidebar() {
                 <UserCircle className="w-4 h-4 mr-2" />
                 My Profile
               </DropdownMenuItem>
+
+              {/* Role Switching - Only for Super Admin */}
+              {canSwitchRoles && (
+                <>
+                  <DropdownMenuSeparator className="bg-slate-700" />
+                  <DropdownMenuLabel className="text-xs text-slate-400 px-2">
+                    <Eye className="w-3 h-3 inline mr-1" />
+                    Switch Role (Preview)
+                  </DropdownMenuLabel>
+                  <DropdownMenuRadioGroup
+                    value={role}
+                    onValueChange={(value) => switchRole(value as UserRole)}
+                  >
+                    {(Object.keys(roleLabels) as UserRole[]).map((r) => (
+                      <DropdownMenuRadioItem
+                        key={r}
+                        value={r}
+                        className="cursor-pointer hover:bg-slate-700 focus:bg-slate-700"
+                      >
+                        <Shield className={cn('w-3 h-3 mr-2', roleColors[r])} />
+                        {roleLabels[r]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </>
+              )}
+
+              <DropdownMenuSeparator className="bg-slate-700" />
               <DropdownMenuItem
-                onClick={logout}
+                onClick={handleLogout}
                 className="cursor-pointer hover:bg-red-500/20 focus:bg-red-500/20 text-red-400"
               >
                 <LogOut className="w-4 h-4 mr-2" />
@@ -241,6 +335,28 @@ export function Sidebar() {
           {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       </div>
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <AlertDialogContent className="bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Sign Out
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to sign out? You will need to log in again to access the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLogout} className="bg-red-600 hover:bg-red-700">
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TooltipProvider>
   )
 }

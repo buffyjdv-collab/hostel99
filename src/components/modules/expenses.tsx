@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -85,6 +85,8 @@ import {
   DollarSign,
   PieChart as PieChartIcon,
   BarChart3,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -529,6 +531,10 @@ function ExpenseDetailDialog({
 
 export function ExpensesPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'expenses:create')
+  const canUpdate = hasPermission(role, 'expenses:update')
+  const canDelete = hasPermission(role, 'expenses:delete')
 
   // Data
   const [expenses, setExpenses] = useState<ExpenseData[]>([])
@@ -773,6 +779,18 @@ export function ExpensesPage() {
     setShowDetailDialog(true)
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this expense?')) return
+    try {
+      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setExpenses((prev) => prev.filter((e) => e.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete expense:', error)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -805,10 +823,12 @@ export function ExpensesPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Track income, expenses, and financial performance</p>
         </div>
+        {canCreate && (
         <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
           <Plus className="w-4 h-4 mr-2" />
           Add Expense
         </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -1031,10 +1051,12 @@ export function ExpensesPage() {
                     ? 'Try adjusting your filters or search query'
                     : 'Add your first expense to get started'}
                 </p>
+                {canCreate && (
                 <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
                   <Plus className="w-4 h-4 mr-2" />
                   Add Expense
                 </Button>
+                )}
               </CardContent>
             </Card>
           ) : (
@@ -1086,6 +1108,16 @@ export function ExpensesPage() {
                                 <DropdownMenuItem onClick={ev => { ev.stopPropagation(); handleViewExpense(e) }}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
+                                {canUpdate && (
+                                <DropdownMenuItem onClick={ev => { ev.stopPropagation(); handleViewExpense(e) }}>
+                                  <Pencil className="h-4 w-4 mr-2" /> Edit
+                                </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                <DropdownMenuItem className="text-red-600" onClick={ev => { ev.stopPropagation(); handleDelete(e.id) }}>
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>

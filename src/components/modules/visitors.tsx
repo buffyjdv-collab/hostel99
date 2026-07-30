@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -47,6 +47,8 @@ import {
   Timer,
   DoorOpen,
   UserX,
+  Trash2,
+  Pencil,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -138,6 +140,10 @@ function isToday(date: string | Date) {
 
 export function VisitorsPage() {
   const { currentUser } = useAppStore()
+  const role = currentUser?.role || ''
+  const canCreate = hasPermission(role, 'visitors:create')
+  const canUpdate = hasPermission(role, 'visitors:update')
+  const canDelete = hasPermission(role, 'visitors:delete')
   const [loading, setLoading] = useState(true)
   const [visitors, setVisitors] = useState<Visitor[]>([])
   const [properties, setProperties] = useState<Property[]>([])
@@ -273,6 +279,18 @@ export function VisitorsPage() {
     } catch { /* ignore */ }
   }
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this visitor record?')) return
+    try {
+      const res = await fetch(`/api/visitors/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setVisitors((prev) => prev.filter((v) => v.id !== id))
+      }
+    } catch (error) {
+      console.error('Failed to delete visitor record:', error)
+    }
+  }
+
   // ── Loading Skeleton ────────────────────────────────────────────────────
 
   if (loading) {
@@ -305,10 +323,12 @@ export function VisitorsPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Track and manage visitor check-ins and check-outs</p>
         </div>
+        {canCreate && (
         <Button onClick={() => setLogVisitorOpen(true)} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
           <Plus className="h-4 w-4" />
           Log Visitor
         </Button>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -496,7 +516,8 @@ export function VisitorsPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        {visitor.status === 'checked_in' && (
+                        <div className="flex items-center justify-end gap-1">
+                        {visitor.status === 'checked_in' && canUpdate && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -507,6 +528,18 @@ export function VisitorsPage() {
                             Check Out
                           </Button>
                         )}
+                        {canDelete && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 h-8"
+                            onClick={() => handleDelete(visitor.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
