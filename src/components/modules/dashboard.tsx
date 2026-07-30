@@ -50,6 +50,7 @@ import {
   XCircle,
   Loader2,
   Megaphone,
+  Users,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -345,25 +346,41 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   // Tenant-specific data
-  const [tenantData, setTenantData] = useState<{ payments: any[]; complaints: any[]; notices: any[] } | null>(null)
+  const [tenantData, setTenantData] = useState<{
+    tenant: any | null
+    payments: any[]
+    complaints: any[]
+    notices: any[]
+    visitors: any[]
+  } | null>(null)
 
   useEffect(() => {
     async function fetchDashboard() {
       try {
         if (currentUser?.role === 'tenant') {
-          // Fetch tenant-specific data
-          const [payRes, compRes, noticeRes] = await Promise.all([
-            fetch('/api/payments?tenantId=' + currentUser.id),
-            fetch('/api/complaints'),
+          // Step 1: Fetch tenant profile by userId
+          const tenantRes = await fetch('/api/tenants?userId=' + currentUser.id)
+          const tenantList = tenantRes.ok ? await tenantRes.json() : []
+          const tenant = Array.isArray(tenantList) && tenantList.length > 0 ? tenantList[0] : null
+
+          // Step 2: Fetch tenant-specific data using tenantId
+          const tenantId = tenant?.id || currentUser.id
+          const [payRes, compRes, noticeRes, visitorRes] = await Promise.all([
+            fetch('/api/payments?tenantId=' + tenantId),
+            fetch('/api/complaints?tenantId=' + tenantId),
             fetch('/api/notices'),
+            fetch('/api/visitors?tenantId=' + tenantId),
           ])
-          const payData = payRes.ok ? await payRes.json() : { payments: [] }
-          const compData = compRes.ok ? await compRes.json() : { complaints: [] }
-          const noticeData = noticeRes.ok ? await noticeRes.json() : { notices: [] }
+          const payData = payRes.ok ? await payRes.json() : []
+          const compData = compRes.ok ? await compRes.json() : []
+          const noticeData = noticeRes.ok ? await noticeRes.json() : []
+          const visitorData = visitorRes.ok ? await visitorRes.json() : []
           setTenantData({
-            payments: payData.payments || [],
-            complaints: (compData.complaints || []).filter((c: any) => c.tenantId === currentUser.id || c.createdById === currentUser.id),
-            notices: noticeData.notices || [],
+            tenant,
+            payments: Array.isArray(payData) ? payData : [],
+            complaints: Array.isArray(compData) ? compData : [],
+            notices: Array.isArray(noticeData) ? noticeData : [],
+            visitors: Array.isArray(visitorData) ? visitorData : [],
           })
         } else {
           const res = await fetch('/api/dashboard')
@@ -420,8 +437,20 @@ export function DashboardPage() {
 
   // Tenant Dashboard
   if (currentUser?.role === 'tenant') {
+    const tenant = tenantData?.tenant
+    const payments = tenantData?.payments ?? []
+    const complaints = tenantData?.complaints ?? []
+    const notices = tenantData?.notices ?? []
+    const visitors = tenantData?.visitors ?? []
+
+    // Payment summary
+    const totalPaid = payments.filter((p: any) => p.status === 'paid').reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    const totalPending = payments.filter((p: any) => p.status === 'pending').reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    const totalOverdue = payments.filter((p: any) => p.status === 'overdue').reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+
     return (
       <div className="space-y-6">
+        {/* Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
@@ -437,100 +466,320 @@ export function DashboardPage() {
           <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>
         ) : (
           <>
+            {/* Welcome Card with Room Info */}
+            <Card className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white border-0">
+              <CardContent className="p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold mb-1">Hello, {currentUser.name}! 👋</h2>
+                    <p className="text-emerald-100 text-sm">Here&apos;s an overview of your hostel stay</p>
+                  </div>
+                  {tenant && (
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2 bg-white/15 rounded-lg px-3 py-2">
+                        <Building2 className="w-4 h-4" />
+                        <span className="font-medium">{tenant.property?.name || 'N/A'}</span>
+                      </div>
+                      {tenant.room && (
+                        <div className="flex items-center gap-2 bg-white/15 rounded-lg px-3 py-2">
+                          <DoorOpen className="w-4 h-4" />
+                          <span className="font-medium">Room {tenant.room.number || tenant.room.name || 'N/A'}</span>
+                        </div>
+                      )}
+                      {tenant.bed && (
+                        <div className="flex items-center gap-2 bg-white/15 rounded-lg px-3 py-2">
+                          <BedDouble className="w-4 h-4" />
+                          <span className="font-medium">Bed {tenant.bed.name || tenant.bed.number || 'N/A'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {tenant && (
+                  <div className="flex items-center gap-6 mt-4 pt-4 border-t border-white/20 text-sm">
+                    <div>
+                      <span className="text-emerald-100">Rent: </span>
+                      <span className="font-semibold">{formatCurrency(tenant.rentAmount || 0)}/mo</span>
+                    </div>
+                    <div>
+                      <span className="text-emerald-100">Status: </span>
+                      <Badge className="bg-white/20 text-white border-0 hover:bg-white/30">
+                        {tenant.status || 'Active'}
+                      </Badge>
+                    </div>
+                    {tenant.checkInDate && (
+                      <div>
+                        <span className="text-emerald-100">Since: </span>
+                        <span className="font-medium">{new Date(tenant.checkInDate).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <Card className="cursor-pointer hover:border-emerald-300 transition-colors" onClick={() => setCurrentPage('payments')}>
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                    <IndianRupee className="w-6 h-6 text-emerald-600" />
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <IndianRupee className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">My Payments</h3>
-                    <p className="text-sm text-muted-foreground">View payment history & dues</p>
+                    <h3 className="font-semibold text-sm">My Payments</h3>
+                    <p className="text-xs text-muted-foreground">View dues & history</p>
                   </div>
                 </CardContent>
               </Card>
               <Card className="cursor-pointer hover:border-amber-300 transition-colors" onClick={() => setCurrentPage('complaints')}>
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-                    <MessageSquareWarning className="w-6 h-6 text-amber-600" />
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                    <MessageSquareWarning className="w-5 h-5 text-amber-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Complaints</h3>
-                    <p className="text-sm text-muted-foreground">Raise & track issues</p>
+                    <h3 className="font-semibold text-sm">Complaints</h3>
+                    <p className="text-xs text-muted-foreground">Raise & track issues</p>
                   </div>
                 </CardContent>
               </Card>
               <Card className="cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setCurrentPage('notices')}>
-                <CardContent className="flex items-center gap-4 p-6">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
-                    <Megaphone className="w-6 h-6 text-blue-600" />
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Megaphone className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="font-semibold">Notices</h3>
-                    <p className="text-sm text-muted-foreground">Important announcements</p>
+                    <h3 className="font-semibold text-sm">Notices</h3>
+                    <p className="text-xs text-muted-foreground">Announcements</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="cursor-pointer hover:border-purple-300 transition-colors" onClick={() => setCurrentPage('visitors')}>
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-sm">Visitors</h3>
+                    <p className="text-xs text-muted-foreground">Log & manage</p>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
-            {/* Recent Payments */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Recent Payments</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentPage('payments')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {tenantData?.payments?.length === 0 ? (
-                  <p className="text-muted-foreground text-sm py-4 text-center">No payments found</p>
-                ) : (
-                  <div className="space-y-3">
-                    {tenantData?.payments?.slice(0, 5).map((p: any) => (
-                      <div key={p.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium">{formatCurrency(p.amount)}</p>
-                          <p className="text-xs text-muted-foreground">{MONTH_NAMES[p.month - 1]} {p.year}</p>
-                        </div>
-                        <Badge className={p.status === 'paid' ? 'bg-emerald-500/15 text-emerald-600 border-0' : p.status === 'overdue' ? 'bg-red-500/15 text-red-600 border-0' : 'bg-amber-500/15 text-amber-600 border-0'}>
-                          {p.status}
-                        </Badge>
-                      </div>
-                    ))}
+            {/* Payment Status Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Total Paid</p>
+                      <p className="text-2xl font-bold text-emerald-600">{formatCurrency(totalPaid)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{payments.filter((p: any) => p.status === 'paid').length} payment(s)</p>
+                    </div>
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-50">
+                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                    </div>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Pending</p>
+                      <p className="text-2xl font-bold text-amber-600">{formatCurrency(totalPending)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{payments.filter((p: any) => p.status === 'pending').length} payment(s)</p>
+                    </div>
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-amber-50">
+                      <Clock className="w-6 h-6 text-amber-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground font-medium">Overdue</p>
+                      <p className="text-2xl font-bold text-red-600">{formatCurrency(totalOverdue)}</p>
+                      <p className="text-xs text-muted-foreground mt-1">{payments.filter((p: any) => p.status === 'overdue').length} payment(s)</p>
+                    </div>
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-red-50">
+                      <AlertCircle className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-            {/* Active Notices */}
-            <Card>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Active Notices</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setCurrentPage('notices')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {tenantData?.notices?.filter((n: any) => n.isActive).length === 0 ? (
-                  <p className="text-muted-foreground text-sm py-4 text-center">No active notices</p>
-                ) : (
-                  <div className="space-y-3">
-                    {tenantData?.notices?.filter((n: any) => n.isActive).slice(0, 5).map((n: any) => (
-                      <div key={n.id} className="p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <Badge className={n.type === 'urgent' ? 'bg-red-500/15 text-red-600 border-0' : 'bg-blue-500/15 text-blue-600 border-0'}>
-                            {n.type}
-                          </Badge>
-                          <span className="text-sm font-medium">{n.title}</span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.content}</p>
-                      </div>
-                    ))}
+            {/* Middle Section: Recent Payments + Complaints */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Payments */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <IndianRupee className="w-5 h-5 text-emerald-500" />
+                      Recent Payments
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setCurrentPage('payments')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardHeader>
+                <CardContent>
+                  {payments.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <IndianRupee className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No payments found</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-80">
+                      <div className="space-y-3">
+                        {payments.slice(0, 5).map((p: any) => (
+                          <div key={p.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div>
+                              <p className="text-sm font-medium">{formatCurrency(p.amount)}</p>
+                              <p className="text-xs text-muted-foreground">{MONTH_NAMES[(p.month || 1) - 1]} {p.year || new Date().getFullYear()}</p>
+                            </div>
+                            <Badge className={p.status === 'paid' ? 'bg-emerald-500/15 text-emerald-600 border-0' : p.status === 'overdue' ? 'bg-red-500/15 text-red-600 border-0' : 'bg-amber-500/15 text-amber-600 border-0'}>
+                              {p.status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Recent Complaints */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <MessageSquareWarning className="w-5 h-5 text-amber-500" />
+                      My Complaints
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setCurrentPage('complaints')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {complaints.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <CheckCircle2 className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No complaints raised</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-80">
+                      <div className="space-y-3">
+                        {complaints.slice(0, 5).map((c: any) => (
+                          <div key={c.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
+                            {getComplaintStatusIcon(c.status)}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">{c.title}</p>
+                              <p className="text-xs text-muted-foreground line-clamp-1">{c.description}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge className={`text-[10px] px-1.5 py-0 ${getComplaintStatusColor(c.status)}`}>
+                                  {getComplaintStatusLabel(c.status)}
+                                </Badge>
+                                <span className="text-[10px] text-muted-foreground">{formatRelativeTime(c.createdAt)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Bottom Section: Notices + Visitors */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Active Notices */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Megaphone className="w-5 h-5 text-blue-500" />
+                      Recent Notices
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setCurrentPage('notices')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {notices.filter((n: any) => n.isActive).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Megaphone className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No active notices</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-80">
+                      <div className="space-y-3">
+                        {notices.filter((n: any) => n.isActive).slice(0, 5).map((n: any) => (
+                          <div key={n.id} className="p-3 bg-slate-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <Badge className={n.type === 'urgent' ? 'bg-red-500/15 text-red-600 border-0' : n.type === 'important' ? 'bg-amber-500/15 text-amber-600 border-0' : 'bg-blue-500/15 text-blue-600 border-0'}>
+                                {n.type}
+                              </Badge>
+                              <span className="text-sm font-medium">{n.title}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.content}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">{formatRelativeTime(n.createdAt)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Visitor Log */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Users className="w-5 h-5 text-purple-500" />
+                      Visitor Log
+                    </CardTitle>
+                    <Button variant="ghost" size="sm" onClick={() => setCurrentPage('visitors')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {visitors.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                      <Users className="w-8 h-8 mb-2 opacity-40" />
+                      <p className="text-sm">No visitors recorded</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="max-h-80">
+                      <div className="space-y-3">
+                        {visitors.slice(0, 5).map((v: any) => (
+                          <div key={v.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-100 shrink-0">
+                                <Users className="w-4 h-4 text-purple-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{v.name}</p>
+                                <p className="text-xs text-muted-foreground">{v.purpose}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={v.status === 'checked_in' ? 'bg-emerald-500/15 text-emerald-600 border-0' : 'bg-slate-500/15 text-slate-600 border-0'}>
+                                {v.status === 'checked_in' ? 'In' : 'Out'}
+                              </Badge>
+                              <p className="text-[10px] text-muted-foreground mt-1">
+                                {new Date(v.checkIn).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </>
         )}
       </div>

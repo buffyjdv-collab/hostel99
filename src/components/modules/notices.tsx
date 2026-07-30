@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 import {
   Select,
   SelectContent,
@@ -58,11 +70,20 @@ interface Notice {
   content: string
   type: string
   propertyId: string
+  priority: string
   isActive: boolean
   expiryDate: string | null
   createdAt: string
   property?: { id: string; name: string }
   createdBy?: { id: string; name: string; email: string }
+}
+
+interface EditNoticeFormData {
+  title: string
+  content: string
+  type: string
+  priority: string
+  isActive: boolean
 }
 
 interface Communication {
@@ -144,6 +165,24 @@ export function NoticesPage() {
   const [createNoticeOpen, setCreateNoticeOpen] = useState(false)
   const [sendMessageOpen, setSendMessageOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null)
+  const [editFormData, setEditFormData] = useState<EditNoticeFormData>({
+    title: '',
+    content: '',
+    type: 'general',
+    priority: 'normal',
+    isActive: true,
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
 
   // Create Notice form
   const [noticeForm, setNoticeForm] = useState({
@@ -270,15 +309,85 @@ export function NoticesPage() {
     } catch { /* ignore */ }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this notice?')) return
+  const handleDelete = (id: string) => {
+    const n = notices.find((nt) => nt.id === id)
+    if (!n) return
+    setDeleteTarget({ id: n.id, name: n.title })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
     try {
-      const res = await fetch(`/api/notices/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/notices/${deleteTarget.id}`, { method: 'DELETE' })
       if (res.ok) {
-        setNotices((prev) => prev.filter((n) => n.id !== id))
+        toast({ title: 'Success', description: `Notice has been deleted` })
+        setNotices((prev) => prev.filter((n) => n.id !== deleteTarget.id))
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete notice', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete notice:', error)
+      toast({ title: 'Error', description: 'Failed to delete notice', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+    }
+  }
+
+  // ── Edit Dialog Handlers ──────────────────────────────────────────────────
+
+  function openEditDialog(notice: Notice) {
+    setSelectedNotice(notice)
+    setEditFormData({
+      title: notice.title,
+      content: notice.content,
+      type: notice.type,
+      priority: notice.priority || 'normal',
+      isActive: notice.isActive,
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedNotice || !editFormData.title.trim()) {
+      toast({ title: 'Validation Error', description: 'Title is required', variant: 'destructive' })
+      return
+    }
+
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch('/api/notices', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedNotice.id,
+          title: editFormData.title.trim(),
+          content: editFormData.content.trim(),
+          type: editFormData.type,
+          priority: editFormData.priority,
+          isActive: editFormData.isActive,
+        }),
+      })
+
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Notice updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedNotice(null)
+        fetchData()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update notice', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update notice:', error)
+      toast({ title: 'Error', description: 'Failed to update notice', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
     }
   }
 
@@ -443,6 +552,7 @@ export function NoticesPage() {
                             variant="ghost"
                             size="sm"
                             className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7"
+                            onClick={() => openEditDialog(notice)}
                           >
                             <Pencil className="h-3 w-3 mr-1" />
                             Edit
@@ -700,6 +810,112 @@ export function NoticesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Notice Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedNotice(null) }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Notice</DialogTitle>
+            <DialogDescription>Update the notice details below.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-notice-title">Title *</Label>
+              <Input
+                id="edit-notice-title"
+                placeholder="Notice title"
+                value={editFormData.title}
+                onChange={(e) => setEditFormData((prev) => ({ ...prev, title: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-notice-content">Content *</Label>
+              <Textarea
+                id="edit-notice-content"
+                placeholder="Notice content..."
+                rows={4}
+                value={editFormData.content}
+                onChange={(e) => setEditFormData((prev) => ({ ...prev, content: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={editFormData.type} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, type: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(NOTICE_TYPE_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={editFormData.priority} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, priority: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="edit-notice-active"
+                checked={editFormData.isActive}
+                onCheckedChange={(checked) => setEditFormData((prev) => ({ ...prev, isActive: checked === true }))}
+              />
+              <Label htmlFor="edit-notice-active" className="text-sm font-medium">Active</Label>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Notice
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Notice</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The notice will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

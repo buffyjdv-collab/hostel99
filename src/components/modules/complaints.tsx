@@ -19,6 +19,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -721,6 +732,23 @@ export function ComplaintsPage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false)
   const [selectedComplaint, setSelectedComplaint] = useState<ComplaintData | null>(null)
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    title: '',
+    description: '',
+    category: 'maintenance' as ComplaintCategory,
+    priority: 'medium' as ComplaintPriority,
+    status: 'open' as ComplaintStatus,
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
+
   // ── Fetch Data ─────────────────────────────────────────────────────────────
 
   const fetchComplaints = useCallback(async () => {
@@ -933,15 +961,80 @@ export function ComplaintsPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this complaint?')) return
+  function openEditDialog(complaint: ComplaintData) {
+    setSelectedComplaint(complaint)
+    setEditFormData({
+      title: complaint.title,
+      description: complaint.description,
+      category: complaint.category,
+      priority: complaint.priority,
+      status: complaint.status,
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedComplaint || !editFormData.title.trim()) {
+      toast({ title: 'Validation Error', description: 'Complaint title is required', variant: 'destructive' })
+      return
+    }
     try {
-      const res = await fetch(`/api/complaints/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch('/api/complaints', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedComplaint.id,
+          title: editFormData.title.trim(),
+          description: editFormData.description.trim(),
+          category: editFormData.category,
+          priority: editFormData.priority,
+          status: editFormData.status,
+        }),
+      })
       if (res.ok) {
-        setComplaints((prev) => prev.filter((c) => c.id !== id))
+        toast({ title: 'Success', description: 'Complaint updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedComplaint(null)
+        fetchComplaints()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update complaint', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update complaint:', error)
+      toast({ title: 'Error', description: 'Failed to update complaint', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
+
+  function handleDelete(id: string) {
+    const complaint = complaints.find((c) => c.id === id)
+    if (!complaint) return
+    setDeleteTarget({ id: complaint.id, name: complaint.title })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/complaints/${deleteTarget.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast({ title: 'Success', description: `Complaint has been deleted` })
+        setComplaints((prev) => prev.filter((c) => c.id !== deleteTarget.id))
+      } else {
+        toast({ title: 'Error', description: 'Failed to delete complaint', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete complaint:', error)
+      toast({ title: 'Error', description: 'Failed to delete complaint', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -1224,7 +1317,7 @@ export function ComplaintsPage() {
                                 </DropdownMenuItem>
                               )}
                               {canUpdate && (
-                                <DropdownMenuItem onClick={() => { setSelectedComplaint(complaint); setShowDetailDialog(true) }}>
+                                <DropdownMenuItem onClick={() => openEditDialog(complaint)}>
                                   <Pencil className="w-4 h-4 mr-2" /> Edit
                                 </DropdownMenuItem>
                               )}
@@ -1266,6 +1359,138 @@ export function ComplaintsPage() {
         onAddResolution={handleAddResolution}
         loading={actionLoading}
       />
+
+      {/* ── Edit Complaint Dialog ────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedComplaint(null) }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Complaint</DialogTitle>
+            <DialogDescription>
+              Update the complaint details below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              {/* Title */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-complaint-title">Title *</Label>
+                <Input
+                  id="edit-complaint-title"
+                  placeholder="Complaint title"
+                  value={editFormData.title}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, title: e.target.value }))}
+                  required
+                />
+              </div>
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-complaint-desc">Description</Label>
+                <Textarea
+                  id="edit-complaint-desc"
+                  placeholder="Describe the complaint..."
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+              {/* Category & Priority */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select
+                    value={editFormData.category}
+                    onValueChange={(v) => setEditFormData((prev) => ({ ...prev, category: v as ComplaintCategory }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+                        <SelectItem key={key} value={key}>
+                          {cfg.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority</Label>
+                  <Select
+                    value={editFormData.priority}
+                    onValueChange={(v) => setEditFormData((prev) => ({ ...prev, priority: v as ComplaintPriority }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+                        <SelectItem key={key} value={key}>
+                          {cfg.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editFormData.status}
+                  onValueChange={(v) => setEditFormData((prev) => ({ ...prev, status: v as ComplaintStatus }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>
+                        {cfg.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Complaint
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Complaint</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The complaint will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

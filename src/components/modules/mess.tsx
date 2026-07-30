@@ -22,6 +22,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -282,6 +292,38 @@ export function MessPage() {
     date: format(new Date(), 'yyyy-MM-dd'),
     notes: '',
   })
+
+  // Edit / Delete state
+  const [actionLoading, setActionLoading] = useState(false)
+  const [editConsumptionDialogOpen, setEditConsumptionDialogOpen] = useState(false)
+  const [selectedConsumption, setSelectedConsumption] = useState<ConsumptionLog | null>(null)
+  const [editConsumptionForm, setEditConsumptionForm] = useState({
+    id: '',
+    itemId: '',
+    mealType: 'breakfast',
+    issuedQty: 0,
+    consumedQty: 0,
+    returnedQty: 0,
+    wastageQty: 0,
+    notes: '',
+  })
+
+  const [editWasteDialogOpen, setEditWasteDialogOpen] = useState(false)
+  const [selectedWaste, setSelectedWaste] = useState<WasteRecord | null>(null)
+  const [editWasteForm, setEditWasteForm] = useState({
+    id: '',
+    category: 'food_waste',
+    description: '',
+    itemId: '',
+    quantity: 0,
+    unit: 'kg',
+    estimatedCost: 0,
+    disposalMethod: 'trash',
+    notes: '',
+  })
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'consumption' | 'waste'; id: string; name: string } | null>(null)
 
   // ─── Data fetching ─────────────────────────────────────────
   const fetchMessData = useCallback(async (type: string = 'all') => {
@@ -591,6 +633,144 @@ export function MessPage() {
     setAttendanceRows(prev =>
       prev.map(r => (r.tenantId === tenantId ? { ...r, [field]: value } : r))
     )
+  }
+
+  // ─── Edit / Delete handlers ─────────────────────────────────
+  const openEditConsumptionDialog = (log: ConsumptionLog) => {
+    setSelectedConsumption(log)
+    setEditConsumptionForm({
+      id: log.id,
+      itemId: log.item?.name || '',
+      mealType: log.mealType,
+      issuedQty: log.issuedQty,
+      consumedQty: log.consumedQty,
+      returnedQty: log.returnedQty,
+      wastageQty: log.wastageQty,
+      notes: '',
+    })
+    setEditConsumptionDialogOpen(true)
+  }
+
+  const openEditWasteDialog = (record: WasteRecord) => {
+    setSelectedWaste(record)
+    setEditWasteForm({
+      id: record.id,
+      category: record.category,
+      description: record.description,
+      itemId: record.item?.name || '',
+      quantity: record.quantity,
+      unit: record.unit || 'kg',
+      estimatedCost: record.estimatedCost,
+      disposalMethod: record.disposalMethod || 'trash',
+      notes: '',
+    })
+    setEditWasteDialogOpen(true)
+  }
+
+  const handleEditConsumption = async () => {
+    if (!selectedConsumption) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/mess', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'consumption',
+          id: editConsumptionForm.id,
+          issuedQty: editConsumptionForm.issuedQty,
+          consumedQty: editConsumptionForm.consumedQty,
+          returnedQty: editConsumptionForm.returnedQty,
+          wastageQty: editConsumptionForm.wastageQty,
+          notes: editConsumptionForm.notes || undefined,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Consumption log updated successfully' })
+        setEditConsumptionDialogOpen(false)
+        setSelectedConsumption(null)
+        fetchMessData('consumption')
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update consumption log', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update consumption log', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleEditWaste = async () => {
+    if (!selectedWaste) return
+    if (!editWasteForm.description) {
+      toast({ title: 'Validation Error', description: 'Please enter a description', variant: 'destructive' })
+      return
+    }
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/mess', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'waste',
+          id: editWasteForm.id,
+          category: editWasteForm.category,
+          description: editWasteForm.description,
+          quantity: editWasteForm.quantity,
+          unit: editWasteForm.unit,
+          estimatedCost: editWasteForm.estimatedCost,
+          disposalMethod: editWasteForm.disposalMethod,
+          notes: editWasteForm.notes || undefined,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Waste record updated successfully' })
+        setEditWasteDialogOpen(false)
+        setSelectedWaste(null)
+        fetchMessData('waste')
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update waste record', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to update waste record', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const openDeleteDialog = (type: 'consumption' | 'waste', id: string, name: string) => {
+    setDeleteTarget({ type, id, name })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/mess', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: deleteTarget.type,
+          id: deleteTarget.id,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        if (deleteTarget.type === 'consumption') fetchMessData('consumption')
+        else fetchMessData('waste')
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete record', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete record', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+    }
   }
 
   // ─── Stats Cards ───────────────────────────────────────────
@@ -975,6 +1155,7 @@ export function MessPage() {
                         <TableHead>Unit</TableHead>
                         <TableHead className="text-right">Cost/Unit</TableHead>
                         <TableHead className="text-right">Total Cost</TableHead>
+                        {(canUpdate || canDelete) && <TableHead className="w-12" />}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1003,6 +1184,34 @@ export function MessPage() {
                             <TableCell className="text-right font-medium text-sm">
                               {formatCurrency(log.totalCost)}
                             </TableCell>
+                            {(canUpdate || canDelete) && (
+                              <TableCell>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="size-8">
+                                      <MoreVertical className="size-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {canUpdate && (
+                                      <DropdownMenuItem onClick={() => openEditConsumptionDialog(log)} className="gap-2">
+                                        <Edit3 className="size-3.5" />
+                                        Edit
+                                      </DropdownMenuItem>
+                                    )}
+                                    {canDelete && (
+                                      <DropdownMenuItem
+                                        onClick={() => openDeleteDialog('consumption', log.id, log.item?.name || 'Consumption log')}
+                                        className="gap-2 text-red-600 dark:text-red-400"
+                                      >
+                                        <Trash className="size-3.5" />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            )}
                           </TableRow>
                         )
                       })}
@@ -1201,13 +1410,16 @@ export function MessPage() {
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
                                   {canUpdate && (
-                                    <DropdownMenuItem className="gap-2 text-slate-600 dark:text-slate-400">
+                                    <DropdownMenuItem onClick={() => openEditWasteDialog(record)} className="gap-2">
                                       <Edit3 className="size-3.5" />
-                                      View Details
+                                      Edit
                                     </DropdownMenuItem>
                                   )}
                                   {canDelete && (
-                                    <DropdownMenuItem className="gap-2 text-red-600 dark:text-red-400">
+                                    <DropdownMenuItem
+                                      onClick={() => openDeleteDialog('waste', record.id, record.description)}
+                                      className="gap-2 text-red-600 dark:text-red-400"
+                                    >
                                       <Trash className="size-3.5" />
                                       Delete
                                     </DropdownMenuItem>
@@ -1537,6 +1749,258 @@ export function MessPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ─── Edit Consumption Dialog ─────────────────────────────── */}
+      <Dialog open={editConsumptionDialogOpen} onOpenChange={setEditConsumptionDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="size-5" />
+              Edit Consumption Log
+            </DialogTitle>
+            <DialogDescription>
+              Update consumption quantities for {selectedConsumption?.item?.name || 'item'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Meal Type</Label>
+              <Select
+                value={editConsumptionForm.mealType}
+                onValueChange={(v) => setEditConsumptionForm(prev => ({ ...prev, mealType: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MEAL_TYPES.map((meal) => (
+                    <SelectItem key={meal.value} value={meal.value}>
+                      {meal.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Issued Qty</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={editConsumptionForm.issuedQty}
+                  onChange={(e) => setEditConsumptionForm(prev => ({ ...prev, issuedQty: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Consumed Qty</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={editConsumptionForm.consumedQty}
+                  onChange={(e) => setEditConsumptionForm(prev => ({ ...prev, consumedQty: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-2">
+                <Label>Returned Qty</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={editConsumptionForm.returnedQty}
+                  onChange={(e) => setEditConsumptionForm(prev => ({ ...prev, returnedQty: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Wastage Qty</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={editConsumptionForm.wastageQty}
+                  onChange={(e) => setEditConsumptionForm(prev => ({ ...prev, wastageQty: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Optional notes..."
+                value={editConsumptionForm.notes}
+                onChange={(e) => setEditConsumptionForm(prev => ({ ...prev, notes: e.target.value }))}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditConsumptionDialogOpen(false)} disabled={actionLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditConsumption} disabled={actionLoading} className="gap-2">
+              {actionLoading ? <Loader2 className="size-4 animate-spin" /> : <Edit3 className="size-4" />}
+              Update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Edit Waste Record Dialog ──────────────────────────── */}
+      <Dialog open={editWasteDialogOpen} onOpenChange={setEditWasteDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="size-5" />
+              Edit Waste Record
+            </DialogTitle>
+            <DialogDescription>
+              Update waste record details
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Category *</Label>
+              <Select
+                value={editWasteForm.category}
+                onValueChange={(v) => setEditWasteForm(prev => ({ ...prev, category: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WASTE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Description *</Label>
+              <Textarea
+                placeholder="Describe the waste..."
+                value={editWasteForm.description}
+                onChange={(e) => setEditWasteForm(prev => ({ ...prev, description: e.target.value }))}
+                rows={2}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-2">
+                <Label>Quantity</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  value={editWasteForm.quantity}
+                  onChange={(e) => setEditWasteForm(prev => ({ ...prev, quantity: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Unit</Label>
+                <Select
+                  value={editWasteForm.unit}
+                  onValueChange={(v) => setEditWasteForm(prev => ({ ...prev, unit: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="kg">Kg</SelectItem>
+                    <SelectItem value="litres">Litres</SelectItem>
+                    <SelectItem value="pieces">Pieces</SelectItem>
+                    <SelectItem value="packets">Packets</SelectItem>
+                    <SelectItem value="grams">Grams</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-2">
+                <Label>Est. Cost (₹)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={editWasteForm.estimatedCost}
+                  onChange={(e) => setEditWasteForm(prev => ({ ...prev, estimatedCost: parseFloat(e.target.value) || 0 }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Disposal Method</Label>
+              <div className="flex flex-wrap gap-2">
+                {DISPOSAL_METHODS.map((method) => {
+                  const Icon = method.icon
+                  const isActive = editWasteForm.disposalMethod === method.value
+                  return (
+                    <Button
+                      key={method.value}
+                      type="button"
+                      variant={isActive ? 'default' : 'outline'}
+                      size="sm"
+                      className="gap-1.5"
+                      onClick={() => setEditWasteForm(prev => ({ ...prev, disposalMethod: method.value }))}
+                    >
+                      <Icon className="size-3.5" />
+                      {method.label}
+                    </Button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Optional notes..."
+                value={editWasteForm.notes}
+                onChange={(e) => setEditWasteForm(prev => ({ ...prev, notes: e.target.value }))}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditWasteDialogOpen(false)} disabled={actionLoading}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditWaste} disabled={actionLoading} className="gap-2">
+              {actionLoading ? <Loader2 className="size-4 animate-spin" /> : <Edit3 className="size-4" />}
+              Update
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Delete Confirmation Dialog ──────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={actionLoading}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {actionLoading ? <Loader2 className="size-4 mr-2 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +20,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 import {
   Select,
   SelectContent,
@@ -137,6 +148,15 @@ interface StaffFormData {
   joinDate: string
   aadhaarNumber: string
   address: string
+}
+
+interface EditStaffFormData {
+  name: string
+  email: string
+  phone: string
+  role: StaffRole
+  department: string
+  status: StaffStatus
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -869,6 +889,24 @@ export function StaffPage() {
   const [selectedStaff, setSelectedStaff] = useState<StaffData | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState<EditStaffFormData>({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'caretaker',
+    department: '',
+    status: 'active',
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
 
   const fetchStaff = async () => {
@@ -976,15 +1014,89 @@ export function StaffPage() {
     setShowDetailDialog(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this staff member?')) return
+  // ── Edit Dialog Handlers ──────────────────────────────────────────────────
+
+  function openEditDialog(s: StaffData) {
+    setSelectedStaff(s)
+    setEditFormData({
+      name: s.name,
+      email: s.user?.email || '',
+      phone: s.phone,
+      role: s.role,
+      department: s.property?.name || '',
+      status: s.status,
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedStaff || !editFormData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Staff name is required', variant: 'destructive' })
+      return
+    }
+
     try {
-      const res = await fetch(`/api/staff/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch('/api/staff', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedStaff.id,
+          name: editFormData.name.trim(),
+          email: editFormData.email.trim() || undefined,
+          phone: editFormData.phone.trim(),
+          role: editFormData.role,
+          department: editFormData.department.trim() || undefined,
+          status: editFormData.status,
+        }),
+      })
+
       if (res.ok) {
-        setStaff((prev) => prev.filter((s) => s.id !== id))
+        toast({ title: 'Success', description: 'Staff member updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedStaff(null)
+        fetchStaff()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update staff member', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update staff member:', error)
+      toast({ title: 'Error', description: 'Failed to update staff member', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
+
+  // ── Delete Dialog Handlers ────────────────────────────────────────────────
+
+  const handleDelete = (id: string) => {
+    const s = staff.find((st) => st.id === id)
+    if (!s) return
+    setDeleteTarget({ id: s.id, name: s.name })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/staff/${deleteTarget.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        setStaff((prev) => prev.filter((s) => s.id !== deleteTarget.id))
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete staff member', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete staff member:', error)
+      toast({ title: 'Error', description: 'Failed to delete staff member', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -1173,7 +1285,7 @@ export function StaffPage() {
                               <Eye className="h-4 w-4 mr-2" /> View Details
                             </DropdownMenuItem>
                             {canUpdate && (
-                            <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewStaff(s) }}>
+                            <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(s) }}>
                               <Pencil className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
                             )}
@@ -1285,7 +1397,7 @@ export function StaffPage() {
                               <Eye className="h-4 w-4 mr-2" /> View Details
                             </DropdownMenuItem>
                             {canUpdate && (
-                            <DropdownMenuItem onClick={e => { e.stopPropagation(); handleViewStaff(s) }}>
+                            <DropdownMenuItem onClick={e => { e.stopPropagation(); openEditDialog(s) }}>
                               <Pencil className="h-4 w-4 mr-2" /> Edit
                             </DropdownMenuItem>
                             )}
@@ -1328,6 +1440,120 @@ export function StaffPage() {
         onSubmit={handleMarkAttendance}
         submitting={submitting}
       />
+
+      {/* ── Edit Staff Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedStaff(null) }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Staff Member</DialogTitle>
+            <DialogDescription>Update the staff member details below.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-staff-name">Name *</Label>
+                <Input
+                  id="edit-staff-name"
+                  placeholder="Full name"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-staff-email">Email</Label>
+                <Input
+                  id="edit-staff-email"
+                  type="email"
+                  placeholder="Email address"
+                  value={editFormData.email}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-staff-phone">Phone *</Label>
+                <Input
+                  id="edit-staff-phone"
+                  placeholder="Phone number"
+                  value={editFormData.phone}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-staff-role">Role *</Label>
+                <Select value={editFormData.role} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, role: v as StaffRole }))}>
+                  <SelectTrigger id="edit-staff-role">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(ROLE_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-staff-department">Department</Label>
+                <Input
+                  id="edit-staff-department"
+                  placeholder="Department"
+                  value={editFormData.department}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, department: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-staff-status">Status *</Label>
+                <Select value={editFormData.status} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, status: v as StaffStatus }))}>
+                  <SelectTrigger id="edit-staff-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Staff
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Staff Member</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The staff member will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

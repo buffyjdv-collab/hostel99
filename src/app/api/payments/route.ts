@@ -8,6 +8,7 @@ export async function GET(request: Request) {
     const month = searchParams.get('month')
     const year = searchParams.get('year')
     const propertyId = searchParams.get('propertyId')
+    const tenantId = searchParams.get('tenantId')
 
     const where: Record<string, unknown> = {}
 
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
     if (month) where.month = parseInt(month)
     if (year) where.year = parseInt(year)
     if (propertyId) where.propertyId = propertyId
+    if (tenantId) where.tenantId = tenantId
 
     const payments = await db.payment.findMany({
       where,

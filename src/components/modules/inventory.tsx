@@ -46,6 +46,16 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Package,
   AlertTriangle,
   IndianRupee,
@@ -1025,6 +1035,8 @@ export function InventoryPage() {
   const [showAdjustDialog, setShowAdjustDialog] = useState(false)
   const [showHistoryDialog, setShowHistoryDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -1569,6 +1581,17 @@ export function InventoryPage() {
                               <DropdownMenuItem onClick={() => handleViewTransactions(item)}>
                                 <History className="h-4 w-4 mr-2" /> View Transactions
                               </DropdownMenuItem>
+                              {canDelete && (
+                                <DropdownMenuItem
+                                  className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                                  onClick={() => {
+                                    setDeleteTarget({ id: item.id, name: item.name })
+                                    setDeleteDialogOpen(true)
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" /> Delete Item
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -1627,6 +1650,52 @@ export function InventoryPage() {
         onSubmit={handleEditItem}
         submitting={submitting}
       />
+
+      {/* ── Delete Confirmation Dialog ──────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Inventory Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. All related stock transactions, consumption logs, and waste records will also be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!deleteTarget) return
+                setSubmitting(true)
+                try {
+                  const res = await fetch('/api/inventory', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: deleteTarget.id }),
+                  })
+                  if (res.ok) {
+                    toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+                    fetchInventory()
+                  } else {
+                    const data = await res.json()
+                    toast({ title: 'Error', description: data.error || 'Failed to delete item', variant: 'destructive' })
+                  }
+                } catch {
+                  toast({ title: 'Error', description: 'Failed to delete item', variant: 'destructive' })
+                } finally {
+                  setSubmitting(false)
+                  setDeleteDialogOpen(false)
+                  setDeleteTarget(null)
+                }
+              }}
+              disabled={submitting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

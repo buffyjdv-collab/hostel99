@@ -20,6 +20,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -676,6 +687,23 @@ export function TenantsPage() {
   const [selectedTenant, setSelectedTenant] = useState<TenantData | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    emergencyContact: '',
+    status: 'active' as TenantStatus,
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
+
   // Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
@@ -938,15 +966,87 @@ export function TenantsPage() {
     setShowDetailDialog(true)
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this tenant?')) return
+  function openEditDialog(tenant: TenantData) {
+    setSelectedTenant(tenant)
+    setEditFormData({
+      name: tenant.name,
+      email: tenant.email || '',
+      phone: tenant.phone,
+      emergencyContact: tenant.emergencyContact || '',
+      status: tenant.status,
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedTenant || !editFormData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Tenant name is required', variant: 'destructive' })
+      return
+    }
     try {
-      const res = await fetch(`/api/tenants/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch('/api/tenants', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedTenant.id,
+          name: editFormData.name.trim(),
+          email: editFormData.email.trim() || undefined,
+          phone: editFormData.phone.trim(),
+          emergencyContact: editFormData.emergencyContact.trim() || undefined,
+          status: editFormData.status,
+        }),
+      })
       if (res.ok) {
-        setTenants((prev) => prev.filter((t) => t.id !== id))
+        toast({ title: 'Success', description: 'Tenant updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedTenant(null)
+        // Refresh data
+        try {
+          const tenantsRes = await fetch('/api/tenants')
+          if (tenantsRes.ok) {
+            const data = await tenantsRes.json()
+            setTenants(Array.isArray(data) ? data : data.tenants || [])
+          }
+        } catch {}
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update tenant', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update tenant:', error)
+      toast({ title: 'Error', description: 'Failed to update tenant', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
+
+  function handleDelete(id: string) {
+    const tenant = tenants.find((t) => t.id === id)
+    if (!tenant) return
+    setDeleteTarget({ id: tenant.id, name: tenant.name })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/tenants/${deleteTarget.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        setTenants((prev) => prev.filter((t) => t.id !== deleteTarget.id))
+      } else {
+        toast({ title: 'Error', description: 'Failed to delete tenant', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete tenant:', error)
+      toast({ title: 'Error', description: 'Failed to delete tenant', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -1191,7 +1291,7 @@ export function TenantsPage() {
                                 View Details
                               </DropdownMenuItem>
                               {canUpdate && (
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openTenantDetail(tenant) }}>
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(tenant) }}>
                                 <Pencil className="h-4 w-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
@@ -1538,6 +1638,127 @@ export function TenantsPage() {
         open={showDetailDialog}
         onClose={() => setShowDetailDialog(false)}
       />
+
+      {/* ── Edit Tenant Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedTenant(null) }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Tenant</DialogTitle>
+            <DialogDescription>
+              Update the tenant details below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Name */}
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-tenant-name">Name *</Label>
+                <Input
+                  id="edit-tenant-name"
+                  placeholder="Tenant name"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-tenant-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-tenant-email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={editFormData.email}
+                    onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-tenant-phone">Phone *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-tenant-phone"
+                    placeholder="+91 9876543210"
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              {/* Emergency Contact */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-tenant-emergency">Emergency Contact</Label>
+                <Input
+                  id="edit-tenant-emergency"
+                  placeholder="Emergency contact name"
+                  value={editFormData.emergencyContact}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, emergencyContact: e.target.value }))}
+                />
+              </div>
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editFormData.status}
+                  onValueChange={(v) => setEditFormData((prev) => ({ ...prev, status: v as TenantStatus }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>
+                        {cfg.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Tenant
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Tenant</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The tenant will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

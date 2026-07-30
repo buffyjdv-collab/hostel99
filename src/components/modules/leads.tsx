@@ -19,6 +19,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -516,6 +527,24 @@ export function LeadsPage() {
   const [selectedLead, setSelectedLead] = useState<LeadData | null>(null)
   const [showDetailDialog, setShowDetailDialog] = useState(false)
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    source: 'website' as LeadSource,
+    status: 'lead' as LeadStage,
+    notes: '',
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
+
   // Filter state
   const [searchQuery, setSearchQuery] = useState('')
   const [filterSource, setFilterSource] = useState<string>('all')
@@ -694,15 +723,31 @@ export function LeadsPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this lead?')) return
+  function handleDelete(id: string) {
+    const lead = leads.find((l) => l.id === id)
+    if (!lead) return
+    setDeleteTarget({ id: lead.id, name: lead.name })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
     try {
-      const res = await fetch(`/api/leads/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/leads/${deleteTarget.id}`, { method: 'DELETE' })
       if (res.ok) {
-        setLeads((prev) => prev.filter((l) => l.id !== id))
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        setLeads((prev) => prev.filter((l) => l.id !== deleteTarget.id))
+      } else {
+        toast({ title: 'Error', description: 'Failed to delete lead', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete lead:', error)
+      toast({ title: 'Error', description: 'Failed to delete lead', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -727,6 +772,64 @@ export function LeadsPage() {
   function openLeadDetail(lead: LeadData) {
     setSelectedLead(lead)
     setShowDetailDialog(true)
+  }
+
+  function openEditDialog(lead: LeadData) {
+    setSelectedLead(lead)
+    setEditFormData({
+      name: lead.name,
+      email: lead.email || '',
+      phone: lead.phone,
+      source: lead.source,
+      status: lead.status,
+      notes: lead.notes || '',
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedLead || !editFormData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Lead name is required', variant: 'destructive' })
+      return
+    }
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedLead.id,
+          name: editFormData.name.trim(),
+          email: editFormData.email.trim() || undefined,
+          phone: editFormData.phone.trim(),
+          source: editFormData.source,
+          status: editFormData.status,
+          notes: editFormData.notes.trim() || undefined,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Lead updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedLead(null)
+        // Refresh data
+        try {
+          const leadsRes = await fetch('/api/leads')
+          if (leadsRes.ok) {
+            const data = await leadsRes.json()
+            setLeads(data.leads || data || [])
+          }
+        } catch {}
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update lead', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update lead:', error)
+      toast({ title: 'Error', description: 'Failed to update lead', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -1041,7 +1144,7 @@ export function LeadsPage() {
                                   </DropdownMenuItem>
                                 )}
                                 {canUpdate && (
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openLeadDetail(lead) }}>
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(lead) }}>
                                     <Pencil className="h-4 w-4 mr-2" />
                                     Edit
                                   </DropdownMenuItem>
@@ -1215,6 +1318,148 @@ export function LeadsPage() {
         onClose={() => setShowDetailDialog(false)}
         onStageChange={handleStageChange}
       />
+
+      {/* ── Edit Lead Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedLead(null) }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Lead</DialogTitle>
+            <DialogDescription>
+              Update the lead details below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Name */}
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-lead-name">Name *</Label>
+                <Input
+                  id="edit-lead-name"
+                  placeholder="Lead name"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              {/* Email */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-lead-email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-lead-email"
+                    type="email"
+                    placeholder="email@example.com"
+                    value={editFormData.email}
+                    onChange={(e) => setEditFormData((prev) => ({ ...prev, email: e.target.value }))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-lead-phone">Phone *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-lead-phone"
+                    placeholder="+91 9876543210"
+                    value={editFormData.phone}
+                    onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              {/* Source */}
+              <div className="space-y-2">
+                <Label>Source</Label>
+                <Select
+                  value={editFormData.source}
+                  onValueChange={(v) => setEditFormData((prev) => ({ ...prev, source: v as LeadSource }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(SOURCE_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>
+                        {cfg.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Status */}
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editFormData.status}
+                  onValueChange={(v) => setEditFormData((prev) => ({ ...prev, status: v as LeadStage }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PIPELINE_STAGES.map((stage) => (
+                      <SelectItem key={stage.key} value={stage.key}>
+                        {stage.label}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value="lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Notes */}
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-lead-notes">Notes</Label>
+                <Textarea
+                  id="edit-lead-notes"
+                  placeholder="Additional notes about this lead..."
+                  value={editFormData.notes}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Lead
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The lead will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

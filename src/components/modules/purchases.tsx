@@ -69,6 +69,7 @@ import {
   XCircle,
   AlertTriangle,
   Trash2,
+  Pencil,
   ChevronDown,
   ChevronUp,
   ArrowRight,
@@ -360,6 +361,29 @@ export function PurchasesPage() {
   const [showCreateGRN, setShowCreateGRN] = useState(false)
   const [showGRNDetail, setShowGRNDetail] = useState(false)
   const [selectedGRN, setSelectedGRN] = useState<GoodsReceivedNote | null>(null)
+
+  // ── Edit dialog state ──────────────────────────────────────────────────────
+  const [showEditPO, setShowEditPO] = useState(false)
+  const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null)
+  const [editPOStatus, setEditPOStatus] = useState<POStatus>('draft')
+  const [editPOPaymentStatus, setEditPOPaymentStatus] = useState<PaymentStatus>('unpaid')
+  const [editPOPaymentMode, setEditPOPaymentMode] = useState('')
+  const [editPONotes, setEditPONotes] = useState('')
+
+  const [showEditPR, setShowEditPR] = useState(false)
+  const [editingPR, setEditingPR] = useState<PurchaseRequisition | null>(null)
+  const [editPRStatus, setEditPRStatus] = useState<PRStatus>('draft')
+  const [editPRPriority, setEditPRPriority] = useState<PRPriority>('normal')
+  const [editPRNotes, setEditPRNotes] = useState('')
+
+  const [showEditGRN, setShowEditGRN] = useState(false)
+  const [editingGRN, setEditingGRN] = useState<GoodsReceivedNote | null>(null)
+  const [editGRNStatus, setEditGRNStatus] = useState<GRNStatus>('pending_inspection')
+  const [editGRNNotes, setEditGRNNotes] = useState('')
+
+  // ── Delete dialog state ────────────────────────────────────────────────────
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'orders' | 'requisition' | 'grn'; id: string; name: string } | null>(null)
 
   // ── PO Form state ──────────────────────────────────────────────────────────
   const [poVendorId, setPoVendorId] = useState('')
@@ -884,6 +908,162 @@ export function PurchasesPage() {
     setShowGRNDetail(true)
   }
 
+  // ── Edit PO ────────────────────────────────────────────────────────────────
+
+  const openEditPODialog = (order: PurchaseOrder) => {
+    setEditingPO(order)
+    setEditPOStatus(order.status)
+    setEditPOPaymentStatus(order.paymentStatus)
+    setEditPOPaymentMode(order.paymentMode || '')
+    setEditPONotes(order.notes || '')
+    setShowEditPO(true)
+  }
+
+  const handleEditPO = async () => {
+    if (!editingPO) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/purchases', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editingPO.id,
+          status: editPOStatus,
+          paymentStatus: editPOPaymentStatus,
+          paymentMode: editPOPaymentMode || null,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Purchase order updated successfully' })
+        setShowEditPO(false)
+        setEditingPO(null)
+        fetchOrders()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update purchase order', variant: 'destructive' })
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to update purchase order', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // ── Edit PR ────────────────────────────────────────────────────────────────
+
+  const openEditPRDialog = (pr: PurchaseRequisition) => {
+    setEditingPR(pr)
+    setEditPRStatus(pr.status)
+    setEditPRPriority(pr.priority)
+    setEditPRNotes(pr.notes || '')
+    setShowEditPR(true)
+  }
+
+  const handleEditPR = async () => {
+    if (!editingPR) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/purchases', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'requisition',
+          id: editingPR.id,
+          status: editPRStatus,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Requisition updated successfully' })
+        setShowEditPR(false)
+        setEditingPR(null)
+        fetchRequisitions()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update requisition', variant: 'destructive' })
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to update requisition', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // ── Edit GRN ───────────────────────────────────────────────────────────────
+
+  const openEditGRNDialog = (grn: GoodsReceivedNote) => {
+    setEditingGRN(grn)
+    setEditGRNStatus(grn.status)
+    setEditGRNNotes(grn.notes || '')
+    setShowEditGRN(true)
+  }
+
+  const handleEditGRN = async () => {
+    if (!editingGRN) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/purchases', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'grn',
+          id: editingGRN.id,
+          status: editGRNStatus,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'GRN updated successfully' })
+        setShowEditGRN(false)
+        setEditingGRN(null)
+        fetchGrns()
+        fetchOrders()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update GRN', variant: 'destructive' })
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to update GRN', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  // ── Delete ─────────────────────────────────────────────────────────────────
+
+  const openDeleteDialog = (type: 'orders' | 'requisition' | 'grn', id: string, name: string) => {
+    setDeleteTarget({ type, id, name })
+    setShowDeleteDialog(true)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setActionLoading(true)
+    try {
+      const res = await fetch('/api/purchases', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: deleteTarget.type,
+          id: deleteTarget.id,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        if (deleteTarget.type === 'orders') fetchOrders()
+        else if (deleteTarget.type === 'requisition') fetchRequisitions()
+        else fetchGrns()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete', variant: 'destructive' })
+      }
+    } catch (err) {
+      toast({ title: 'Error', description: 'Failed to delete', variant: 'destructive' })
+    } finally {
+      setActionLoading(false)
+      setShowDeleteDialog(false)
+      setDeleteTarget(null)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -1073,6 +1253,11 @@ export function PurchasesPage() {
                                 <DropdownMenuItem onClick={() => openPODetail(order)}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => openEditPODialog(order)}>
+                                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                )}
                                 {order.status === 'draft' && canUpdate && (
                                   <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'submitted')}>
                                     <ArrowRight className="h-4 w-4 mr-2" /> Submit
@@ -1091,6 +1276,11 @@ export function PurchasesPage() {
                                 {['draft', 'submitted'].includes(order.status) && canDelete && (
                                   <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'cancelled')} className="text-red-600">
                                     <XCircle className="h-4 w-4 mr-2" /> Cancel
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem onClick={() => openDeleteDialog('orders', order.id, order.poNumber)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
                                   </DropdownMenuItem>
                                 )}
                                 {order.paymentStatus === 'unpaid' && order.status === 'received' && canUpdate && (
@@ -1182,6 +1372,11 @@ export function PurchasesPage() {
                                 <DropdownMenuItem onClick={() => openPRDetail(pr)}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => openEditPRDialog(pr)}>
+                                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                )}
                                 {pr.status === 'submitted' && canUpdate && (
                                   <>
                                     <DropdownMenuItem onClick={() => updatePRStatus(pr.id, 'approved')}>
@@ -1191,6 +1386,11 @@ export function PurchasesPage() {
                                       <XCircle className="h-4 w-4 mr-2" /> Reject
                                     </DropdownMenuItem>
                                   </>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem onClick={() => openDeleteDialog('requisition', pr.id, pr.prNumber)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -1271,6 +1471,11 @@ export function PurchasesPage() {
                                 <DropdownMenuItem onClick={() => openGRNDetail(grn)}>
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => openEditGRNDialog(grn)}>
+                                    <Pencil className="h-4 w-4 mr-2" /> Edit
+                                  </DropdownMenuItem>
+                                )}
                                 {grn.status === 'pending_inspection' && canUpdate && (
                                   <>
                                     <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'accepted')}>
@@ -1283,6 +1488,11 @@ export function PurchasesPage() {
                                       <XCircle className="h-4 w-4 mr-2" /> Reject
                                     </DropdownMenuItem>
                                   </>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem onClick={() => openDeleteDialog('grn', grn.id, grn.grnNumber)} className="text-red-600">
+                                    <Trash2 className="h-4 w-4 mr-2" /> Delete
+                                  </DropdownMenuItem>
                                 )}
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -2208,6 +2418,280 @@ export function PurchasesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          EDIT PO DIALOG
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showEditPO} onOpenChange={setShowEditPO}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Purchase Order</DialogTitle>
+            <DialogDescription>Update purchase order details for {editingPO?.poNumber}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Read-only info */}
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900/50 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">PO Number</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingPO?.poNumber}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">Vendor</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingPO?.vendor.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">Net Amount</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingPO ? formatCurrency(editingPO.netAmount) : '—'}</span>
+              </div>
+            </div>
+
+            {/* Editable fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editPOStatus} onValueChange={val => setEditPOStatus(val as POStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="partially_received">Partially Received</SelectItem>
+                    <SelectItem value="received">Received</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Status</Label>
+                <Select value={editPOPaymentStatus} onValueChange={val => setEditPOPaymentStatus(val as PaymentStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unpaid">Unpaid</SelectItem>
+                    <SelectItem value="partial">Partial</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Payment Mode</Label>
+                <Select value={editPOPaymentMode} onValueChange={setEditPOPaymentMode}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                    <SelectItem value="upi">UPI</SelectItem>
+                    <SelectItem value="credit">Credit</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes or terms..."
+                value={editPONotes}
+                onChange={e => setEditPONotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditPO(false)} disabled={actionLoading}>Cancel</Button>
+            <Button onClick={handleEditPO} disabled={actionLoading}>
+              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Update PO
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          EDIT PR DIALOG
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showEditPR} onOpenChange={setShowEditPR}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Requisition</DialogTitle>
+            <DialogDescription>Update requisition details for {editingPR?.prNumber}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Read-only info */}
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900/50 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">PR Number</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingPR?.prNumber}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">Title</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingPR?.title}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">Requested By</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingPR?.requestedBy.name}</span>
+              </div>
+            </div>
+
+            {/* Editable fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={editPRStatus} onValueChange={val => setEditPRStatus(val as PRStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="submitted">Submitted</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                    <SelectItem value="converted">Converted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <Select value={editPRPriority} onValueChange={val => setEditPRPriority(val as PRPriority)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="normal">Normal</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="urgent">Urgent</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes..."
+                value={editPRNotes}
+                onChange={e => setEditPRNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditPR(false)} disabled={actionLoading}>Cancel</Button>
+            <Button onClick={handleEditPR} disabled={actionLoading}>
+              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Update Requisition
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          EDIT GRN DIALOG
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <Dialog open={showEditGRN} onOpenChange={setShowEditGRN}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit GRN</DialogTitle>
+            <DialogDescription>Update GRN details for {editingGRN?.grnNumber}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Read-only info */}
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900/50 space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">GRN Number</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingGRN?.grnNumber}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">Vendor</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingGRN?.purchaseOrder.vendor.name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-500 dark:text-slate-400">Received By</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">{editingGRN?.receivedBy.name}</span>
+              </div>
+            </div>
+
+            {/* Editable fields */}
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editGRNStatus} onValueChange={val => setEditGRNStatus(val as GRNStatus)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending_inspection">Pending Inspection</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
+                  <SelectItem value="partially_accepted">Partially Accepted</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Additional notes..."
+                value={editGRNNotes}
+                onChange={e => setEditGRNNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditGRN(false)} disabled={actionLoading}>Cancel</Button>
+            <Button onClick={handleEditGRN} disabled={actionLoading}>
+              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Update GRN
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          DELETE CONFIRMATION
+      ═══════════════════════════════════════════════════════════════════════ */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
+              {deleteTarget?.type === 'orders' && ' Only draft or cancelled purchase orders can be deleted.'}
+              {deleteTarget?.type === 'requisition' && ' Only draft, cancelled, or rejected requisitions can be deleted.'}
+              {deleteTarget?.type === 'grn' && ' Only pending inspection or rejected GRNs can be deleted.'}
+              {' '}This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={actionLoading}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

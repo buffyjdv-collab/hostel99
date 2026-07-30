@@ -19,6 +19,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -66,6 +76,7 @@ import {
   CreditCard,
   Banknote,
   Globe,
+  Trash2,
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
@@ -184,6 +195,9 @@ export function VendorsPage() {
 
   const [editForm, setEditForm] = useState(form)
   const [submitting, setSubmitting] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // ── Data Fetching ──────────────────────────────────────────────
 
@@ -328,6 +342,36 @@ export function VendorsPage() {
   const openDetail = (vendor: VendorData) => {
     setSelectedVendor(vendor)
     setDetailDialogOpen(true)
+  }
+
+  const openDeleteDialog = (vendor: VendorData) => {
+    setDeleteTarget({ id: vendor.id, name: vendor.name })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch('/api/vendors', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        fetchVendors()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete vendor', variant: 'destructive' })
+      }
+    } catch {
+      toast({ title: 'Error', description: 'Failed to delete vendor', variant: 'destructive' })
+    } finally {
+      setDeleting(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+    }
   }
 
   // ── Render ─────────────────────────────────────────────────────
@@ -535,6 +579,11 @@ export function VendorsPage() {
                             {vendor.status !== 'blacklisted' && (
                               <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(vendor, 'blacklisted') }} className="text-red-600">
                                 <Ban className="h-4 w-4 mr-2" /> Blacklist
+                              </DropdownMenuItem>
+                            )}
+                            {canDelete && (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDeleteDialog(vendor) }} className="text-red-600 dark:text-red-400">
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -922,6 +971,30 @@ export function VendorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+              Vendors with existing purchase orders cannot be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {deleting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

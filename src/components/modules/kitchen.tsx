@@ -40,6 +40,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Tooltip,
@@ -71,6 +81,8 @@ import {
   Utensils,
   X,
   Minus,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import { format, parseISO, addDays, isToday, isTomorrow, isSameDay } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
@@ -230,6 +242,18 @@ export function KitchenPage() {
   const [serveConfirmOpen, setServeConfirmOpen] = useState(false)
   const [servingMenu, setServingMenu] = useState<MenuPlan | null>(null)
 
+  // Edit dialog states
+  const [editIssueDialogOpen, setEditIssueDialogOpen] = useState(false)
+  const [editRecipeDialogOpen, setEditRecipeDialogOpen] = useState(false)
+  const [editMenuDialogOpen, setEditMenuDialogOpen] = useState(false)
+  const [editingIssue, setEditingIssue] = useState<KitchenIssue | null>(null)
+  const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null)
+  const [editingMenu, setEditingMenu] = useState<MenuPlan | null>(null)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ type: 'issue' | 'recipe' | 'menu'; id: string; name: string } | null>(null)
+
   // Form states
   const [issueForm, setIssueForm] = useState({
     itemId: '',
@@ -248,6 +272,29 @@ export function KitchenPage() {
   })
   const [menuForm, setMenuForm] = useState({
     date: format(new Date(), 'yyyy-MM-dd'),
+    mealType: 'lunch',
+    headCount: '100',
+    notes: '',
+    items: [] as { recipeId: string; dishName: string; servings: string }[],
+  })
+
+  // Edit form states
+  const [editIssueForm, setEditIssueForm] = useState({
+    quantity: '',
+    issuedTo: '',
+    purpose: '',
+    notes: '',
+  })
+  const [editRecipeForm, setEditRecipeForm] = useState({
+    name: '',
+    category: 'veg',
+    mealType: 'lunch',
+    baseServings: '100',
+    instructions: '',
+    ingredients: [] as { itemId: string; quantity: string; unit: string }[],
+  })
+  const [editMenuForm, setEditMenuForm] = useState({
+    date: '',
     mealType: 'lunch',
     headCount: '100',
     notes: '',
@@ -469,6 +516,202 @@ export function KitchenPage() {
     }
   }
 
+  // ── Edit Issue ─────────────────────────────────────────────────────────────
+
+  const openEditIssueDialog = (issue: KitchenIssue) => {
+    setEditingIssue(issue)
+    setEditIssueForm({
+      quantity: String(issue.quantity),
+      issuedTo: issue.issuedTo,
+      purpose: issue.purpose || '',
+      notes: issue.notes || '',
+    })
+    setEditIssueDialogOpen(true)
+  }
+
+  const handleEditIssue = async () => {
+    if (!editingIssue) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/kitchen', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'issue',
+          id: editingIssue.id,
+          quantity: parseFloat(editIssueForm.quantity),
+          issuedTo: editIssueForm.issuedTo || undefined,
+          purpose: editIssueForm.purpose || null,
+          notes: editIssueForm.notes || null,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Kitchen issue updated successfully' })
+        setEditIssueDialogOpen(false)
+        setEditingIssue(null)
+        fetchData()
+      } else {
+        const err = await res.json()
+        toast({ title: 'Error', description: err.error || 'Failed to update issue', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update issue', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Edit Recipe ─────────────────────────────────────────────────────────────
+
+  const openEditRecipeDialog = (recipe: Recipe) => {
+    setEditingRecipe(recipe)
+    setEditRecipeForm({
+      name: recipe.name,
+      category: recipe.category,
+      mealType: recipe.mealType,
+      baseServings: String(recipe.baseServings),
+      instructions: recipe.instructions || '',
+      ingredients: recipe.ingredients.map(ing => ({
+        itemId: ing.item ? (ing as any).itemId || '' : '',
+        quantity: String(ing.quantity),
+        unit: ing.unit,
+      })),
+    })
+    setEditRecipeDialogOpen(true)
+  }
+
+  const handleEditRecipe = async () => {
+    if (!editingRecipe) return
+    if (!editRecipeForm.name) {
+      toast({ title: 'Validation Error', description: 'Recipe name is required', variant: 'destructive' })
+      return
+    }
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/kitchen', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'recipe',
+          id: editingRecipe.id,
+          name: editRecipeForm.name,
+          category: editRecipeForm.category,
+          mealType: editRecipeForm.mealType,
+          baseServings: parseInt(editRecipeForm.baseServings) || 100,
+          instructions: editRecipeForm.instructions || null,
+          ingredients: editRecipeForm.ingredients.map(ing => ({
+            itemId: ing.itemId,
+            quantity: parseFloat(ing.quantity),
+            unit: ing.unit,
+          })),
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Recipe updated successfully' })
+        setEditRecipeDialogOpen(false)
+        setEditingRecipe(null)
+        fetchData()
+      } else {
+        const err = await res.json()
+        toast({ title: 'Error', description: err.error || 'Failed to update recipe', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update recipe', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Edit Menu ───────────────────────────────────────────────────────────────
+
+  const openEditMenuDialog = (menu: MenuPlan) => {
+    setEditingMenu(menu)
+    setEditMenuForm({
+      date: format(parseISO(menu.date), 'yyyy-MM-dd'),
+      mealType: menu.mealType,
+      headCount: String(menu.headCount),
+      notes: menu.notes || '',
+      items: menu.items.map(item => ({
+        recipeId: item.recipeId || '',
+        dishName: item.dishName,
+        servings: String(item.servings),
+      })),
+    })
+    setEditMenuDialogOpen(true)
+  }
+
+  const handleEditMenu = async () => {
+    if (!editingMenu) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/kitchen', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'menu',
+          id: editingMenu.id,
+          date: editMenuForm.date,
+          mealType: editMenuForm.mealType,
+          headCount: parseInt(editMenuForm.headCount) || 0,
+          notes: editMenuForm.notes || null,
+          items: editMenuForm.items.map(item => ({
+            recipeId: item.recipeId || null,
+            dishName: item.dishName,
+            servings: parseInt(item.servings) || 1,
+          })),
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: 'Menu plan updated successfully' })
+        setEditMenuDialogOpen(false)
+        setEditingMenu(null)
+        fetchData()
+      } else {
+        const err = await res.json()
+        toast({ title: 'Error', description: err.error || 'Failed to update menu plan', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to update menu plan', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── Delete ──────────────────────────────────────────────────────────────────
+
+  const openDeleteDialog = (type: 'issue' | 'recipe' | 'menu', id: string, name: string) => {
+    setDeleteTarget({ type, id, name })
+    setDeleteDialogOpen(true)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/kitchen', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: deleteTarget.type,
+          id: deleteTarget.id,
+        }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        fetchData()
+      } else {
+        const err = await res.json()
+        toast({ title: 'Error', description: err.error || 'Failed to delete item', variant: 'destructive' })
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to delete item', variant: 'destructive' })
+    } finally {
+      setSubmitting(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
+    }
+  }
+
   // ── Recipe ingredient helpers ──────────────────────────────────────────────
 
   const addRecipeIngredient = () => {
@@ -518,6 +761,68 @@ export function KitchenPage() {
 
   const updateMenuItem = (index: number, field: string, value: string) => {
     setMenuForm(prev => ({
+      ...prev,
+      items: prev.items.map((item, i) => {
+        if (i !== index) return item
+        const updated = { ...item, [field]: value }
+        if (field === 'recipeId' && value) {
+          const recipe = data?.recipes.find(r => r.id === value)
+          if (recipe) updated.dishName = recipe.name
+        }
+        return updated
+      }),
+    }))
+  }
+
+  // ── Edit recipe ingredient helpers ─────────────────────────────────────────
+
+  const addEditRecipeIngredient = () => {
+    setEditRecipeForm(prev => ({
+      ...prev,
+      ingredients: [...prev.ingredients, { itemId: '', quantity: '', unit: 'kg' }],
+    }))
+  }
+
+  const removeEditRecipeIngredient = (index: number) => {
+    setEditRecipeForm(prev => ({
+      ...prev,
+      ingredients: prev.ingredients.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateEditRecipeIngredient = (index: number, field: string, value: string) => {
+    setEditRecipeForm(prev => ({
+      ...prev,
+      ingredients: prev.ingredients.map((ing, i) => {
+        if (i !== index) return ing
+        const updated = { ...ing, [field]: value }
+        if (field === 'itemId') {
+          const item = inventoryItems.find(it => it.id === value)
+          if (item) updated.unit = item.unit
+        }
+        return updated
+      }),
+    }))
+  }
+
+  // ── Edit menu item helpers ─────────────────────────────────────────────────
+
+  const addEditMenuItem = () => {
+    setEditMenuForm(prev => ({
+      ...prev,
+      items: [...prev.items, { recipeId: '', dishName: '', servings: '1' }],
+    }))
+  }
+
+  const removeEditMenuItem = (index: number) => {
+    setEditMenuForm(prev => ({
+      ...prev,
+      items: prev.items.filter((_, i) => i !== index),
+    }))
+  }
+
+  const updateEditMenuItem = (index: number, field: string, value: string) => {
+    setEditMenuForm(prev => ({
       ...prev,
       items: prev.items.map((item, i) => {
         if (i !== index) return item
@@ -789,6 +1094,21 @@ export function KitchenPage() {
                                   <Eye className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
+                                {canUpdate && (
+                                  <DropdownMenuItem onClick={() => openEditIssueDialog(issue)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit Issue
+                                  </DropdownMenuItem>
+                                )}
+                                {canDelete && (
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteDialog('issue', issue.id, issue.issueNumber)}
+                                    className="text-red-600 dark:text-red-400"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Issue
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -901,6 +1221,32 @@ export function KitchenPage() {
                               Mark as Served
                             </Button>
                           )}
+                          {(canUpdate || canDelete) && (
+                            <div className="flex gap-2 mt-2">
+                              {canUpdate && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 gap-1 text-xs h-7"
+                                  onClick={() => openEditMenuDialog(menu)}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                  Edit
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 gap-1 text-xs h-7 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  onClick={() => openDeleteDialog('menu', menu.id, `${menu.mealType} - ${format(parseISO(menu.date), 'dd MMM yyyy')}`)}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  Delete
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -992,18 +1338,41 @@ export function KitchenPage() {
                       </ScrollArea>
                     </div>
                     <Separator className="my-3" />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full gap-2"
-                      onClick={() => {
-                        setSelectedRecipe(recipe)
-                        setRecipeDetailOpen(true)
-                      }}
-                    >
-                      <Eye className="h-4 w-4" />
-                      View Full Recipe
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2"
+                        onClick={() => {
+                          setSelectedRecipe(recipe)
+                          setRecipeDetailOpen(true)
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                        View
+                      </Button>
+                      {canUpdate && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => openEditRecipeDialog(recipe)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          Edit
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          onClick={() => openDeleteDialog('recipe', recipe.id, recipe.name)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}
@@ -1603,6 +1972,400 @@ export function KitchenPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Issue Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={editIssueDialogOpen} onOpenChange={setEditIssueDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit Kitchen Issue
+            </DialogTitle>
+            <DialogDescription>
+              Update the details of this kitchen issue.
+            </DialogDescription>
+          </DialogHeader>
+          {editingIssue && (
+            <div className="space-y-4 py-2">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <p className="text-sm font-medium">{editingIssue.issueNumber}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{editingIssue.item.name}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Quantity</Label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={editIssueForm.quantity}
+                    onChange={e => setEditIssueForm(prev => ({ ...prev, quantity: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Unit</Label>
+                  <Input
+                    value={editingIssue.unit}
+                    disabled
+                    className="bg-slate-50 dark:bg-slate-800"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Purpose</Label>
+                <Select value={editIssueForm.purpose} onValueChange={v => setEditIssueForm(prev => ({ ...prev, purpose: v }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select purpose..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="breakfast">Breakfast</SelectItem>
+                    <SelectItem value="lunch">Lunch</SelectItem>
+                    <SelectItem value="dinner">Dinner</SelectItem>
+                    <SelectItem value="snacks">Snacks</SelectItem>
+                    <SelectItem value="special">Special</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Issued To</Label>
+                <Input
+                  value={editIssueForm.issuedTo}
+                  onChange={e => setEditIssueForm(prev => ({ ...prev, issuedTo: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes (Optional)</Label>
+                <Textarea
+                  value={editIssueForm.notes}
+                  onChange={e => setEditIssueForm(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditIssueDialogOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditIssue} disabled={submitting} className="gap-2">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+              Update Issue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Recipe Dialog ────────────────────────────────────────────────── */}
+      <Dialog open={editRecipeDialogOpen} onOpenChange={setEditRecipeDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit Recipe
+            </DialogTitle>
+            <DialogDescription>
+              Update the recipe details and ingredients.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Recipe Name</Label>
+                <Input
+                  value={editRecipeForm.name}
+                  onChange={e => setEditRecipeForm(prev => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={editRecipeForm.category} onValueChange={v => setEditRecipeForm(prev => ({ ...prev, category: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="veg">Vegetarian</SelectItem>
+                    <SelectItem value="non_veg">Non-Vegetarian</SelectItem>
+                    <SelectItem value="vegan">Vegan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Meal Type</Label>
+                <Select value={editRecipeForm.mealType} onValueChange={v => setEditRecipeForm(prev => ({ ...prev, mealType: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="breakfast">Breakfast</SelectItem>
+                    <SelectItem value="lunch">Lunch</SelectItem>
+                    <SelectItem value="dinner">Dinner</SelectItem>
+                    <SelectItem value="snacks">Snacks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Base Servings</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={editRecipeForm.baseServings}
+                  onChange={e => setEditRecipeForm(prev => ({ ...prev, baseServings: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Instructions</Label>
+              <Textarea
+                value={editRecipeForm.instructions}
+                onChange={e => setEditRecipeForm(prev => ({ ...prev, instructions: e.target.value }))}
+                rows={3}
+              />
+            </div>
+
+            {/* Ingredients */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Ingredients (Bill of Materials)</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addEditRecipeIngredient} className="gap-1">
+                  <Plus className="h-3 w-3" />
+                  Add Ingredient
+                </Button>
+              </div>
+              {editRecipeForm.ingredients.length === 0 ? (
+                <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-4 border border-dashed rounded-lg">
+                  No ingredients added yet. Click &quot;Add Ingredient&quot; to start.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {editRecipeForm.ingredients.map((ing, idx) => (
+                    <div key={idx} className="flex items-end gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-slate-500">Item</Label>
+                        <Select value={ing.itemId} onValueChange={v => updateEditRecipeIngredient(idx, 'itemId', v)}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select item..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <ScrollArea className="max-h-40">
+                              {inventoryItems.map(item => (
+                                <SelectItem key={item.id} value={item.id}>
+                                  {item.name} ({item.unit})
+                                </SelectItem>
+                              ))}
+                            </ScrollArea>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="w-24">
+                        <Label className="text-xs text-slate-500">Qty</Label>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          placeholder="0"
+                          value={ing.quantity}
+                          onChange={e => updateEditRecipeIngredient(idx, 'quantity', e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="w-20">
+                        <Label className="text-xs text-slate-500">Unit</Label>
+                        <Input
+                          value={ing.unit}
+                          onChange={e => updateEditRecipeIngredient(idx, 'unit', e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-slate-400 hover:text-red-500"
+                        onClick={() => removeEditRecipeIngredient(idx)}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditRecipeDialogOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditRecipe} disabled={submitting} className="gap-2">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+              Update Recipe
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Menu Plan Dialog ────────────────────────────────────────────── */}
+      <Dialog open={editMenuDialogOpen} onOpenChange={setEditMenuDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="h-5 w-5" />
+              Edit Menu Plan
+            </DialogTitle>
+            <DialogDescription>
+              Update the menu plan details and dishes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Date</Label>
+                <Input
+                  type="date"
+                  value={editMenuForm.date}
+                  onChange={e => setEditMenuForm(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Meal Type</Label>
+                <Select value={editMenuForm.mealType} onValueChange={v => setEditMenuForm(prev => ({ ...prev, mealType: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="breakfast">Breakfast</SelectItem>
+                    <SelectItem value="lunch">Lunch</SelectItem>
+                    <SelectItem value="dinner">Dinner</SelectItem>
+                    <SelectItem value="snacks">Snacks</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Head Count</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={editMenuForm.headCount}
+                  onChange={e => setEditMenuForm(prev => ({ ...prev, headCount: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes (Optional)</Label>
+                <Input
+                  value={editMenuForm.notes}
+                  onChange={e => setEditMenuForm(prev => ({ ...prev, notes: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Menu Dishes */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Dishes</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addEditMenuItem} className="gap-1">
+                  <Plus className="h-3 w-3" />
+                  Add Dish
+                </Button>
+              </div>
+              {editMenuForm.items.length === 0 ? (
+                <p className="text-sm text-slate-400 dark:text-slate-500 text-center py-4 border border-dashed rounded-lg">
+                  No dishes added yet. Click &quot;Add Dish&quot; to start.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {editMenuForm.items.map((item, idx) => (
+                    <div key={idx} className="flex items-end gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-slate-500">Recipe (Optional)</Label>
+                        <Select value={item.recipeId} onValueChange={v => updateEditMenuItem(idx, 'recipeId', v)}>
+                          <SelectTrigger className="h-9">
+                            <SelectValue placeholder="Select recipe..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <ScrollArea className="max-h-40">
+                              {(data?.recipes || []).map(recipe => (
+                                <SelectItem key={recipe.id} value={recipe.id}>
+                                  {recipe.name} ({recipe.category})
+                                </SelectItem>
+                              ))}
+                            </ScrollArea>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-xs text-slate-500">Dish Name</Label>
+                        <Input
+                          value={item.dishName}
+                          onChange={e => updateEditMenuItem(idx, 'dishName', e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <div className="w-24">
+                        <Label className="text-xs text-slate-500">Servings</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.servings}
+                          onChange={e => updateEditMenuItem(idx, 'servings', e.target.value)}
+                          className="h-9"
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 shrink-0 text-slate-400 hover:text-red-500"
+                        onClick={() => removeEditMenuItem(idx)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditMenuDialogOpen(false)} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditMenu} disabled={submitting} className="gap-2">
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+              Update Menu Plan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation AlertDialog ──────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
+              {deleteTarget?.type === 'issue' && ' This kitchen issue record will be permanently removed.'}
+              {deleteTarget?.type === 'recipe' && ' This recipe and all its ingredients will be permanently removed. Menu plan items referencing this recipe will also be affected.'}
+              {deleteTarget?.type === 'menu' && ' This menu plan and all its dishes will be permanently removed.'}
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={submitting}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

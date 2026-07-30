@@ -18,6 +18,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -60,6 +71,7 @@ interface Visitor {
   purpose: string
   tenantId: string | null
   hostId: string | null
+  hostName: string | null
   propertyId: string
   checkIn: string
   checkOut: string | null
@@ -68,6 +80,14 @@ interface Visitor {
   tenant?: { id: string; name: string; phone?: string } | null
   host?: { id: string; name: string; email?: string } | null
   property?: { id: string; name: string; address?: string } | null
+}
+
+interface EditVisitorFormData {
+  name: string
+  phone: string
+  purpose: string
+  hostName: string
+  status: string
 }
 
 interface Property {
@@ -158,6 +178,24 @@ export function VisitorsPage() {
   // Dialogs
   const [logVisitorOpen, setLogVisitorOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null)
+  const [editFormData, setEditFormData] = useState<EditVisitorFormData>({
+    name: '',
+    phone: '',
+    purpose: '',
+    hostName: '',
+    status: 'checked_in',
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
 
   // Log Visitor form
   const [visitorForm, setVisitorForm] = useState({
@@ -275,19 +313,92 @@ export function VisitorsPage() {
         setVisitors((prev) =>
           prev.map((v) => v.id === visitorId ? updated : v)
         )
+        toast({ title: 'Success', description: 'Visitor checked out successfully' })
       }
     } catch { /* ignore */ }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this visitor record?')) return
+  // ── Edit Dialog Handlers ──────────────────────────────────────────────────
+
+  function openEditDialog(visitor: Visitor) {
+    setSelectedVisitor(visitor)
+    setEditFormData({
+      name: visitor.name,
+      phone: visitor.phone || '',
+      purpose: visitor.purpose,
+      hostName: visitor.host?.name || '',
+      status: visitor.status,
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedVisitor || !editFormData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Visitor name is required', variant: 'destructive' })
+      return
+    }
+
     try {
-      const res = await fetch(`/api/visitors/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch('/api/visitors', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedVisitor.id,
+          name: editFormData.name.trim(),
+          phone: editFormData.phone.trim() || undefined,
+          purpose: editFormData.purpose.trim(),
+          hostName: editFormData.hostName.trim() || undefined,
+          status: editFormData.status,
+        }),
+      })
+
       if (res.ok) {
-        setVisitors((prev) => prev.filter((v) => v.id !== id))
+        toast({ title: 'Success', description: 'Visitor updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedVisitor(null)
+        fetchData()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update visitor', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update visitor:', error)
+      toast({ title: 'Error', description: 'Failed to update visitor', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
+
+  // ── Delete Dialog Handlers ────────────────────────────────────────────────
+
+  const handleDelete = (id: string) => {
+    const v = visitors.find((vt) => vt.id === id)
+    if (!v) return
+    setDeleteTarget({ id: v.id, name: v.name })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/visitors/${deleteTarget.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        setVisitors((prev) => prev.filter((v) => v.id !== deleteTarget.id))
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete visitor record', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete visitor record:', error)
+      toast({ title: 'Error', description: 'Failed to delete visitor record', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -517,11 +628,22 @@ export function VisitorsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                        {canUpdate && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 h-8"
+                            onClick={() => openEditDialog(visitor)}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                        )}
                         {visitor.status === 'checked_in' && canUpdate && (
                           <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 h-8"
+                            className="gap-1 text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700 h-8"
                             onClick={() => handleCheckOut(visitor.id)}
                           >
                             <LogOut className="h-3.5 w-3.5" />
@@ -631,6 +753,104 @@ export function VisitorsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Edit Visitor Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedVisitor(null) }}>
+        <DialogContent className="sm:max-w-[480px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Visitor</DialogTitle>
+            <DialogDescription>Update the visitor details below.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-visitor-name">Name *</Label>
+              <Input
+                id="edit-visitor-name"
+                placeholder="Visitor name"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-visitor-phone">Phone</Label>
+              <Input
+                id="edit-visitor-phone"
+                placeholder="Phone number"
+                value={editFormData.phone}
+                onChange={(e) => setEditFormData((prev) => ({ ...prev, phone: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-visitor-purpose">Purpose *</Label>
+              <Input
+                id="edit-visitor-purpose"
+                placeholder="Purpose of visit"
+                value={editFormData.purpose}
+                onChange={(e) => setEditFormData((prev) => ({ ...prev, purpose: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-visitor-host">Host Name</Label>
+              <Input
+                id="edit-visitor-host"
+                placeholder="Host name"
+                value={editFormData.hostName}
+                onChange={(e) => setEditFormData((prev) => ({ ...prev, hostName: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-visitor-status">Status *</Label>
+              <Select value={editFormData.status} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, status: v }))}>
+                <SelectTrigger id="edit-visitor-status">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checked_in">Checked In</SelectItem>
+                  <SelectItem value="checked_out">Checked Out</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Visitor
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Visitor Record</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the visitor record for <strong>{deleteTarget?.name}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -56,6 +56,8 @@ model Property {
   pincode     String?
   landmark    String?
   description String?
+  contactPhone String?
+  contactEmail String?
   totalRooms  Int      @default(0)
   totalBeds   Int      @default(0)
   occupancy   Int      @default(0)
@@ -903,4 +905,13 @@ model HousekeepingItem {
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ─── Role Permissions (RBAC Persistence) ───────────────────
+model RolePermission {
+  id          String   @id @default(cuid())
+  role        String   @unique
+  permissions String   // JSON string of permissions array
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
 }

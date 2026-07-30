@@ -186,6 +186,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentUser: (user) => {
     if (user) {
       localStorage.setItem('hostelpro_user', JSON.stringify(user))
+    } else {
+      localStorage.removeItem('hostelpro_user')
     }
     set({ currentUser: user })
   },

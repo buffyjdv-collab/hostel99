@@ -1,12 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useAppStore, hasPermission, ROLE_PERMISSIONS, type Permission, type UserRole } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
-import { Separator } from '@/components/ui/separator'
 import {
   Table,
   TableBody,
@@ -20,9 +19,6 @@ import {
   Shield,
   Save,
   Loader2,
-  CheckCircle2,
-  XCircle,
-  Users,
   Eye,
   Lock,
 } from 'lucide-react'
@@ -240,14 +236,45 @@ export function RoleManagementPage() {
   const [customPermissions, setCustomPermissions] = useState<Record<UserRole, Permission[]>>({})
   const [hasChanges, setHasChanges] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState<UserRole>('manager')
 
   const canManage = currentUser && hasPermission(currentUser.role, 'role-management:update')
   const canView = currentUser && hasPermission(currentUser.role, 'role-management:read')
 
-  // Initialize permissions from ROLE_PERMISSIONS
+  // Load permissions from the database on mount, fall back to in-memory defaults
   useEffect(() => {
-    setCustomPermissions({ ...ROLE_PERMISSIONS } as Record<UserRole, Permission[]>)
+    async function loadPermissions() {
+      try {
+        const res = await fetch('/api/role-permissions')
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data) && data.length > 0) {
+            // Parse the API response into a Record<UserRole, Permission[]>
+            const dbPerms: Record<string, Permission[]> = {}
+            for (const item of data) {
+              dbPerms[item.role] = item.permissions
+            }
+            // Merge with defaults so roles not in DB still have their defaults
+            const merged = { ...ROLE_PERMISSIONS } as Record<string, Permission[]>
+            for (const [role, perms] of Object.entries(dbPerms)) {
+              merged[role] = perms
+            }
+            setCustomPermissions(merged as Record<UserRole, Permission[]>)
+            // Also sync the in-memory ROLE_PERMISSIONS
+            for (const [role, perms] of Object.entries(dbPerms)) {
+              ROLE_PERMISSIONS[role] = perms
+            }
+            return
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load permissions from API, using defaults:', err)
+      }
+      // Fallback to in-memory defaults
+      setCustomPermissions({ ...ROLE_PERMISSIONS } as Record<UserRole, Permission[]>)
+    }
+    loadPermissions().finally(() => setLoading(false))
   }, [])
 
   const togglePermission = (role: UserRole, permission: Permission) => {
@@ -279,13 +306,22 @@ export function RoleManagementPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      // In a real app, this would save to the database
-      // For now, we update the in-memory ROLE_PERMISSIONS
+      // Save to database via API
+      const res = await fetch('/api/role-permissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: customPermissions }),
+      })
+      if (!res.ok) {
+        const errData = await res.json()
+        throw new Error(errData.error || 'Failed to save permissions')
+      }
+      // Also update the in-memory ROLE_PERMISSIONS so the rest of the app works immediately
       Object.keys(customPermissions).forEach(role => {
         ROLE_PERMISSIONS[role] = customPermissions[role as UserRole]
       })
       setHasChanges(false)
-      toast({ title: 'Permissions Saved', description: 'Role permissions have been updated successfully.' })
+      toast({ title: 'Permissions Saved', description: 'Role permissions have been persisted to the database successfully.' })
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' })
     } finally {
@@ -373,6 +409,14 @@ export function RoleManagementPage() {
           <h2 className="text-lg font-semibold text-slate-600">Access Denied</h2>
           <p className="text-sm text-slate-500">You do not have permission to view role management.</p>
         </div>
+      </div>
+    )
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
       </div>
     )
   }

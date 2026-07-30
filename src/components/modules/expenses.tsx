@@ -20,6 +20,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -137,6 +148,15 @@ interface ExpenseFormData {
   vendor: string
   propertyId: string
   receipt: string
+  status: ExpenseStatus
+}
+
+interface EditExpenseFormData {
+  description: string
+  amount: string
+  category: ExpenseCategory
+  date: string
+  paymentMode: string
   status: ExpenseStatus
 }
 
@@ -558,6 +578,24 @@ export function ExpensesPage() {
   const [selectedExpense, setSelectedExpense] = useState<ExpenseData | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState<EditExpenseFormData>({
+    description: '',
+    amount: '',
+    category: 'maintenance',
+    date: '',
+    paymentMode: '',
+    status: 'pending',
+  })
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
+  const { toast } = useToast()
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
 
   const fetchExpenses = async () => {
@@ -779,15 +817,89 @@ export function ExpensesPage() {
     setShowDetailDialog(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this expense?')) return
+  // ── Edit Dialog Handlers ──────────────────────────────────────────────────
+
+  function openEditDialog(expense: ExpenseData) {
+    setSelectedExpense(expense)
+    setEditFormData({
+      description: expense.description,
+      amount: expense.amount.toString(),
+      category: expense.category,
+      date: expense.date ? new Date(expense.date).toISOString().split('T')[0] : '',
+      paymentMode: '',
+      status: expense.status,
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedExpense || !editFormData.description.trim()) {
+      toast({ title: 'Validation Error', description: 'Description is required', variant: 'destructive' })
+      return
+    }
+
     try {
-      const res = await fetch(`/api/expenses/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch('/api/expenses', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedExpense.id,
+          description: editFormData.description.trim(),
+          amount: editFormData.amount ? parseFloat(editFormData.amount) : undefined,
+          category: editFormData.category,
+          date: editFormData.date || undefined,
+          paymentMode: editFormData.paymentMode.trim() || undefined,
+          status: editFormData.status,
+        }),
+      })
+
       if (res.ok) {
-        setExpenses((prev) => prev.filter((e) => e.id !== id))
+        toast({ title: 'Success', description: 'Expense updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedExpense(null)
+        fetchExpenses()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update expense', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update expense:', error)
+      toast({ title: 'Error', description: 'Failed to update expense', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
+
+  // ── Delete Dialog Handlers ────────────────────────────────────────────────
+
+  const handleDelete = (id: string) => {
+    const expense = expenses.find((e) => e.id === id)
+    if (!expense) return
+    setDeleteTarget({ id: expense.id, name: expense.description })
+    setDeleteDialogOpen(true)
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch(`/api/expenses/${deleteTarget.id}`, { method: 'DELETE' })
+      if (res.ok) {
+        toast({ title: 'Success', description: `Expense has been deleted` })
+        setExpenses((prev) => prev.filter((e) => e.id !== deleteTarget.id))
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete expense', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete expense:', error)
+      toast({ title: 'Error', description: 'Failed to delete expense', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -1109,7 +1221,7 @@ export function ExpensesPage() {
                                   <Eye className="h-4 w-4 mr-2" /> View Details
                                 </DropdownMenuItem>
                                 {canUpdate && (
-                                <DropdownMenuItem onClick={ev => { ev.stopPropagation(); handleViewExpense(e) }}>
+                                <DropdownMenuItem onClick={ev => { ev.stopPropagation(); openEditDialog(e) }}>
                                   <Pencil className="h-4 w-4 mr-2" /> Edit
                                 </DropdownMenuItem>
                                 )}
@@ -1261,6 +1373,120 @@ export function ExpensesPage() {
         open={showDetailDialog}
         onClose={() => { setShowDetailDialog(false); setSelectedExpense(null) }}
       />
+
+      {/* ── Edit Expense Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedExpense(null) }}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Expense</DialogTitle>
+            <DialogDescription>Update the expense details below.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-exp-desc">Description *</Label>
+                <Textarea
+                  id="edit-exp-desc"
+                  placeholder="Expense description"
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-exp-amount">Amount *</Label>
+                <Input
+                  id="edit-exp-amount"
+                  type="number"
+                  placeholder="Amount"
+                  value={editFormData.amount}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, amount: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-exp-category">Category *</Label>
+                <Select value={editFormData.category} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, category: v as ExpenseCategory }))}>
+                  <SelectTrigger id="edit-exp-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-exp-date">Date</Label>
+                <Input
+                  id="edit-exp-date"
+                  type="date"
+                  value={editFormData.date}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-exp-payment">Payment Mode</Label>
+                <Input
+                  id="edit-exp-payment"
+                  placeholder="e.g. Cash, UPI, Bank Transfer"
+                  value={editFormData.paymentMode}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, paymentMode: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-exp-status">Status *</Label>
+                <Select value={editFormData.status} onValueChange={(v) => setEditFormData((prev) => ({ ...prev, status: v as ExpenseStatus }))}>
+                  <SelectTrigger id="edit-exp-status">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(EXPENSE_STATUS_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Expense
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Expense</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The expense record will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

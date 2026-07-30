@@ -50,6 +50,8 @@ export async function POST(request: Request) {
       amenities,
       images,
       ownerId,
+      contactPhone,
+      contactEmail,
     } = body
 
     if (!name || !address || !city || !ownerId) {
@@ -74,6 +76,8 @@ export async function POST(request: Request) {
         amenities,
         images,
         ownerId,
+        contactPhone,
+        contactEmail,
       },
       include: {
         owner: { select: { id: true, name: true, email: true } },
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, name, type, address, city, state, pincode, landmark, description, totalRooms, totalBeds, amenities, images, ownerId, isActive, occupancy } = body
+    const { id, name, type, address, city, state, pincode, landmark, description, totalRooms, totalBeds, amenities, images, ownerId, isActive, occupancy, contactPhone, contactEmail } = body
 
     if (!id) {
       return NextResponse.json({ error: 'Property id is required' }, { status: 400 })
@@ -117,6 +121,8 @@ export async function PATCH(request: Request) {
     if (ownerId !== undefined) updateData.ownerId = ownerId
     if (isActive !== undefined) updateData.isActive = isActive
     if (occupancy !== undefined) updateData.occupancy = occupancy
+    if (contactPhone !== undefined) updateData.contactPhone = contactPhone
+    if (contactEmail !== undefined) updateData.contactEmail = contactEmail
 
     const property = await db.property.update({
       where: { id },

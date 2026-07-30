@@ -6,10 +6,12 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const propertyId = searchParams.get('propertyId')
+    const tenantId = searchParams.get('tenantId')
 
     const where: Record<string, unknown> = {}
     if (status) where.status = status
     if (propertyId) where.propertyId = propertyId
+    if (tenantId) where.tenantId = tenantId
 
     const complaints = await db.complaint.findMany({
       where,

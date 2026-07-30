@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +21,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { useToast } from '@/hooks/use-toast'
 import {
   Select,
   SelectContent,
@@ -48,6 +59,8 @@ import {
   Users,
   Warehouse,
   Trash2,
+  Phone,
+  Mail,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -89,6 +102,16 @@ interface PropertyFormData {
   landmark: string
   description: string
   amenities: string[]
+}
+
+interface EditPropertyFormData {
+  name: string
+  address: string
+  type: PropertyType
+  totalRooms: string
+  contactPhone: string
+  contactEmail: string
+  description: string
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -230,6 +253,7 @@ function StatCardSkeleton() {
 
 export function PropertiesPage() {
   const { currentUser } = useAppStore()
+  const { toast } = useToast()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'properties:create')
   const canUpdate = hasPermission(role, 'properties:update')
@@ -256,12 +280,30 @@ export function PropertiesPage() {
     amenities: [],
   })
 
+  // Edit dialog state
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [selectedProperty, setSelectedProperty] = useState<PropertyData | null>(null)
+  const [submittingEdit, setSubmittingEdit] = useState(false)
+  const [editFormData, setEditFormData] = useState<EditPropertyFormData>({
+    name: '',
+    address: '',
+    type: 'pg',
+    totalRooms: '',
+    contactPhone: '',
+    contactEmail: '',
+    description: '',
+  })
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+
   // ── Data Fetching ────────────────────────────────────────────────────────
   useEffect(() => {
     fetchProperties()
   }, [])
 
-  async function fetchProperties() {
+  const fetchProperties = useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch('/api/properties')
@@ -274,7 +316,7 @@ export function PropertiesPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   // ── Computed Values ──────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -339,9 +381,14 @@ export function PropertiesPage() {
         setProperties((prev) => [newProperty, ...prev])
         setDialogOpen(false)
         resetForm()
+        toast({ title: 'Success', description: 'Property created successfully' })
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to create property', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to create property:', error)
+      toast({ title: 'Error', description: 'Failed to create property', variant: 'destructive' })
     } finally {
       setSubmitting(false)
     }
@@ -362,14 +409,94 @@ export function PropertiesPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this property?')) return
+    const property = properties.find((p) => p.id === id)
+    if (!property) return
+    setDeleteTarget({ id: property.id, name: property.name })
+    setDeleteDialogOpen(true)
+  }
+
+  // ── Edit Dialog Handlers ──────────────────────────────────────────────────
+
+  function openEditDialog(property: PropertyData) {
+    setSelectedProperty(property)
+    setEditFormData({
+      name: property.name,
+      address: property.address,
+      type: property.type,
+      totalRooms: property.totalRooms.toString(),
+      contactPhone: (property as PropertyData & { contactPhone?: string }).contactPhone || '',
+      contactEmail: (property as PropertyData & { contactEmail?: string }).contactEmail || '',
+      description: property.description || '',
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!selectedProperty || !editFormData.name.trim()) {
+      toast({ title: 'Validation Error', description: 'Property name is required', variant: 'destructive' })
+      return
+    }
+
     try {
-      const res = await fetch(`/api/properties/${id}`, { method: 'DELETE' })
+      setSubmittingEdit(true)
+      const res = await fetch('/api/properties', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: selectedProperty.id,
+          name: editFormData.name.trim(),
+          address: editFormData.address.trim(),
+          type: editFormData.type,
+          totalRooms: editFormData.totalRooms ? parseInt(editFormData.totalRooms) : undefined,
+          contactPhone: editFormData.contactPhone.trim() || undefined,
+          contactEmail: editFormData.contactEmail.trim() || undefined,
+          description: editFormData.description.trim() || undefined,
+        }),
+      })
+
       if (res.ok) {
-        setProperties((prev) => prev.filter((p) => p.id !== id))
+        toast({ title: 'Success', description: 'Property updated successfully' })
+        setEditDialogOpen(false)
+        setSelectedProperty(null)
+        fetchProperties()
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to update property', variant: 'destructive' })
+      }
+    } catch (error) {
+      console.error('Failed to update property:', error)
+      toast({ title: 'Error', description: 'Failed to update property', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+    }
+  }
+
+  // ── Delete Dialog Handlers ────────────────────────────────────────────────
+
+  async function handleDeleteConfirm() {
+    if (!deleteTarget) return
+    try {
+      setSubmittingEdit(true)
+      const res = await fetch('/api/properties', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: deleteTarget.id }),
+      })
+      if (res.ok) {
+        toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
+        setProperties((prev) => prev.filter((p) => p.id !== deleteTarget.id))
+      } else {
+        const data = await res.json()
+        toast({ title: 'Error', description: data.error || 'Failed to delete property', variant: 'destructive' })
       }
     } catch (error) {
       console.error('Failed to delete property:', error)
+      toast({ title: 'Error', description: 'Failed to delete property', variant: 'destructive' })
+    } finally {
+      setSubmittingEdit(false)
+      setDeleteDialogOpen(false)
+      setDeleteTarget(null)
     }
   }
 
@@ -687,24 +814,169 @@ export function PropertiesPage() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredProperties.map((property) => (
-              <PropertyCard key={property.id} property={property} onDelete={handleDelete} />
+              <PropertyCard key={property.id} property={property} onEdit={openEditDialog} onDelete={handleDelete} />
             ))}
           </div>
         ) : (
           <div className="space-y-3">
             {filteredProperties.map((property) => (
-              <PropertyListItem key={property.id} property={property} onDelete={handleDelete} />
+              <PropertyListItem key={property.id} property={property} onEdit={openEditDialog} onDelete={handleDelete} />
             ))}
           </div>
         )}
       </div>
+
+      {/* ── Edit Property Dialog ──────────────────────────────────────────────── */}
+      <Dialog open={editDialogOpen} onOpenChange={(open) => { setEditDialogOpen(open); if (!open) setSelectedProperty(null) }}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Property</DialogTitle>
+            <DialogDescription>
+              Update the property details below.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Name */}
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-prop-name">Property Name *</Label>
+                <Input
+                  id="edit-prop-name"
+                  placeholder="e.g. Sunshine PG"
+                  value={editFormData.name}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              {/* Type */}
+              <div className="space-y-2">
+                <Label>Property Type *</Label>
+                <Select
+                  value={editFormData.type}
+                  onValueChange={(v) => setEditFormData((prev) => ({ ...prev, type: v as PropertyType }))}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PROPERTY_TYPE_CONFIG).map(([key, cfg]) => (
+                      <SelectItem key={key} value={key}>
+                        {cfg.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Total Rooms */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-prop-rooms">Total Rooms</Label>
+                <Input
+                  id="edit-prop-rooms"
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 20"
+                  value={editFormData.totalRooms}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, totalRooms: e.target.value }))}
+                />
+              </div>
+              {/* Address */}
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-prop-address">Address *</Label>
+                <Input
+                  id="edit-prop-address"
+                  placeholder="Full street address"
+                  value={editFormData.address}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, address: e.target.value }))}
+                  required
+                />
+              </div>
+              {/* Contact Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-prop-phone">Contact Phone</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-prop-phone"
+                    placeholder="e.g. +91 9876543210"
+                    value={editFormData.contactPhone}
+                    onChange={(e) => setEditFormData((prev) => ({ ...prev, contactPhone: e.target.value }))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              {/* Contact Email */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-prop-email">Contact Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-prop-email"
+                    type="email"
+                    placeholder="e.g. info@property.com"
+                    value={editFormData.contactEmail}
+                    onChange={(e) => setEditFormData((prev) => ({ ...prev, contactEmail: e.target.value }))}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              {/* Description */}
+              <div className="sm:col-span-2 space-y-2">
+                <Label htmlFor="edit-prop-desc">Description</Label>
+                <Textarea
+                  id="edit-prop-desc"
+                  placeholder="Brief description of the property..."
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData((prev) => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)} disabled={submittingEdit}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                disabled={submittingEdit}
+              >
+                {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Property
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Delete Confirmation Dialog ─────────────────────────────────────────── */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Property</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone. The property will be permanently removed from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={submittingEdit}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={submittingEdit}
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+            >
+              {submittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </ScrollArea>
   )
 }
 
 // ── Property Card (Grid View) ────────────────────────────────────────────────
 
-function PropertyCard({ property, onDelete }: { property: PropertyData; onDelete: (id: string) => void }) {
+function PropertyCard({ property, onEdit, onDelete }: { property: PropertyData; onEdit: (property: PropertyData) => void; onDelete: (id: string) => void }) {
   const { currentUser } = useAppStore()
   const role = currentUser?.role || ''
   const canUpdate = hasPermission(role, 'properties:update')
@@ -801,7 +1073,7 @@ function PropertyCard({ property, onDelete }: { property: PropertyData; onDelete
           View
         </Button>
         {canUpdate && (
-        <Button variant="outline" size="sm" className="flex-1">
+        <Button variant="outline" size="sm" className="flex-1" onClick={() => onEdit(property)}>
           <Pencil className="mr-1.5 h-3.5 w-3.5" />
           Edit
         </Button>
@@ -823,7 +1095,7 @@ function PropertyCard({ property, onDelete }: { property: PropertyData; onDelete
 
 // ── Property List Item (List View) ──────────────────────────────────────────
 
-function PropertyListItem({ property, onDelete }: { property: PropertyData; onDelete: (id: string) => void }) {
+function PropertyListItem({ property, onEdit, onDelete }: { property: PropertyData; onEdit: (property: PropertyData) => void; onDelete: (id: string) => void }) {
   const { currentUser } = useAppStore()
   const role = currentUser?.role || ''
   const canUpdate = hasPermission(role, 'properties:update')
@@ -885,7 +1157,7 @@ function PropertyListItem({ property, onDelete }: { property: PropertyData; onDe
             </div>
             <div className="flex gap-1.5">
               <Button variant="outline" size="sm"><Eye className="h-3.5 w-3.5" /></Button>
-              {canUpdate && <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>}
+              {canUpdate && <Button variant="outline" size="sm" onClick={() => onEdit(property)}><Pencil className="h-3.5 w-3.5" /></Button>}
               {canDelete && <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50" onClick={() => onDelete(property.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
               <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50">
                 <DoorOpen className="h-3.5 w-3.5" />
