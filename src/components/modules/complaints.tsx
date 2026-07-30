@@ -345,14 +345,14 @@ function ComplaintDetailDialog({
   onAddResolution: (id: string, resolution: string, rating: number) => void
   loading: boolean
 }) {
+  // Derive initial values from complaint
+  const initialAssignTo = complaint?.assignedToId || ''
+  const initialRating = complaint?.rating || 0
+
   const [assignTo, setAssignTo] = useState(initialAssignTo)
   const [newStatus, setNewStatus] = useState<ComplaintStatus | ''>('')
   const [resolutionNotes, setResolutionNotes] = useState('')
   const [resolutionRating, setResolutionRating] = useState(initialRating)
-
-  // Derive initial values from complaint - using key prop on parent Dialog instead of effect
-  const initialAssignTo = complaint?.assignedToId || ''
-  const initialRating = complaint?.rating || 0
 
   if (!complaint) return null
 

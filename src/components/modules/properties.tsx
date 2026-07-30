@@ -689,7 +689,6 @@ function PropertyCard({ property }: { property: PropertyData }) {
   const typeConfig = PROPERTY_TYPE_CONFIG[property.type] || PROPERTY_TYPE_CONFIG.pg
   const amenities = parseAmenities(property.amenities)
   const occupancyPct = property.occupancyPercentage ?? (property.totalBeds > 0 ? Math.round((property.occupancy / property.totalBeds) * 100) : 0)
-  const TypeIcon = getTypeIcon(property.type)
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow group">
