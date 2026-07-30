@@ -122,3 +122,28 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Failed to update complaint' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Complaint id is required' }, { status: 400 })
+    }
+
+    const existingComplaint = await db.complaint.findUnique({ where: { id } })
+    if (!existingComplaint) {
+      return NextResponse.json({ error: 'Complaint not found' }, { status: 404 })
+    }
+
+    // Delete related activity logs first
+    await db.activityLog.deleteMany({ where: { complaintId: id } })
+    await db.complaint.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Complaint deleted successfully', id })
+  } catch (error) {
+    console.error('Complaints DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete complaint' }, { status: 500 })
+  }
+}

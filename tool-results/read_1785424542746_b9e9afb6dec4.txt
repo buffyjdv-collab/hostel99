@@ -1,0 +1,897 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Skeleton } from '@/components/ui/skeleton'
+    11→import { ScrollArea } from '@/components/ui/scroll-area'
+    12→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    13→import {
+    14→  Dialog,
+    15→  DialogContent,
+    16→  DialogDescription,
+    17→  DialogFooter,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→} from '@/components/ui/dialog'
+    21→import {
+    22→  Select,
+    23→  SelectContent,
+    24→  SelectItem,
+    25→  SelectTrigger,
+    26→  SelectValue,
+    27→} from '@/components/ui/select'
+    28→import {
+    29→  Table,
+    30→  TableBody,
+    31→  TableCell,
+    32→  TableHead,
+    33→  TableHeader,
+    34→  TableRow,
+    35→} from '@/components/ui/table'
+    36→import {
+    37→  Settings,
+    38→  User,
+    39→  CreditCard,
+    40→  Users,
+    41→  Database,
+    42→  Shield,
+    43→  Crown,
+    44→  Gem,
+    45→  Star,
+    46→  Building2,
+    47→  Loader2,
+    48→  CheckCircle2,
+    49→  AlertCircle,
+    50→  Clock,
+    51→  Mail,
+    52→  Phone,
+    53→  Pencil,
+    54→  Plus,
+    55→  Server,
+    56→  HardDrive,
+    57→  Activity,
+    58→  RefreshCw,
+    59→  Save,
+    60→  Zap,
+    61→  ChevronRight,
+    62→} from 'lucide-react'
+    63→
+    64→// ── Types ────────────────────────────────────────────────────────────────────
+    65→
+    66→interface UserInfo {
+    67→  id: string
+    68→  name: string
+    69→  email: string
+    70→  phone?: string
+    71→  role: string
+    72→  isActive?: boolean
+    73→  lastLogin?: string
+    74→  avatar?: string
+    75→}
+    76→
+    77→interface PlanInfo {
+    78→  key: string
+    79→  name: string
+    80→  price: number
+    81→  period: string
+    82→  features: string[]
+    83→  highlighted?: boolean
+    84→  current?: boolean
+    85→  icon: React.ReactNode
+    86→  color: string
+    87→}
+    88→
+    89→// ── Constants ────────────────────────────────────────────────────────────────
+    90→
+    91→const PLANS: PlanInfo[] = [
+    92→  {
+    93→    key: 'basic',
+    94→    name: 'Basic',
+    95→    price: 999,
+    96→    period: '/month',
+    97→    icon: <Zap className="h-5 w-5" />,
+    98→    color: 'text-gray-600',
+    99→    features: [
+   100→      'Up to 1 property',
+   101→      'Up to 50 beds',
+   102→      'Basic tenant management',
+   103→      'Payment tracking',
+   104→      'Email support',
+   105→    ],
+   106→  },
+   107→  {
+   108→    key: 'premium',
+   109→    name: 'Premium',
+   110→    price: 2499,
+   111→    period: '/month',
+   112→    icon: <Star className="h-5 w-5" />,
+   113→    color: 'text-emerald-600',
+   114→    highlighted: true,
+   115→    current: true,
+   116→    features: [
+   117→      'Up to 5 properties',
+   118→      'Up to 500 beds',
+   119→      'Advanced tenant management',
+   120→      'Lead CRM',
+   121→      'Payment & expense tracking',
+   122→      'Complaint management',
+   123→      'Staff management',
+   124→      'WhatsApp integration',
+   125→      'Priority support',
+   126→    ],
+   127→  },
+   128→  {
+   129→    key: 'gold',
+   130→    name: 'Gold',
+   131→    price: 4999,
+   132→    period: '/month',
+   133→    icon: <Crown className="h-5 w-5" />,
+   134→    color: 'text-amber-600',
+   135→    features: [
+   136→      'Up to 20 properties',
+   137→      'Unlimited beds',
+   138→      'All Premium features',
+   139→      'Advanced analytics',
+   140→      'Custom reports',
+   141→      'Multi-user access',
+   142→      'API access',
+   143→      'SMS & push notifications',
+   144→      'Dedicated account manager',
+   145→    ],
+   146→  },
+   147→  {
+   148→    key: 'white_label',
+   149→    name: 'White-Label',
+   150→    price: 9999,
+   151→    period: '/month',
+   152→    icon: <Gem className="h-5 w-5" />,
+   153→    color: 'text-violet-600',
+   154→    features: [
+   155→      'Unlimited properties',
+   156→      'Unlimited beds',
+   157→      'All Gold features',
+   158→      'Custom branding',
+   159→      'Custom domain',
+   160→      'White-label app',
+   161→      'Custom integrations',
+   162→      'SLA guarantee',
+   163→      '24/7 phone support',
+   164→      'On-premise deployment option',
+   165→    ],
+   166→  },
+   167→]
+   168→
+   169→const ROLE_LABELS: Record<string, string> = {
+   170→  super_admin: 'Super Admin',
+   171→  owner: 'Owner',
+   172→  manager: 'Manager',
+   173→  staff: 'Staff',
+   174→  tenant: 'Tenant',
+   175→}
+   176→
+   177→// ── Helpers ──────────────────────────────────────────────────────────────────
+   178→
+   179→function formatCurrency(amount: number) {
+   180→  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+   181→}
+   182→
+   183→function formatDate(date: string | Date | null | undefined) {
+   184→  if (!date) return 'Never'
+   185→  return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   186→}
+   187→
+   188→function formatDateTime(date: string | Date | null | undefined) {
+   189→  if (!date) return 'Never'
+   190→  return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+   191→}
+   192→
+   193→// ── Component ────────────────────────────────────────────────────────────────
+   194→
+   195→export function SettingsPage() {
+   196→  const { currentUser } = useAppStore()
+   197→  const [loading, setLoading] = useState(true)
+   198→  const [users, setUsers] = useState<UserInfo[]>([])
+   199→  const [seeding, setSeeding] = useState(false)
+   200→  const [seedResult, setSeedResult] = useState<{ success: boolean; message: string } | null>(null)
+   201→
+   202→  // Profile edit state
+   203→  const [profileEditing, setProfileEditing] = useState(false)
+   204→  const [profileForm, setProfileForm] = useState({
+   205→    name: currentUser?.name || '',
+   206→    email: currentUser?.email || '',
+   207→    phone: '',
+   208→  })
+   209→  const [profileSaving, setProfileSaving] = useState(false)
+   210→
+   211→  // Add user dialog
+   212→  const [addUserOpen, setAddUserOpen] = useState(false)
+   213→  const [userForm, setUserForm] = useState({
+   214→    name: '',
+   215→    email: '',
+   216→    phone: '',
+   217→    role: 'manager',
+   218→  })
+   219→  const [addUserSaving, setAddUserSaving] = useState(false)
+   220→
+   221→  // ── Data Fetching ──────────────────────────────────────────────────────
+   222→
+   223→  const fetchUsers = useCallback(async () => {
+   224→    try {
+   225→      const res = await fetch('/api/staff')
+   226→      if (res.ok) {
+   227→        const data = await res.json()
+   228→        setUsers(Array.isArray(data) ? data.map((s: { id: string; name: string; phone: string; userId?: string; user?: { id: string; name: string; email: string; phone?: string; role: string; isActive?: boolean; lastLogin?: string } }) => ({
+   229→          id: s.user?.id || s.id,
+   230→          name: s.user?.name || s.name,
+   231→          email: s.user?.email || '',
+   232→          phone: s.user?.phone || s.phone,
+   233→          role: s.user?.role || 'staff',
+   234→          isActive: s.user?.isActive,
+   235→          lastLogin: s.user?.lastLogin,
+   236→        })) : [])
+   237→      }
+   238→    } catch { /* ignore */ }
+   239→  }, [])
+   240→
+   241→  useEffect(() => {
+   242→    async function init() {
+   243→      await fetchUsers()
+   244→      setLoading(false)
+   245→    }
+   246→    init()
+   247→  }, [fetchUsers])
+   248→
+   249→  // Populate profile form from currentUser - derive instead of effect
+   250→  const _profileFormDefault = currentUser ? {
+   251→    name: currentUser.name,
+   252→    email: currentUser.email,
+   253→    phone: '',
+   254→  } : { name: '', email: '', phone: '' }
+   255→
+   256→  // ── Handlers ───────────────────────────────────────────────────────────
+   257→
+   258→  const handleSaveProfile = async () => {
+   259→    setProfileSaving(true)
+   260→    // Simulate save
+   261→    await new Promise((r) => setTimeout(r, 1000))
+   262→    setProfileEditing(false)
+   263→    setProfileSaving(false)
+   264→  }
+   265→
+   266→  const handleSeedData = async () => {
+   267→    setSeeding(true)
+   268→    setSeedResult(null)
+   269→    try {
+   270→      const res = await fetch('/api/seed', { method: 'POST' })
+   271→      const data = await res.json()
+   272→      setSeedResult({
+   273→        success: data.success,
+   274→        message: data.message || data.error || 'Seed completed',
+   275→      })
+   276→    } catch (err) {
+   277→      setSeedResult({ success: false, message: 'Failed to seed data' })
+   278→    }
+   279→    setSeeding(false)
+   280→  }
+   281→
+   282→  const handleAddUser = async () => {
+   283→    if (!userForm.name || !userForm.email) return
+   284→    setAddUserSaving(true)
+   285→    await new Promise((r) => setTimeout(r, 1000))
+   286→    setUsers((prev) => [
+   287→      ...prev,
+   288→      {
+   289→        id: `user-${Date.now()}`,
+   290→        name: userForm.name,
+   291→        email: userForm.email,
+   292→        phone: userForm.phone,
+   293→        role: userForm.role,
+   294→        isActive: true,
+   295→        lastLogin: undefined,
+   296→      },
+   297→    ])
+   298→    setAddUserOpen(false)
+   299→    setUserForm({ name: '', email: '', phone: '', role: 'manager' })
+   300→    setAddUserSaving(false)
+   301→  }
+   302→
+   303→  // ── Loading Skeleton ────────────────────────────────────────────────────
+   304→
+   305→  if (loading) {
+   306→    return (
+   307→      <div className="p-6 space-y-6">
+   308→        <Skeleton className="h-10 w-48" />
+   309→        <Skeleton className="h-10 w-80" />
+   310→        <div className="grid gap-4 md:grid-cols-2">
+   311→          <Skeleton className="h-64 rounded-lg" />
+   312→          <Skeleton className="h-64 rounded-lg" />
+   313→        </div>
+   314→        <Skeleton className="h-[300px] rounded-lg" />
+   315→      </div>
+   316→    )
+   317→  }
+   318→
+   319→  // ── Render ──────────────────────────────────────────────────────────────
+   320→
+   321→  return (
+   322→    <div className="p-6 space-y-6">
+   323→      {/* Header */}
+   324→      <div>
+   325→        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+   326→          <Settings className="h-6 w-6 text-emerald-600" />
+   327→          Settings
+   328→        </h1>
+   329→        <p className="text-muted-foreground mt-1">Manage your account, subscription, and system settings</p>
+   330→      </div>
+   331→
+   332→      {/* Tabs */}
+   333→      <Tabs defaultValue="profile" className="space-y-4">
+   334→        <TabsList className="bg-emerald-50">
+   335→          <TabsTrigger value="profile" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+   336→            <User className="h-4 w-4 mr-2" />
+   337→            Profile
+   338→          </TabsTrigger>
+   339→          <TabsTrigger value="subscription" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+   340→            <CreditCard className="h-4 w-4 mr-2" />
+   341→            Subscription
+   342→          </TabsTrigger>
+   343→          <TabsTrigger value="users" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+   344→            <Users className="h-4 w-4 mr-2" />
+   345→            Users
+   346→          </TabsTrigger>
+   347→          <TabsTrigger value="system" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+   348→            <Database className="h-4 w-4 mr-2" />
+   349→            System
+   350→          </TabsTrigger>
+   351→        </TabsList>
+   352→
+   353→        {/* ── Profile Tab ─────────────────────────────────────────────────── */}
+   354→        <TabsContent value="profile" className="space-y-6">
+   355→          <div className="grid gap-6 md:grid-cols-2">
+   356→            {/* Current Profile Card */}
+   357→            <Card className="border-emerald-200">
+   358→              <CardHeader>
+   359→                <div className="flex items-center justify-between">
+   360→                  <CardTitle className="text-base flex items-center gap-2">
+   361→                    <User className="h-4 w-4 text-emerald-600" />
+   362→                    Current Profile
+   363→                  </CardTitle>
+   364→                  {!profileEditing && (
+   365→                    <Button variant="outline" size="sm" className="gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50" onClick={() => setProfileEditing(true)}>
+   366→                      <Pencil className="h-3.5 w-3.5" />
+   367→                      Edit
+   368→                    </Button>
+   369→                  )}
+   370→                </div>
+   371→              </CardHeader>
+   372→              <CardContent className="space-y-4">
+   373→                <div className="flex items-center gap-4">
+   374→                  <div className="h-16 w-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-bold text-xl">
+   375→                    {(currentUser?.name || 'U').charAt(0).toUpperCase()}
+   376→                  </div>
+   377→                  <div>
+   378→                    <h3 className="font-semibold text-lg">{currentUser?.name || 'Unknown User'}</h3>
+   379→                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 capitalize">
+   380→                      <Shield className="h-3 w-3 mr-1" />
+   381→                      {ROLE_LABELS[currentUser?.role || ''] || currentUser?.role || 'N/A'}
+   382→                    </Badge>
+   383→                  </div>
+   384→                </div>
+   385→                <div className="space-y-3 pt-2 border-t">
+   386→                  <div className="flex items-center gap-2 text-sm">
+   387→                    <Mail className="h-4 w-4 text-gray-400" />
+   388→                    <span className="text-muted-foreground">Email:</span>
+   389→                    <span>{currentUser?.email || 'N/A'}</span>
+   390→                  </div>
+   391→                  <div className="flex items-center gap-2 text-sm">
+   392→                    <Phone className="h-4 w-4 text-gray-400" />
+   393→                    <span className="text-muted-foreground">Phone:</span>
+   394→                    <span>{profileForm.phone || 'Not set'}</span>
+   395→                  </div>
+   396→                  <div className="flex items-center gap-2 text-sm">
+   397→                    <Shield className="h-4 w-4 text-gray-400" />
+   398→                    <span className="text-muted-foreground">Role:</span>
+   399→                    <span className="capitalize">{ROLE_LABELS[currentUser?.role || ''] || currentUser?.role || 'N/A'}</span>
+   400→                  </div>
+   401→                </div>
+   402→              </CardContent>
+   403→            </Card>
+   404→
+   405→            {/* Edit Profile Card */}
+   406→            <Card className={profileEditing ? 'border-emerald-300 ring-1 ring-emerald-200' : ''}>
+   407→              <CardHeader>
+   408→                <CardTitle className="text-base flex items-center gap-2">
+   409→                  <Pencil className="h-4 w-4 text-emerald-600" />
+   410→                  Edit Profile
+   411→                </CardTitle>
+   412→                <CardDescription>Update your personal information</CardDescription>
+   413→              </CardHeader>
+   414→              <CardContent className="space-y-4">
+   415→                <div className="space-y-2">
+   416→                  <Label htmlFor="profile-name">Full Name</Label>
+   417→                  <Input
+   418→                    id="profile-name"
+   419→                    value={profileForm.name}
+   420→                    onChange={(e) => setProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+   421→                    disabled={!profileEditing}
+   422→                  />
+   423→                </div>
+   424→                <div className="space-y-2">
+   425→                  <Label htmlFor="profile-email">Email</Label>
+   426→                  <Input
+   427→                    id="profile-email"
+   428→                    type="email"
+   429→                    value={profileForm.email}
+   430→                    onChange={(e) => setProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+   431→                    disabled={!profileEditing}
+   432→                  />
+   433→                </div>
+   434→                <div className="space-y-2">
+   435→                  <Label htmlFor="profile-phone">Phone</Label>
+   436→                  <Input
+   437→                    id="profile-phone"
+   438→                    value={profileForm.phone}
+   439→                    onChange={(e) => setProfileForm((prev) => ({ ...prev, phone: e.target.value }))}
+   440→                    disabled={!profileEditing}
+   441→                    placeholder="Enter phone number"
+   442→                  />
+   443→                </div>
+   444→                {profileEditing && (
+   445→                  <div className="flex gap-2 pt-2">
+   446→                    <Button
+   447→                      onClick={handleSaveProfile}
+   448→                      disabled={profileSaving}
+   449→                      className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+   450→                    >
+   451→                      {profileSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+   452→                      Save Changes
+   453→                    </Button>
+   454→                    <Button variant="outline" onClick={() => setProfileEditing(false)}>
+   455→                      Cancel
+   456→                    </Button>
+   457→                  </div>
+   458→                )}
+   459→              </CardContent>
+   460→            </Card>
+   461→          </div>
+   462→        </TabsContent>
+   463→
+   464→        {/* ── Subscription Tab ─────────────────────────────────────────────── */}
+   465→        <TabsContent value="subscription" className="space-y-6">
+   466→          {/* Current Plan */}
+   467→          <Card className="border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50">
+   468→            <CardContent className="p-6">
+   469→              <div className="flex items-center justify-between">
+   470→                <div className="flex items-center gap-4">
+   471→                  <div className="h-12 w-12 rounded-full bg-emerald-100 flex items-center justify-center">
+   472→                    <Star className="h-6 w-6 text-emerald-600" />
+   473→                  </div>
+   474→                  <div>
+   475→                    <h3 className="font-semibold text-lg">Premium Plan</h3>
+   476→                    <p className="text-sm text-emerald-600">Your current subscription</p>
+   477→                  </div>
+   478→                </div>
+   479→                <div className="text-right">
+   480→                  <p className="text-2xl font-bold text-emerald-700">{formatCurrency(2499)}</p>
+   481→                  <p className="text-sm text-muted-foreground">/month</p>
+   482→                </div>
+   483→              </div>
+   484→              <div className="mt-4 pt-4 border-t border-emerald-200">
+   485→                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+   486→                  {['5 Properties', '500 Beds', 'Priority Support', 'WhatsApp Integration'].map((feature) => (
+   487→                    <div key={feature} className="flex items-center gap-1.5 text-sm text-emerald-700">
+   488→                      <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+   489→                      {feature}
+   490→                    </div>
+   491→                  ))}
+   492→                </div>
+   493→              </div>
+   494→            </CardContent>
+   495→          </Card>
+   496→
+   497→          {/* Plan Comparison */}
+   498→          <div>
+   499→            <h3 className="text-lg font-semibold mb-4">Plan Comparison</h3>
+   500→            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+   501→              {PLANS.map((plan) => (
+   502→                <Card
+   503→                  key={plan.key}
+   504→                  className={`relative transition-all hover:shadow-md ${
+   505→                    plan.highlighted
+   506→                      ? 'border-emerald-400 ring-2 ring-emerald-200'
+   507→                      : plan.current
+   508→                      ? 'border-emerald-300'
+   509→                      : ''
+   510→                  }`}
+   511→                >
+   512→                  {plan.highlighted && (
+   513→                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+   514→                      <Badge className="bg-emerald-600 text-white">Popular</Badge>
+   515→                    </div>
+   516→                  )}
+   517→                  {plan.current && (
+   518→                    <div className="absolute -top-3 right-3">
+   519→                      <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">Current</Badge>
+   520→                    </div>
+   521→                  )}
+   522→                  <CardHeader className="pb-2">
+   523→                    <div className="flex items-center gap-2">
+   524→                      <span className={plan.color}>{plan.icon}</span>
+   525→                      <CardTitle className="text-base">{plan.name}</CardTitle>
+   526→                    </div>
+   527→                    <div className="mt-2">
+   528→                      <span className="text-2xl font-bold">{formatCurrency(plan.price)}</span>
+   529→                      <span className="text-sm text-muted-foreground">{plan.period}</span>
+   530→                    </div>
+   531→                  </CardHeader>
+   532→                  <CardContent className="space-y-3">
+   533→                    <ul className="space-y-2">
+   534→                      {plan.features.map((feature) => (
+   535→                        <li key={feature} className="flex items-start gap-2 text-sm">
+   536→                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+   537→                          <span>{feature}</span>
+   538→                        </li>
+   539→                      ))}
+   540→                    </ul>
+   541→                    <Button
+   542→                      className={`w-full mt-2 ${
+   543→                        plan.current
+   544→                          ? 'bg-gray-100 text-gray-500 hover:bg-gray-100 cursor-default'
+   545→                          : plan.highlighted
+   546→                          ? 'bg-emerald-600 hover:bg-emerald-700'
+   547→                          : 'bg-white border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+   548→                      }`}
+   549→                      variant={plan.current ? 'secondary' : plan.highlighted ? 'default' : 'outline'}
+   550→                      disabled={plan.current}
+   551→                    >
+   552→                      {plan.current ? 'Current Plan' : 'Upgrade'}
+   553→                      {!plan.current && <ChevronRight className="h-4 w-4 ml-1" />}
+   554→                    </Button>
+   555→                  </CardContent>
+   556→                </Card>
+   557→              ))}
+   558→            </div>
+   559→          </div>
+   560→        </TabsContent>
+   561→
+   562→        {/* ── Users Tab ───────────────────────────────────────────────────── */}
+   563→        <TabsContent value="users" className="space-y-6">
+   564→          <div className="flex items-center justify-between">
+   565→            <div>
+   566→              <h3 className="text-lg font-semibold">User Management</h3>
+   567→              <p className="text-sm text-muted-foreground">Manage users and their roles</p>
+   568→            </div>
+   569→            <Button onClick={() => setAddUserOpen(true)} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+   570→              <Plus className="h-4 w-4" />
+   571→              Add User
+   572→            </Button>
+   573→          </div>
+   574→
+   575→          <Card>
+   576→            <CardContent className="p-0">
+   577→              <Table>
+   578→                <TableHeader>
+   579→                  <TableRow>
+   580→                    <TableHead>Name</TableHead>
+   581→                    <TableHead>Email</TableHead>
+   582→                    <TableHead>Role</TableHead>
+   583→                    <TableHead>Status</TableHead>
+   584→                    <TableHead>Last Login</TableHead>
+   585→                    <TableHead className="text-right">Actions</TableHead>
+   586→                  </TableRow>
+   587→                </TableHeader>
+   588→                <TableBody>
+   589→                  {users.length === 0 ? (
+   590→                    <TableRow>
+   591→                      <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+   592→                        <Users className="h-10 w-10 text-gray-300 mx-auto mb-2" />
+   593→                        No users found
+   594→                      </TableCell>
+   595→                    </TableRow>
+   596→                  ) : (
+   597→                    users.map((user) => (
+   598→                      <TableRow key={user.id}>
+   599→                        <TableCell>
+   600→                          <div className="flex items-center gap-2">
+   601→                            <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 font-medium text-sm">
+   602→                              {user.name.charAt(0).toUpperCase()}
+   603→                            </div>
+   604→                            <span className="font-medium">{user.name}</span>
+   605→                          </div>
+   606→                        </TableCell>
+   607→                        <TableCell className="text-sm text-muted-foreground">{user.email}</TableCell>
+   608→                        <TableCell>
+   609→                          <Badge
+   610→                            variant="outline"
+   611→                            className={
+   612→                              user.role === 'super_admin' ? 'border-red-200 text-red-700 bg-red-50' :
+   613→                              user.role === 'owner' ? 'border-purple-200 text-purple-700 bg-purple-50' :
+   614→                              user.role === 'manager' ? 'border-emerald-200 text-emerald-700 bg-emerald-50' :
+   615→                              user.role === 'staff' ? 'border-blue-200 text-blue-700 bg-blue-50' :
+   616→                              'border-gray-200 text-gray-700 bg-gray-50'
+   617→                            }
+   618→                          >
+   619→                            {ROLE_LABELS[user.role] || user.role}
+   620→                          </Badge>
+   621→                        </TableCell>
+   622→                        <TableCell>
+   623→                          <Badge
+   624→                            className={
+   625→                              user.isActive !== false
+   626→                                ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+   627→                                : 'bg-red-100 text-red-700 border-red-200'
+   628→                            }
+   629→                          >
+   630→                            {user.isActive !== false ? 'Active' : 'Inactive'}
+   631→                          </Badge>
+   632→                        </TableCell>
+   633→                        <TableCell className="text-sm text-muted-foreground">
+   634→                          {formatDateTime(user.lastLogin)}
+   635→                        </TableCell>
+   636→                        <TableCell className="text-right">
+   637→                          <Button variant="ghost" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50">
+   638→                            <Pencil className="h-3.5 w-3.5" />
+   639→                          </Button>
+   640→                        </TableCell>
+   641→                      </TableRow>
+   642→                    ))
+   643→                  )}
+   644→                </TableBody>
+   645→              </Table>
+   646→            </CardContent>
+   647→          </Card>
+   648→
+   649→          {/* Role Info */}
+   650→          <Card className="border-emerald-200 bg-emerald-50/30">
+   651→            <CardHeader>
+   652→              <CardTitle className="text-base flex items-center gap-2">
+   653→                <Shield className="h-4 w-4 text-emerald-600" />
+   654→                Role Permissions
+   655→              </CardTitle>
+   656→            </CardHeader>
+   657→            <CardContent>
+   658→              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+   659→                {[
+   660→                  { role: 'Super Admin', desc: 'Full system access, manage all properties and users', color: 'text-red-600' },
+   661→                  { role: 'Owner', desc: 'Manage owned properties, tenants, and finances', color: 'text-purple-600' },
+   662→                  { role: 'Manager', desc: 'Manage properties, tenants, leads, and staff', color: 'text-emerald-600' },
+   663→                  { role: 'Staff', desc: 'View assigned tasks, update attendance', color: 'text-blue-600' },
+   664→                  { role: 'Tenant', desc: 'View own profile, payments, and complaints', color: 'text-gray-600' },
+   665→                ].map((r) => (
+   666→                  <div key={r.role} className="flex items-start gap-2 p-3 rounded-lg bg-white border">
+   667→                    <Shield className={`h-4 w-4 mt-0.5 ${r.color}`} />
+   668→                    <div>
+   669→                      <p className="font-medium text-sm">{r.role}</p>
+   670→                      <p className="text-xs text-muted-foreground">{r.desc}</p>
+   671→                    </div>
+   672→                  </div>
+   673→                ))}
+   674→              </div>
+   675→            </CardContent>
+   676→          </Card>
+   677→        </TabsContent>
+   678→
+   679→        {/* ── System Tab ──────────────────────────────────────────────────── */}
+   680→        <TabsContent value="system" className="space-y-6">
+   681→          {/* Database Info */}
+   682→          <Card className="border-emerald-200">
+   683→            <CardHeader>
+   684→              <CardTitle className="text-base flex items-center gap-2">
+   685→                <Database className="h-4 w-4 text-emerald-600" />
+   686→                Database Information
+   687→              </CardTitle>
+   688→            </CardHeader>
+   689→            <CardContent>
+   690→              <div className="grid gap-4 md:grid-cols-3">
+   691→                <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-100">
+   692→                  <Server className="h-5 w-5 text-emerald-600" />
+   693→                  <div>
+   694→                    <p className="text-sm font-medium">Database Type</p>
+   695→                    <p className="text-xs text-muted-foreground">SQLite (Local)</p>
+   696→                  </div>
+   697→                </div>
+   698→                <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-100">
+   699→                  <HardDrive className="h-5 w-5 text-emerald-600" />
+   700→                  <div>
+   701→                    <p className="text-sm font-medium">Storage</p>
+   702→                    <p className="text-xs text-muted-foreground">Local filesystem</p>
+   703→                  </div>
+   704→                </div>
+   705→                <div className="flex items-center gap-3 p-3 rounded-lg bg-emerald-50/50 border border-emerald-100">
+   706→                  <Activity className="h-5 w-5 text-emerald-600" />
+   707→                  <div>
+   708→                    <p className="text-sm font-medium">Status</p>
+   709→                    <p className="text-xs text-emerald-600 flex items-center gap-1">
+   710→                      <CheckCircle2 className="h-3 w-3" />
+   711→                      Operational
+   712→                    </p>
+   713→                  </div>
+   714→                </div>
+   715→              </div>
+   716→            </CardContent>
+   717→          </Card>
+   718→
+   719→          {/* Seed Data */}
+   720→          <Card className="border-amber-200">
+   721→            <CardHeader>
+   722→              <CardTitle className="text-base flex items-center gap-2">
+   723→                <RefreshCw className="h-4 w-4 text-amber-600" />
+   724→                Seed Database
+   725→              </CardTitle>
+   726→              <CardDescription>
+   727→                Populate the database with sample data for testing and development. This will add sample properties, tenants, payments, and more.
+   728→              </CardDescription>
+   729→            </CardHeader>
+   730→            <CardContent>
+   731→              <div className="flex items-center gap-4">
+   732→                <Button
+   733→                  onClick={handleSeedData}
+   734→                  disabled={seeding}
+   735→                  className="gap-2 bg-amber-600 hover:bg-amber-700"
+   736→                >
+   737→                  {seeding ? (
+   738→                    <Loader2 className="h-4 w-4 animate-spin" />
+   739→                  ) : (
+   740→                    <RefreshCw className="h-4 w-4" />
+   741→                  )}
+   742→                  {seeding ? 'Seeding...' : 'Seed Sample Data'}
+   743→                </Button>
+   744→                {seedResult && (
+   745→                  <div className={`flex items-center gap-2 text-sm ${seedResult.success ? 'text-emerald-600' : 'text-red-600'}`}>
+   746→                    {seedResult.success ? (
+   747→                      <CheckCircle2 className="h-4 w-4" />
+   748→                    ) : (
+   749→                      <AlertCircle className="h-4 w-4" />
+   750→                    )}
+   751→                    {seedResult.message}
+   752→                  </div>
+   753→                )}
+   754→              </div>
+   755→            </CardContent>
+   756→          </Card>
+   757→
+   758→          {/* System Health */}
+   759→          <Card className="border-emerald-200">
+   760→            <CardHeader>
+   761→              <CardTitle className="text-base flex items-center gap-2">
+   762→                <Activity className="h-4 w-4 text-emerald-600" />
+   763→                System Health
+   764→              </CardTitle>
+   765→            </CardHeader>
+   766→            <CardContent>
+   767→              <div className="grid gap-4 md:grid-cols-2">
+   768→                {[
+   769→                  { name: 'API Server', status: 'healthy', detail: 'Response time: < 50ms' },
+   770→                  { name: 'Database', status: 'healthy', detail: 'Connection: Active' },
+   771→                  { name: 'File Storage', status: 'healthy', detail: 'Usage: 12%' },
+   772→                  { name: 'Background Jobs', status: 'healthy', detail: 'No pending jobs' },
+   773→                ].map((service) => (
+   774→                  <div key={service.name} className="flex items-center justify-between p-3 rounded-lg border">
+   775→                    <div className="flex items-center gap-3">
+   776→                      <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+   777→                      <div>
+   778→                        <p className="font-medium text-sm">{service.name}</p>
+   779→                        <p className="text-xs text-muted-foreground">{service.detail}</p>
+   780→                      </div>
+   781→                    </div>
+   782→                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+   783→                      Healthy
+   784→                    </Badge>
+   785→                  </div>
+   786→                ))}
+   787→              </div>
+   788→            </CardContent>
+   789→          </Card>
+   790→
+   791→          {/* App Info */}
+   792→          <Card>
+   793→            <CardHeader>
+   794→              <CardTitle className="text-base">Application Info</CardTitle>
+   795→            </CardHeader>
+   796→            <CardContent>
+   797→              <div className="grid gap-3 md:grid-cols-2 text-sm">
+   798→                <div className="flex justify-between p-2 border-b">
+   799→                  <span className="text-muted-foreground">Version</span>
+   800→                  <span className="font-medium">1.0.0</span>
+   801→                </div>
+   802→                <div className="flex justify-between p-2 border-b">
+   803→                  <span className="text-muted-foreground">Environment</span>
+   804→                  <span className="font-medium">Development</span>
+   805→                </div>
+   806→                <div className="flex justify-between p-2 border-b">
+   807→                  <span className="text-muted-foreground">Framework</span>
+   808→                  <span className="font-medium">Next.js 16</span>
+   809→                </div>
+   810→                <div className="flex justify-between p-2 border-b">
+   811→                  <span className="text-muted-foreground">Database</span>
+   812→                  <span className="font-medium">SQLite / Prisma</span>
+   813→                </div>
+   814→                <div className="flex justify-between p-2 border-b">
+   815→                  <span className="text-muted-foreground">UI Framework</span>
+   816→                  <span className="font-medium">shadcn/ui + Tailwind</span>
+   817→                </div>
+   818→                <div className="flex justify-between p-2 border-b">
+   819→                  <span className="text-muted-foreground">Last Deployment</span>
+   820→                  <span className="font-medium">{formatDate(new Date())}</span>
+   821→                </div>
+   822→              </div>
+   823→            </CardContent>
+   824→          </Card>
+   825→        </TabsContent>
+   826→      </Tabs>
+   827→
+   828→      {/* Add User Dialog */}
+   829→      <Dialog open={addUserOpen} onOpenChange={setAddUserOpen}>
+   830→        <DialogContent className="sm:max-w-[450px]">
+   831→          <DialogHeader>
+   832→            <DialogTitle className="flex items-center gap-2">
+   833→              <User className="h-5 w-5 text-emerald-600" />
+   834→              Add User
+   835→            </DialogTitle>
+   836→            <DialogDescription>Add a new user to the system with a specific role.</DialogDescription>
+   837→          </DialogHeader>
+   838→          <div className="space-y-4 py-4">
+   839→            <div className="space-y-2">
+   840→              <Label htmlFor="user-name">Full Name</Label>
+   841→              <Input
+   842→                id="user-name"
+   843→                placeholder="Enter full name"
+   844→                value={userForm.name}
+   845→                onChange={(e) => setUserForm((prev) => ({ ...prev, name: e.target.value }))}
+   846→              />
+   847→            </div>
+   848→            <div className="space-y-2">
+   849→              <Label htmlFor="user-email">Email</Label>
+   850→              <Input
+   851→                id="user-email"
+   852→                type="email"
+   853→                placeholder="Enter email address"
+   854→                value={userForm.email}
+   855→                onChange={(e) => setUserForm((prev) => ({ ...prev, email: e.target.value }))}
+   856→              />
+   857→            </div>
+   858→            <div className="space-y-2">
+   859→              <Label htmlFor="user-phone">Phone</Label>
+   860→              <Input
+   861→                id="user-phone"
+   862→                placeholder="Enter phone number"
+   863→                value={userForm.phone}
+   864→                onChange={(e) => setUserForm((prev) => ({ ...prev, phone: e.target.value }))}
+   865→              />
+   866→            </div>
+   867→            <div className="space-y-2">
+   868→              <Label>Role</Label>
+   869→              <Select value={userForm.role} onValueChange={(v) => setUserForm((prev) => ({ ...prev, role: v }))}>
+   870→                <SelectTrigger>
+   871→                  <SelectValue />
+   872→                </SelectTrigger>
+   873→                <SelectContent>
+   874→                  <SelectItem value="owner">Owner</SelectItem>
+   875→                  <SelectItem value="manager">Manager</SelectItem>
+   876→                  <SelectItem value="staff">Staff</SelectItem>
+   877→                </SelectContent>
+   878→              </Select>
+   879→            </div>
+   880→          </div>
+   881→          <DialogFooter>
+   882→            <Button variant="outline" onClick={() => setAddUserOpen(false)}>Cancel</Button>
+   883→            <Button
+   884→              onClick={handleAddUser}
+   885→              disabled={addUserSaving || !userForm.name || !userForm.email}
+   886→              className="bg-emerald-600 hover:bg-emerald-700"
+   887→            >
+   888→              {addUserSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   889→              Add User
+   890→            </Button>
+   891→          </DialogFooter>
+   892→        </DialogContent>
+   893→      </Dialog>
+   894→    </div>
+   895→  )
+   896→}
+   897→

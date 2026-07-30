@@ -48,6 +48,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
+  Loader2,
+  Megaphone,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -338,17 +340,37 @@ function ChartSkeleton() {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function DashboardPage() {
-  const { setCurrentPage } = useAppStore()
+  const { setCurrentPage, currentUser } = useAppStore()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Tenant-specific data
+  const [tenantData, setTenantData] = useState<{ payments: any[]; complaints: any[]; notices: any[] } | null>(null)
 
   useEffect(() => {
     async function fetchDashboard() {
       try {
-        const res = await fetch('/api/dashboard')
-        if (res.ok) {
-          const json = await res.json()
-          setData(json)
+        if (currentUser?.role === 'tenant') {
+          // Fetch tenant-specific data
+          const [payRes, compRes, noticeRes] = await Promise.all([
+            fetch('/api/payments?tenantId=' + currentUser.id),
+            fetch('/api/complaints'),
+            fetch('/api/notices'),
+          ])
+          const payData = payRes.ok ? await payRes.json() : { payments: [] }
+          const compData = compRes.ok ? await compRes.json() : { complaints: [] }
+          const noticeData = noticeRes.ok ? await noticeRes.json() : { notices: [] }
+          setTenantData({
+            payments: payData.payments || [],
+            complaints: (compData.complaints || []).filter((c: any) => c.tenantId === currentUser.id || c.createdById === currentUser.id),
+            notices: noticeData.notices || [],
+          })
+        } else {
+          const res = await fetch('/api/dashboard')
+          if (res.ok) {
+            const json = await res.json()
+            setData(json)
+          }
         }
       } catch (err) {
         console.error('Failed to fetch dashboard data:', err)
@@ -357,7 +379,7 @@ export function DashboardPage() {
       }
     }
     fetchDashboard()
-  }, [])
+  }, [currentUser])
 
   // ── Derived chart data ───────────────────────────────────────────────────
 
@@ -396,6 +418,126 @@ export function DashboardPage() {
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  // Tenant Dashboard
+  if (currentUser?.role === 'tenant') {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">My Dashboard</h1>
+            <p className="text-muted-foreground text-sm">Welcome back, {currentUser.name}!</p>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <CalendarDays className="w-4 h-4" />
+            {formatDate(new Date())}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>
+        ) : (
+          <>
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="cursor-pointer hover:border-emerald-300 transition-colors" onClick={() => setCurrentPage('payments')}>
+                <CardContent className="flex items-center gap-4 p-6">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <IndianRupee className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">My Payments</h3>
+                    <p className="text-sm text-muted-foreground">View payment history & dues</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="cursor-pointer hover:border-amber-300 transition-colors" onClick={() => setCurrentPage('complaints')}>
+                <CardContent className="flex items-center gap-4 p-6">
+                  <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                    <MessageSquareWarning className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Complaints</h3>
+                    <p className="text-sm text-muted-foreground">Raise & track issues</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="cursor-pointer hover:border-blue-300 transition-colors" onClick={() => setCurrentPage('notices')}>
+                <CardContent className="flex items-center gap-4 p-6">
+                  <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <Megaphone className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">Notices</h3>
+                    <p className="text-sm text-muted-foreground">Important announcements</p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Recent Payments */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Recent Payments</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentPage('payments')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {tenantData?.payments?.length === 0 ? (
+                  <p className="text-muted-foreground text-sm py-4 text-center">No payments found</p>
+                ) : (
+                  <div className="space-y-3">
+                    {tenantData?.payments?.slice(0, 5).map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium">{formatCurrency(p.amount)}</p>
+                          <p className="text-xs text-muted-foreground">{MONTH_NAMES[p.month - 1]} {p.year}</p>
+                        </div>
+                        <Badge className={p.status === 'paid' ? 'bg-emerald-500/15 text-emerald-600 border-0' : p.status === 'overdue' ? 'bg-red-500/15 text-red-600 border-0' : 'bg-amber-500/15 text-amber-600 border-0'}>
+                          {p.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Active Notices */}
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Active Notices</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setCurrentPage('notices')}>View All <ArrowRight className="w-4 h-4 ml-1" /></Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {tenantData?.notices?.filter((n: any) => n.isActive).length === 0 ? (
+                  <p className="text-muted-foreground text-sm py-4 text-center">No active notices</p>
+                ) : (
+                  <div className="space-y-3">
+                    {tenantData?.notices?.filter((n: any) => n.isActive).slice(0, 5).map((n: any) => (
+                      <div key={n.id} className="p-3 bg-slate-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Badge className={n.type === 'urgent' ? 'bg-red-500/15 text-red-600 border-0' : 'bg-blue-500/15 text-blue-600 border-0'}>
+                            {n.type}
+                          </Badge>
+                          <span className="text-sm font-medium">{n.title}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{n.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // Admin/Owner/Manager/Staff Dashboard
   return (
     <div className="space-y-6">
       {/* Page Header */}

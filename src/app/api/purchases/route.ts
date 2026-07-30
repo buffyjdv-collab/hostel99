@@ -270,3 +270,74 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to update purchase' }, { status: 500 })
   }
 }
+
+// DELETE /api/purchases - Delete PO/PR/GRN
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    if (data.type === 'requisition') {
+      const existing = await db.purchaseRequisition.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Purchase requisition not found' }, { status: 404 })
+
+      // Only allow deletion of draft or cancelled requisitions
+      if (!['draft', 'cancelled', 'rejected'].includes(existing.status)) {
+        return NextResponse.json(
+          { error: 'Cannot delete requisition with status: ' + existing.status + '. Only draft, cancelled, or rejected requisitions can be deleted.' },
+          { status: 400 }
+        )
+      }
+
+      // Items have cascade delete in schema
+      await db.purchaseRequisition.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Purchase requisition deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'grn') {
+      const existing = await db.goodsReceivedNote.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'GRN not found' }, { status: 404 })
+
+      // Only allow deletion of pending inspection or rejected GRNs
+      if (!['pending_inspection', 'rejected'].includes(existing.status)) {
+        return NextResponse.json(
+          { error: 'Cannot delete GRN with status: ' + existing.status + '. Only pending_inspection or rejected GRNs can be deleted.' },
+          { status: 400 }
+        )
+      }
+
+      // Items have cascade delete in schema
+      await db.goodsReceivedNote.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'GRN deleted successfully', id: data.id })
+    }
+
+    // Default: delete purchase order
+    const existing = await db.purchaseOrder.findUnique({
+      where: { id: data.id },
+      include: { goodsReceivedNotes: true },
+    })
+    if (!existing) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
+
+    // Only allow deletion of draft or cancelled POs
+    if (!['draft', 'cancelled'].includes(existing.status)) {
+      return NextResponse.json(
+        { error: 'Cannot delete PO with status: ' + existing.status + '. Only draft or cancelled POs can be deleted.' },
+        { status: 400 }
+      )
+    }
+
+    // Check for GRNs
+    if (existing.goodsReceivedNotes.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete PO with existing GRNs. Please delete GRNs first.' },
+        { status: 400 }
+      )
+    }
+
+    // Items have cascade delete in schema
+    await db.purchaseOrder.delete({ where: { id: data.id } })
+    return NextResponse.json({ message: 'Purchase order deleted successfully', id: data.id })
+  } catch (error) {
+    console.error('Purchases DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete purchase' }, { status: 500 })
+  }
+}

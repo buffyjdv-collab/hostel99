@@ -134,3 +134,42 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Failed to update lead' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Lead id is required' }, { status: 400 })
+    }
+
+    const existingLead = await db.lead.findUnique({
+      where: { id },
+      include: { bookings: true },
+    })
+    if (!existingLead) {
+      return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    // Check for active bookings
+    const activeBookings = existingLead.bookings.filter(
+      (b) => b.status === 'confirmed' || b.status === 'checked_in'
+    )
+    if (activeBookings.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete lead with active bookings. Please cancel bookings first.' },
+        { status: 400 }
+      )
+    }
+
+    // Delete associated bookings first, then the lead
+    await db.booking.deleteMany({ where: { leadId: id } })
+    await db.lead.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Lead deleted successfully', id })
+  } catch (error) {
+    console.error('Leads DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete lead' }, { status: 500 })
+  }
+}

@@ -1,0 +1,252 @@
+/home/z/my-project/src/components/modules/visitors.tsx:268:        const updated = await res.json()
+/home/z/my-project/src/components/modules/visitors.tsx:270:          prev.map((v) => v.id === visitorId ? updated : v)
+/home/z/my-project/src/components/modules/complaints.tsx:131:  updatedAt: string
+/home/z/my-project/src/components/modules/complaints.tsx:334:  onUpdateStatus,
+/home/z/my-project/src/components/modules/complaints.tsx:343:  onUpdateStatus: (id: string, status: ComplaintStatus, resolution?: string, rating?: number) => void
+/home/z/my-project/src/components/modules/complaints.tsx:368:    timeline.push({ status: 'assigned', date: complaint.updatedAt, label: `Assigned to ${complaint.assignedTo.name}` })
+/home/z/my-project/src/components/modules/complaints.tsx:371:    timeline.push({ status: 'in_progress', date: complaint.updatedAt, label: 'Work started' })
+/home/z/my-project/src/components/modules/complaints.tsx:374:    timeline.push({ status: 'resolved', date: complaint.updatedAt, label: 'Complaint resolved' })
+/home/z/my-project/src/components/modules/complaints.tsx:377:    timeline.push({ status: 'closed', date: complaint.updatedAt, label: 'Complaint closed' })
+/home/z/my-project/src/components/modules/complaints.tsx:504:            {/* Update Status */}
+/home/z/my-project/src/components/modules/complaints.tsx:508:                  <Label className="text-xs">Update Status</Label>
+/home/z/my-project/src/components/modules/complaints.tsx:522:                  onClick={() => newStatus && onUpdateStatus(complaint.id, newStatus as ComplaintStatus)}
+/home/z/my-project/src/components/modules/complaints.tsx:526:                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
+/home/z/my-project/src/components/modules/complaints.tsx:782:        const updated = new Date(c.updatedAt)
+/home/z/my-project/src/components/modules/complaints.tsx:783:        const diffDays = Math.max(1, Math.ceil((updated.getTime() - created.getTime()) / 86400000))
+/home/z/my-project/src/components/modules/complaints.tsx:865:  const handleUpdateStatus = async (id: string, status: ComplaintStatus, resolution?: string, rating?: number) => {
+/home/z/my-project/src/components/modules/complaints.tsx:883:      console.error('Failed to update complaint:', err)
+/home/z/my-project/src/components/modules/complaints.tsx:899:        // Update the selected complaint
+/home/z/my-project/src/components/modules/complaints.tsx:900:        const updated = await res.json()
+/home/z/my-project/src/components/modules/complaints.tsx:901:        setSelectedComplaint(updated)
+/home/z/my-project/src/components/modules/complaints.tsx:1203:                                  <ArrowUpDown className="w-4 h-4 mr-2" /> Update Status
+/home/z/my-project/src/components/modules/complaints.tsx:1234:        onUpdateStatus={handleUpdateStatus}
+/home/z/my-project/src/components/modules/expenses.tsx:74:  CreditCard,
+/home/z/my-project/src/components/modules/expenses.tsx:110:  updatedAt: string
+/home/z/my-project/src/components/modules/expenses.tsx:1157:                <CreditCard className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+/home/z/my-project/src/components/modules/notices.tsx:260:      // Update locally since there's no PATCH endpoint
+/home/z/my-project/src/components/modules/tenants.tsx:52:  Pencil,
+/home/z/my-project/src/components/modules/tenants.tsx:63:  CreditCard,
+/home/z/my-project/src/components/modules/tenants.tsx:125:  updatedAt: string
+/home/z/my-project/src/components/modules/tenants.tsx:538:                    Agreement has expired. Please renew or update status.
+/home/z/my-project/src/components/modules/tenants.tsx:649:          Created on {formatDate(tenant.createdAt)} · Last updated {formatDate(tenant.updatedAt)}
+/home/z/my-project/src/components/modules/tenants.tsx:1175:                                <Pencil className="h-4 w-4 mr-2" />
+/home/z/my-project/src/components/modules/tenants.tsx:1176:                                Edit
+/home/z/my-project/src/components/modules/tenants.tsx:1443:                <CreditCard className="h-4 w-4 text-emerald-600" />
+/home/z/my-project/src/components/modules/settings.tsx:39:  CreditCard,
+/home/z/my-project/src/components/modules/settings.tsx:53:  Pencil,
+/home/z/my-project/src/components/modules/settings.tsx:202:  // Profile edit state
+/home/z/my-project/src/components/modules/settings.tsx:203:  const [profileEditing, setProfileEditing] = useState(false)
+/home/z/my-project/src/components/modules/settings.tsx:262:    setProfileEditing(false)
+/home/z/my-project/src/components/modules/settings.tsx:340:            <CreditCard className="h-4 w-4 mr-2" />
+/home/z/my-project/src/components/modules/settings.tsx:364:                  {!profileEditing && (
+/home/z/my-project/src/components/modules/settings.tsx:365:                    <Button variant="outline" size="sm" className="gap-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50" onClick={() => setProfileEditing(true)}>
+/home/z/my-project/src/components/modules/settings.tsx:366:                      <Pencil className="h-3.5 w-3.5" />
+/home/z/my-project/src/components/modules/settings.tsx:367:                      Edit
+/home/z/my-project/src/components/modules/settings.tsx:405:            {/* Edit Profile Card */}
+/home/z/my-project/src/components/modules/settings.tsx:406:            <Card className={profileEditing ? 'border-emerald-300 ring-1 ring-emerald-200' : ''}>
+/home/z/my-project/src/components/modules/settings.tsx:409:                  <Pencil className="h-4 w-4 text-emerald-600" />
+/home/z/my-project/src/components/modules/settings.tsx:410:                  Edit Profile
+/home/z/my-project/src/components/modules/settings.tsx:412:                <CardDescription>Update your personal information</CardDescription>
+/home/z/my-project/src/components/modules/settings.tsx:421:                    disabled={!profileEditing}
+/home/z/my-project/src/components/modules/settings.tsx:431:                    disabled={!profileEditing}
+/home/z/my-project/src/components/modules/settings.tsx:440:                    disabled={!profileEditing}
+/home/z/my-project/src/components/modules/settings.tsx:444:                {profileEditing && (
+/home/z/my-project/src/components/modules/settings.tsx:454:                    <Button variant="outline" onClick={() => setProfileEditing(false)}>
+/home/z/my-project/src/components/modules/settings.tsx:638:                            <Pencil className="h-3.5 w-3.5" />
+/home/z/my-project/src/components/modules/settings.tsx:663:                  { role: 'Staff', desc: 'View assigned tasks, update attendance', color: 'text-blue-600' },
+/home/z/my-project/src/components/modules/kitchen.tsx:483:  const updateRecipeIngredient = (index: number, field: string, value: string) => {
+/home/z/my-project/src/components/modules/kitchen.tsx:488:        const updated = { ...ing, [field]: value }
+/home/z/my-project/src/components/modules/kitchen.tsx:491:          if (item) updated.unit = item.unit
+/home/z/my-project/src/components/modules/kitchen.tsx:493:        return updated
+/home/z/my-project/src/components/modules/kitchen.tsx:514:  const updateMenuItem = (index: number, field: string, value: string) => {
+/home/z/my-project/src/components/modules/kitchen.tsx:519:        const updated = { ...item, [field]: value }
+/home/z/my-project/src/components/modules/kitchen.tsx:522:          if (recipe) updated.dishName = recipe.name
+/home/z/my-project/src/components/modules/kitchen.tsx:524:        return updated
+/home/z/my-project/src/components/modules/kitchen.tsx:1201:                        <Select value={ing.itemId} onValueChange={v => updateRecipeIngredient(idx, 'itemId', v)}>
+/home/z/my-project/src/components/modules/kitchen.tsx:1224:                          onChange={e => updateRecipeIngredient(idx, 'quantity', e.target.value)}
+/home/z/my-project/src/components/modules/kitchen.tsx:1232:                          onChange={e => updateRecipeIngredient(idx, 'unit', e.target.value)}
+/home/z/my-project/src/components/modules/kitchen.tsx:1340:                        <Select value={item.recipeId} onValueChange={v => updateMenuItem(idx, 'recipeId', v)}>
+/home/z/my-project/src/components/modules/kitchen.tsx:1360:                          onChange={e => updateMenuItem(idx, 'dishName', e.target.value)}
+/home/z/my-project/src/components/modules/kitchen.tsx:1370:                          onChange={e => updateMenuItem(idx, 'servings', e.target.value)}
+/home/z/my-project/src/components/modules/payments.tsx:80:  CreditCard,
+/home/z/my-project/src/components/modules/payments.tsx:139:  updatedAt: string
+/home/z/my-project/src/components/modules/payments.tsx:177:const METHOD_CONFIG: Record<PaymentMethod, { label: string; icon: typeof CreditCard }> = {
+/home/z/my-project/src/components/modules/payments.tsx:180:  card: { label: 'Card', icon: CreditCard },
+/home/z/my-project/src/components/modules/payments.tsx:565:            <CreditCard className="w-5 h-5 text-emerald-600" />
+/home/z/my-project/src/components/modules/purchases.tsx:506:  const updatePOItem = (index: number, field: keyof POFormItem, value: string | number) => {
+/home/z/my-project/src/components/modules/purchases.tsx:508:      const updated = [...prev]
+/home/z/my-project/src/components/modules/purchases.tsx:509:      updated[index] = { ...updated[index], [field]: value }
+/home/z/my-project/src/components/modules/purchases.tsx:511:        const qty = parseFloat(updated[index].quantity) || 0
+/home/z/my-project/src/components/modules/purchases.tsx:512:        const price = parseFloat(updated[index].unitPrice) || 0
+/home/z/my-project/src/components/modules/purchases.tsx:513:        updated[index].totalPrice = qty * price
+/home/z/my-project/src/components/modules/purchases.tsx:515:      return updated
+/home/z/my-project/src/components/modules/purchases.tsx:530:        const updated = [...prev]
+/home/z/my-project/src/components/modules/purchases.tsx:531:        updated[index] = {
+/home/z/my-project/src/components/modules/purchases.tsx:532:          ...updated[index],
+/home/z/my-project/src/components/modules/purchases.tsx:537:          totalPrice: (parseFloat(updated[index].quantity) || 0) * invItem.unitPrice,
+/home/z/my-project/src/components/modules/purchases.tsx:539:        return updated
+/home/z/my-project/src/components/modules/purchases.tsx:546:  const updatePRItem = (index: number, field: keyof PRFormItem, value: string) => {
+/home/z/my-project/src/components/modules/purchases.tsx:548:      const updated = [...prev]
+/home/z/my-project/src/components/modules/purchases.tsx:549:      updated[index] = { ...updated[index], [field]: value }
+/home/z/my-project/src/components/modules/purchases.tsx:550:      return updated
+/home/z/my-project/src/components/modules/purchases.tsx:589:  const updateGRNItem = (index: number, field: keyof GRNFormItem, value: string | number) => {
+/home/z/my-project/src/components/modules/purchases.tsx:591:      const updated = [...prev]
+/home/z/my-project/src/components/modules/purchases.tsx:592:      updated[index] = { ...updated[index], [field]: value }
+/home/z/my-project/src/components/modules/purchases.tsx:593:      return updated
+/home/z/my-project/src/components/modules/purchases.tsx:777:  // ── Update PO Status ───────────────────────────────────────────────────────
+/home/z/my-project/src/components/modules/purchases.tsx:779:  const updatePOStatus = async (poId: string, status: POStatus, extra?: Record<string, any>) => {
+/home/z/my-project/src/components/modules/purchases.tsx:793:        toast({ title: 'Success', description: `PO status updated to ${PO_STATUS_CONFIG[status].label}` })
+/home/z/my-project/src/components/modules/purchases.tsx:796:        toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+/home/z/my-project/src/components/modules/purchases.tsx:799:      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+/home/z/my-project/src/components/modules/purchases.tsx:805:  // ── Update PR Status ───────────────────────────────────────────────────────
+/home/z/my-project/src/components/modules/purchases.tsx:807:  const updatePRStatus = async (prId: string, status: PRStatus) => {
+/home/z/my-project/src/components/modules/purchases.tsx:824:        toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+/home/z/my-project/src/components/modules/purchases.tsx:827:      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+/home/z/my-project/src/components/modules/purchases.tsx:833:  // ── Update GRN Status ──────────────────────────────────────────────────────
+/home/z/my-project/src/components/modules/purchases.tsx:835:  const updateGRNStatus = async (grnId: string, status: GRNStatus) => {
+/home/z/my-project/src/components/modules/purchases.tsx:848:        toast({ title: 'Success', description: `GRN status updated to ${GRN_STATUS_CONFIG[status].label}` })
+/home/z/my-project/src/components/modules/purchases.tsx:852:        toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+/home/z/my-project/src/components/modules/purchases.tsx:855:      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+/home/z/my-project/src/components/modules/purchases.tsx:1072:                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'submitted')}>
+/home/z/my-project/src/components/modules/purchases.tsx:1077:                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'approved')}>
+/home/z/my-project/src/components/modules/purchases.tsx:1087:                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'cancelled')} className="text-red-600">
+/home/z/my-project/src/components/modules/purchases.tsx:1092:                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, order.status, { paymentStatus: 'paid' })}>
+/home/z/my-project/src/components/modules/purchases.tsx:1182:                                    <DropdownMenuItem onClick={() => updatePRStatus(pr.id, 'approved')}>
+/home/z/my-project/src/components/modules/purchases.tsx:1271:                                    <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'accepted')}>
+/home/z/my-project/src/components/modules/purchases.tsx:1274:                                    <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'partially_accepted')}>
+/home/z/my-project/src/components/modules/purchases.tsx:1277:                                    <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'rejected')} className="text-red-600">
+/home/z/my-project/src/components/modules/purchases.tsx:1357:                          onChange={e => updatePOItem(idx, 'itemName', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1370:                        onChange={e => updatePOItem(idx, 'quantity', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1379:                      <Select value={item.unit} onValueChange={val => updatePOItem(idx, 'unit', val)}>
+/home/z/my-project/src/components/modules/purchases.tsx:1398:                        onChange={e => updatePOItem(idx, 'unitPrice', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1411:                        onChange={e => updatePOItem(idx, 'gstRate', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1633:                  <Button onClick={() => { updatePOStatus(selectedPO.id, 'submitted'); setShowPODetail(false); }} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/purchases.tsx:1638:                  <Button onClick={() => { updatePOStatus(selectedPO.id, 'approved'); setShowPODetail(false); }} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/purchases.tsx:1663:                  <Button onClick={() => { updatePOStatus(selectedPO.id, selectedPO.status, { paymentStatus: 'paid' }); setShowPODetail(false); }} variant="outline" disabled={actionLoading}>
+/home/z/my-project/src/components/modules/purchases.tsx:1748:                        onChange={e => updatePRItem(idx, 'itemName', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1758:                        onChange={e => updatePRItem(idx, 'quantity', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1765:                      <Select value={item.unit} onValueChange={val => updatePRItem(idx, 'unit', val)}>
+/home/z/my-project/src/components/modules/purchases.tsx:1782:                        onChange={e => updatePRItem(idx, 'estimatedPrice', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:1916:                  <Button onClick={() => { updatePRStatus(selectedPR.id, 'approved'); setShowPRDetail(false); }} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/purchases.tsx:1945:                  updatePRStatus(selectedPR.id, 'rejected')
+/home/z/my-project/src/components/modules/purchases.tsx:2038:                          onChange={e => updateGRNItem(idx, 'receivedQty', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:2049:                          onChange={e => updateGRNItem(idx, 'acceptedQty', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:2060:                          onChange={e => updateGRNItem(idx, 'rejectedQty', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:2070:                          onChange={e => updateGRNItem(idx, 'batchNumber', e.target.value)}
+/home/z/my-project/src/components/modules/purchases.tsx:2191:                  <Button onClick={() => { updateGRNStatus(selectedGRN.id, 'accepted'); setShowGRNDetail(false); }} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/purchases.tsx:2194:                  <Button variant="outline" onClick={() => { updateGRNStatus(selectedGRN.id, 'partially_accepted'); setShowGRNDetail(false); }} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/purchases.tsx:2197:                  <Button variant="destructive" onClick={() => { updateGRNStatus(selectedGRN.id, 'rejected'); setShowGRNDetail(false); }} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/properties.tsx:36:  Pencil,
+/home/z/my-project/src/components/modules/properties.tsx:78:  updatedAt: string
+/home/z/my-project/src/components/modules/properties.tsx:781:          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+/home/z/my-project/src/components/modules/properties.tsx:782:          Edit
+/home/z/my-project/src/components/modules/properties.tsx:853:              <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+/home/z/my-project/src/components/modules/leads.tsx:112:  updatedAt: string
+/home/z/my-project/src/components/modules/leads.tsx:488:          {lead.updatedAt && ` · Updated ${formatDate(lead.updatedAt)}`}
+/home/z/my-project/src/components/modules/leads.tsx:700:        const updated = await res.json()
+/home/z/my-project/src/components/modules/leads.tsx:701:        setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, ...updated } : l)))
+/home/z/my-project/src/components/modules/leads.tsx:702:        setSelectedLead((prev) => (prev?.id === leadId ? { ...prev, ...updated } : prev))
+/home/z/my-project/src/components/modules/leads.tsx:705:      console.error('Failed to update lead stage:', err)
+/home/z/my-project/src/components/modules/rooms.tsx:34:  Pencil,
+/home/z/my-project/src/components/modules/rooms.tsx:97:  updatedAt: string
+/home/z/my-project/src/components/modules/rooms.tsx:1144:          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+/home/z/my-project/src/components/modules/rooms.tsx:1145:          Edit
+/home/z/my-project/src/components/modules/rooms.tsx:1227:              <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+/home/z/my-project/src/components/modules/assets.tsx:62:  Edit3,
+/home/z/my-project/src/components/modules/assets.tsx:367:  const [editAssetDialogOpen, setEditAssetDialogOpen] = useState(false)
+/home/z/my-project/src/components/modules/assets.tsx:369:  const [editLaundryDialogOpen, setEditLaundryDialogOpen] = useState(false)
+/home/z/my-project/src/components/modules/assets.tsx:410:  // Edit laundry form
+/home/z/my-project/src/components/modules/assets.tsx:411:  const [editLaundryForm, setEditLaundryForm] = useState({
+/home/z/my-project/src/components/modules/assets.tsx:598:  const openEditAssetDialog = (asset: AssetItem) => {
+/home/z/my-project/src/components/modules/assets.tsx:617:    setEditAssetDialogOpen(true)
+/home/z/my-project/src/components/modules/assets.tsx:666:  const handleEditAsset = async () => {
+/home/z/my-project/src/components/modules/assets.tsx:693:        toast({ title: 'Success', description: 'Asset updated successfully' })
+/home/z/my-project/src/components/modules/assets.tsx:694:        setEditAssetDialogOpen(false)
+/home/z/my-project/src/components/modules/assets.tsx:699:        toast({ title: 'Error', description: data.error || 'Failed to update asset', variant: 'destructive' })
+/home/z/my-project/src/components/modules/assets.tsx:702:      toast({ title: 'Error', description: 'Failed to update asset', variant: 'destructive' })
+/home/z/my-project/src/components/modules/assets.tsx:722:  const resetEditLaundryForm = () => {
+/home/z/my-project/src/components/modules/assets.tsx:723:    setEditLaundryForm({
+/home/z/my-project/src/components/modules/assets.tsx:743:  const openEditLaundryDialog = (item: LaundryItemData) => {
+/home/z/my-project/src/components/modules/assets.tsx:745:    setEditLaundryForm({
+/home/z/my-project/src/components/modules/assets.tsx:758:    setEditLaundryDialogOpen(true)
+/home/z/my-project/src/components/modules/assets.tsx:800:  const handleEditLaundry = async () => {
+/home/z/my-project/src/components/modules/assets.tsx:801:    if (!selectedLaundry || !editLaundryForm.name.trim()) {
+/home/z/my-project/src/components/modules/assets.tsx:810:        totalQuantity: editLaundryForm.totalQuantity ? parseInt(editLaundryForm.totalQuantity) : undefined,
+/home/z/my-project/src/components/modules/assets.tsx:811:        issuedQuantity: editLaundryForm.issuedQuantity ? parseInt(editLaundryForm.issuedQuantity) : undefined,
+/home/z/my-project/src/components/modules/assets.tsx:812:        inLaundry: editLaundryForm.inLaundry ? parseInt(editLaundryForm.inLaundry) : undefined,
+/home/z/my-project/src/components/modules/assets.tsx:813:        damagedQuantity: editLaundryForm.damagedQuantity ? parseInt(editLaundryForm.damagedQuantity) : undefined,
+/home/z/my-project/src/components/modules/assets.tsx:814:        condition: editLaundryForm.condition,
+/home/z/my-project/src/components/modules/assets.tsx:815:        status: editLaundryForm.status,
+/home/z/my-project/src/components/modules/assets.tsx:816:        notes: editLaundryForm.notes.trim() || null,
+/home/z/my-project/src/components/modules/assets.tsx:824:        toast({ title: 'Success', description: 'Laundry item updated successfully' })
+/home/z/my-project/src/components/modules/assets.tsx:825:        setEditLaundryDialogOpen(false)
+/home/z/my-project/src/components/modules/assets.tsx:830:        toast({ title: 'Error', description: data.error || 'Failed to update laundry item', variant: 'destructive' })
+/home/z/my-project/src/components/modules/assets.tsx:833:      toast({ title: 'Error', description: 'Failed to update laundry item', variant: 'destructive' })
+/home/z/my-project/src/components/modules/assets.tsx:1324:                                <DropdownMenuItem onClick={() => openEditAssetDialog(asset)}>
+/home/z/my-project/src/components/modules/assets.tsx:1325:                                  <Edit3 className="h-4 w-4 mr-2" />
+/home/z/my-project/src/components/modules/assets.tsx:1326:                                  Edit Asset
+/home/z/my-project/src/components/modules/assets.tsx:1505:                                <DropdownMenuItem onClick={() => openEditLaundryDialog(item)}>
+/home/z/my-project/src/components/modules/assets.tsx:1506:                                  <Edit3 className="h-4 w-4 mr-2" />
+/home/z/my-project/src/components/modules/assets.tsx:1507:                                  Edit Item
+/home/z/my-project/src/components/modules/assets.tsx:1877:      {/* ── Edit Asset Dialog ──────────────────────────────────────────────────── */}
+/home/z/my-project/src/components/modules/assets.tsx:1878:      <Dialog open={editAssetDialogOpen} onOpenChange={setEditAssetDialogOpen}>
+/home/z/my-project/src/components/modules/assets.tsx:1881:            <DialogTitle>Edit Asset</DialogTitle>
+/home/z/my-project/src/components/modules/assets.tsx:1882:            <DialogDescription>Update asset details and status</DialogDescription>
+/home/z/my-project/src/components/modules/assets.tsx:1886:              <Label htmlFor="edit-asset-name">Name *</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1888:                id="edit-asset-name"
+/home/z/my-project/src/components/modules/assets.tsx:1894:              <Label htmlFor="edit-asset-tag">Asset Tag</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1896:                id="edit-asset-tag"
+/home/z/my-project/src/components/modules/assets.tsx:1902:              <Label htmlFor="edit-asset-category">Category</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1904:                <SelectTrigger id="edit-asset-category">
+/home/z/my-project/src/components/modules/assets.tsx:1915:              <Label htmlFor="edit-asset-subcategory">Sub-category</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1917:                <SelectTrigger id="edit-asset-subcategory">
+/home/z/my-project/src/components/modules/assets.tsx:1928:              <Label htmlFor="edit-asset-room">Room</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1930:                <SelectTrigger id="edit-asset-room">
+/home/z/my-project/src/components/modules/assets.tsx:1943:              <Label htmlFor="edit-asset-current-value">Current Value (₹)</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1945:                id="edit-asset-current-value"
+/home/z/my-project/src/components/modules/assets.tsx:1952:              <Label htmlFor="edit-asset-condition">Condition</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1954:                <SelectTrigger id="edit-asset-condition">
+/home/z/my-project/src/components/modules/assets.tsx:1967:              <Label htmlFor="edit-asset-status">Status</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1969:                <SelectTrigger id="edit-asset-status">
+/home/z/my-project/src/components/modules/assets.tsx:1981:              <Label htmlFor="edit-asset-assigned">Assigned To</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1983:                id="edit-asset-assigned"
+/home/z/my-project/src/components/modules/assets.tsx:1989:              <Label htmlFor="edit-asset-vendor">Vendor</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1991:                id="edit-asset-vendor"
+/home/z/my-project/src/components/modules/assets.tsx:1997:              <Label htmlFor="edit-asset-notes">Notes</Label>
+/home/z/my-project/src/components/modules/assets.tsx:1999:                id="edit-asset-notes"
+/home/z/my-project/src/components/modules/assets.tsx:2007:            <Button variant="outline" onClick={() => setEditAssetDialogOpen(false)} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/assets.tsx:2010:            <Button onClick={handleEditAsset} disabled={actionLoading}>
+/home/z/my-project/src/components/modules/assets.tsx:2011:              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Edit3 className="h-4 w-4 mr-2" />}
+/home/z/my-project/src/components/modules/assets.tsx:2012:              Update Asset
+/home/z/my-project/src/components/modules/assets.tsx:2121:      {/* ── Edit Laundry Item Dialog ──────────────────────────────────────────── */}
+/home/z/my-project/src/components/modules/assets.tsx:2122:      <Dialog open={editLaundryDialogOpen} onOpenChange={setEditLaundryDialogOpen}>
+/home/z/my-project/src/components/modules/assets.tsx:2125:            <DialogTitle>Edit Laundry Item</DialogTitle>
+/home/z/my-project/src/components/modules/assets.tsx:2126:            <DialogDescription>Update laundry item details and quantities</DialogDescription>
+/home/z/my-project/src/components/modules/assets.tsx:2131:              <Input value={editLaundryForm.name} disabled className="bg-slate-50 dark:bg-slate-800" />
+/home/z/my-project/src/components/modules/assets.tsx:2134:              <Label htmlFor="edit-laundry-total-qty">Total Quantity</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2136:                id="edit-laundry-total-qty"
+/home/z/my-project/src/components/modules/assets.tsx:2138:                value={editLaundryForm.totalQuantity}
+/home/z/my-project/src/components/modules/assets.tsx:2139:                onChange={(e) => setEditLaundryForm({ ...editLaundryForm, totalQuantity: e.target.value })}
+/home/z/my-project/src/components/modules/assets.tsx:2143:              <Label htmlFor="edit-laundry-issued-qty">Issued Quantity</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2145:                id="edit-laundry-issued-qty"
+/home/z/my-project/src/components/modules/assets.tsx:2147:                value={editLaundryForm.issuedQuantity}
+/home/z/my-project/src/components/modules/assets.tsx:2148:                onChange={(e) => setEditLaundryForm({ ...editLaundryForm, issuedQuantity: e.target.value })}
+/home/z/my-project/src/components/modules/assets.tsx:2152:              <Label htmlFor="edit-laundry-in-laundry">In Laundry</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2154:                id="edit-laundry-in-laundry"
+/home/z/my-project/src/components/modules/assets.tsx:2156:                value={editLaundryForm.inLaundry}
+/home/z/my-project/src/components/modules/assets.tsx:2157:                onChange={(e) => setEditLaundryForm({ ...editLaundryForm, inLaundry: e.target.value })}
+/home/z/my-project/src/components/modules/assets.tsx:2161:              <Label htmlFor="edit-laundry-damaged">Damaged Quantity</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2163:                id="edit-laundry-damaged"
+/home/z/my-project/src/components/modules/assets.tsx:2165:                value={editLaundryForm.damagedQuantity}
+/home/z/my-project/src/components/modules/assets.tsx:2166:                onChange={(e) => setEditLaundryForm({ ...editLaundryForm, damagedQuantity: e.target.value })}
+/home/z/my-project/src/components/modules/assets.tsx:2170:              <Label htmlFor="edit-laundry-condition">Condition</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2171:              <Select value={editLaundryForm.condition} onValueChange={(v) => setEditLaundryForm({ ...editLaundryForm, condition: v as LaundryCondition })}>
+/home/z/my-project/src/components/modules/assets.tsx:2172:                <SelectTrigger id="edit-laundry-condition">
+/home/z/my-project/src/components/modules/assets.tsx:2185:              <Label htmlFor="edit-laundry-status">Status</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2186:              <Select value={editLaundryForm.status} onValueChange={(v) => setEditLaundryForm({ ...editLaundryForm, status: v as LaundryStatus })}>
+/home/z/my-project/src/components/modules/assets.tsx:2187:                <SelectTrigger id="edit-laundry-status">
+/home/z/my-project/src/components/modules/assets.tsx:2200:              <Label htmlFor="edit-laundry-notes">Notes</Label>
+/home/z/my-project/src/components/modules/assets.tsx:2202:                id="edit-laundry-notes"
+/home/z/my-project/src/components/modules/assets.tsx:2203:                value={editLaundryForm.notes}
+
+[Showing results with pagination = limit: 250]

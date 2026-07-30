@@ -191,3 +191,34 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to update inventory' }, { status: 500 })
   }
 }
+
+// DELETE /api/inventory - Delete inventory item
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json()
+    const { id } = data
+
+    if (!id) {
+      return NextResponse.json({ error: 'Item id is required' }, { status: 400 })
+    }
+
+    const existingItem = await db.inventoryItem.findUnique({ where: { id } })
+    if (!existingItem) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+    }
+
+    // Delete related records first, then the item
+    await db.stockTransaction.deleteMany({ where: { itemId: id } })
+    await db.kitchenIssue.deleteMany({ where: { itemId: id } })
+    await db.recipeItem.deleteMany({ where: { itemId: id } })
+    await db.consumptionLog.deleteMany({ where: { itemId: id } })
+    await db.wasteRecord.deleteMany({ where: { itemId: id } })
+    await db.purchaseOrderItem.deleteMany({ where: { itemId: id } })
+    await db.inventoryItem.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Inventory item deleted successfully', id })
+  } catch (error) {
+    console.error('Inventory DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete inventory item' }, { status: 500 })
+  }
+}

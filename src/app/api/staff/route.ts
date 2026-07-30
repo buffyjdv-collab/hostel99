@@ -66,3 +66,69 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create staff' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json()
+    const { id, name, phone, role, propertyId, salary, joinDate, status, aadhaarNumber, address, userId } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Staff id is required' }, { status: 400 })
+    }
+
+    const existingStaff = await db.staff.findUnique({ where: { id } })
+    if (!existingStaff) {
+      return NextResponse.json({ error: 'Staff not found' }, { status: 404 })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (name !== undefined) updateData.name = name
+    if (phone !== undefined) updateData.phone = phone
+    if (role !== undefined) updateData.role = role
+    if (propertyId !== undefined) updateData.propertyId = propertyId
+    if (salary !== undefined) updateData.salary = parseFloat(salary)
+    if (joinDate !== undefined) updateData.joinDate = new Date(joinDate)
+    if (status !== undefined) updateData.status = status
+    if (aadhaarNumber !== undefined) updateData.aadhaarNumber = aadhaarNumber
+    if (address !== undefined) updateData.address = address
+    if (userId !== undefined) updateData.userId = userId
+
+    const staff = await db.staff.update({
+      where: { id },
+      data: updateData,
+      include: {
+        property: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    return NextResponse.json(staff)
+  } catch (error) {
+    console.error('Staff PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update staff' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Staff id is required' }, { status: 400 })
+    }
+
+    const existingStaff = await db.staff.findUnique({ where: { id } })
+    if (!existingStaff) {
+      return NextResponse.json({ error: 'Staff not found' }, { status: 404 })
+    }
+
+    // Attendance and salary payments have cascade delete in schema
+    await db.staff.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Staff deleted successfully', id })
+  } catch (error) {
+    console.error('Staff DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete staff' }, { status: 500 })
+  }
+}

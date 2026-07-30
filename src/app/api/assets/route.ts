@@ -215,3 +215,39 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to update asset' }, { status: 500 })
   }
 }
+
+// DELETE /api/assets - Delete asset, laundry, housekeeping
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    if (data.type === 'asset') {
+      const existing = await db.asset.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
+
+      await db.asset.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Asset deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'laundry') {
+      const existing = await db.laundryItem.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Laundry item not found' }, { status: 404 })
+
+      await db.laundryItem.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Laundry item deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'housekeeping') {
+      const existing = await db.housekeepingItem.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Housekeeping item not found' }, { status: 404 })
+
+      await db.housekeepingItem.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Housekeeping item deleted successfully', id: data.id })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error) {
+    console.error('Assets DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete asset' }, { status: 500 })
+  }
+}

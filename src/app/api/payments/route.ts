@@ -159,3 +159,26 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Failed to update payment' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Payment id is required' }, { status: 400 })
+    }
+
+    const existingPayment = await db.payment.findUnique({ where: { id } })
+    if (!existingPayment) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+    }
+
+    await db.payment.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Payment deleted successfully', id })
+  } catch (error) {
+    console.error('Payments DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete payment' }, { status: 500 })
+  }
+}

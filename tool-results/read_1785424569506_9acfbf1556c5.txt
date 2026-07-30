@@ -1,0 +1,1238 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Progress } from '@/components/ui/progress'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { Checkbox } from '@/components/ui/checkbox'
+    13→import { ScrollArea } from '@/components/ui/scroll-area'
+    14→import {
+    15→  Dialog,
+    16→  DialogContent,
+    17→  DialogDescription,
+    18→  DialogFooter,
+    19→  DialogHeader,
+    20→  DialogTitle,
+    21→  DialogTrigger,
+    22→} from '@/components/ui/dialog'
+    23→import {
+    24→  Select,
+    25→  SelectContent,
+    26→  SelectItem,
+    27→  SelectTrigger,
+    28→  SelectValue,
+    29→} from '@/components/ui/select'
+    30→import {
+    31→  DoorOpen,
+    32→  Plus,
+    33→  Eye,
+    34→  Pencil,
+    35→  Ban,
+    36→  BedDouble,
+    37→  LayoutGrid,
+    38→  List,
+    39→  Filter,
+    40→  Loader2,
+    41→  Search,
+    42→  Building2,
+    43→  User,
+    44→  IndianRupee,
+    45→  BedSingle,
+    46→  Map as MapIcon,
+    47→  Snowflake,
+    48→  Sun,
+    49→  Crown,
+    50→  Sparkles,
+    51→  CircleDot,
+    52→  ChevronDown,
+    53→  ChevronUp,
+    54→  ArrowUpDown,
+    55→  Grid3X3,
+    56→} from 'lucide-react'
+    57→
+    58→// ── Types ────────────────────────────────────────────────────────────────────
+    59→
+    60→type RoomType = 'ac' | 'non_ac' | 'deluxe' | 'premium'
+    61→type SharingType = 'single' | 'double' | 'triple' | 'four_sharing'
+    62→type RoomStatus = 'available' | 'occupied' | 'maintenance' | 'blocked'
+    63→type BedStatus = 'available' | 'occupied' | 'blocked' | 'maintenance'
+    64→
+    65→interface BedData {
+    66→  id: string
+    67→  name: string
+    68→  number: number
+    69→  status: BedStatus
+    70→  tenant?: { id: string; name: string } | null
+    71→}
+    72→
+    73→interface RoomData {
+    74→  id: string
+    75→  name: string
+    76→  number: string
+    77→  floorId: string
+    78→  floor: { id: string; name: string; number: number }
+    79→  buildingId: string
+    80→  building: { id: string; name: string }
+    81→  propertyId: string
+    82→  property: { id: string; name: string }
+    83→  sharingType: SharingType
+    84→  roomType: RoomType
+    85→  totalBeds: number
+    86→  occupiedBeds: number
+    87→  rent: number
+    88→  deposit: number
+    89→  amenities?: string
+    90→  status: RoomStatus
+    91→  images?: string
+    92→  beds: BedData[]
+    93→  occupiedBedsCount: number
+    94→  availableBedsCount: number
+    95→  tenantsCount: number
+    96→  createdAt: string
+    97→  updatedAt: string
+    98→}
+    99→
+   100→interface PropertyInfo {
+   101→  id: string
+   102→  name: string
+   103→  type: string
+   104→  buildings?: { id: string; name: string; floors?: { id: string; name: string; number: number }[] }[]
+   105→}
+   106→
+   107→interface RoomFormData {
+   108→  propertyId: string
+   109→  buildingId: string
+   110→  floorId: string
+   111→  name: string
+   112→  number: string
+   113→  sharingType: SharingType
+   114→  roomType: RoomType
+   115→  totalBeds: number
+   116→  rent: number
+   117→  deposit: number
+   118→  amenities: string[]
+   119→}
+   120→
+   121→// ── Constants ────────────────────────────────────────────────────────────────
+   122→
+   123→const ROOM_TYPE_CONFIG: Record<RoomType, { label: string; icon: typeof Snowflake; bgClass: string; textClass: string }> = {
+   124→  ac: {
+   125→    label: 'AC',
+   126→    icon: Snowflake,
+   127→    bgClass: 'bg-blue-100 dark:bg-blue-950/50',
+   128→    textClass: 'text-blue-700 dark:text-blue-300',
+   129→  },
+   130→  non_ac: {
+   131→    label: 'Non-AC',
+   132→    icon: Sun,
+   133→    bgClass: 'bg-amber-100 dark:bg-amber-950/50',
+   134→    textClass: 'text-amber-700 dark:text-amber-300',
+   135→  },
+   136→  deluxe: {
+   137→    label: 'Deluxe',
+   138→    icon: Crown,
+   139→    bgClass: 'bg-purple-100 dark:bg-purple-950/50',
+   140→    textClass: 'text-purple-700 dark:text-purple-300',
+   141→  },
+   142→  premium: {
+   143→    label: 'Premium',
+   144→    icon: Sparkles,
+   145→    bgClass: 'bg-emerald-100 dark:bg-emerald-950/50',
+   146→    textClass: 'text-emerald-700 dark:text-emerald-300',
+   147→  },
+   148→}
+   149→
+   150→const SHARING_TYPE_CONFIG: Record<SharingType, { label: string; shortLabel: string }> = {
+   151→  single: { label: 'Single Sharing', shortLabel: '1S' },
+   152→  double: { label: 'Double Sharing', shortLabel: '2S' },
+   153→  triple: { label: 'Triple Sharing', shortLabel: '3S' },
+   154→  four_sharing: { label: 'Four Sharing', shortLabel: '4S' },
+   155→}
+   156→
+   157→const STATUS_CONFIG: Record<RoomStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   158→  available: {
+   159→    label: 'Available',
+   160→    bgClass: 'bg-emerald-100 dark:bg-emerald-950/50',
+   161→    textClass: 'text-emerald-700 dark:text-emerald-300',
+   162→    dotClass: 'bg-emerald-500',
+   163→  },
+   164→  occupied: {
+   165→    label: 'Occupied',
+   166→    bgClass: 'bg-blue-100 dark:bg-blue-950/50',
+   167→    textClass: 'text-blue-700 dark:text-blue-300',
+   168→    dotClass: 'bg-blue-500',
+   169→  },
+   170→  maintenance: {
+   171→    label: 'Maintenance',
+   172→    bgClass: 'bg-red-100 dark:bg-red-950/50',
+   173→    textClass: 'text-red-700 dark:text-red-300',
+   174→    dotClass: 'bg-red-500',
+   175→  },
+   176→  blocked: {
+   177→    label: 'Blocked',
+   178→    bgClass: 'bg-gray-100 dark:bg-gray-950/50',
+   179→    textClass: 'text-gray-700 dark:text-gray-300',
+   180→    dotClass: 'bg-gray-500',
+   181→  },
+   182→}
+   183→
+   184→const BED_STATUS_COLORS: Record<BedStatus, string> = {
+   185→  available: 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600',
+   186→  occupied: 'bg-emerald-500 border-emerald-600',
+   187→  blocked: 'bg-gray-400 dark:bg-gray-500 border-gray-500 dark:border-gray-400',
+   188→  maintenance: 'bg-red-500 border-red-600',
+   189→}
+   190→
+   191→const ROOM_AMENITIES = [
+   192→  'AC',
+   193→  'WiFi',
+   194→  'Attached Bathroom',
+   195→  'Balcony',
+   196→  'Window',
+   197→  'Almirah',
+   198→  'Table',
+   199→  'Chair',
+   200→  'Fan',
+   201→  'Geyser',
+   202→  'TV',
+   203→  'Curtains',
+   204→  'Mirror',
+   205→  'Shoe Rack',
+   206→]
+   207→
+   208→// ── Helpers ──────────────────────────────────────────────────────────────────
+   209→
+   210→function parseAmenities(amenitiesStr?: string | null): string[] {
+   211→  if (!amenitiesStr) return []
+   212→  try {
+   213→    const parsed = JSON.parse(amenitiesStr)
+   214→    return Array.isArray(parsed) ? parsed : []
+   215→  } catch {
+   216→    return amenitiesStr.split(',').map((a) => a.trim()).filter(Boolean)
+   217→  }
+   218→}
+   219→
+   220→function formatCurrency(amount: number): string {
+   221→  return new Intl.NumberFormat('en-IN', {
+   222→    style: 'currency',
+   223→    currency: 'INR',
+   224→    minimumFractionDigits: 0,
+   225→    maximumFractionDigits: 0,
+   226→  }).format(amount)
+   227→}
+   228→
+   229→// ── Sub-components ───────────────────────────────────────────────────────────
+   230→
+   231→function RoomCardSkeleton() {
+   232→  return (
+   233→    <Card className="overflow-hidden">
+   234→      <CardHeader className="pb-3">
+   235→        <div className="flex items-start justify-between">
+   236→          <Skeleton className="h-5 w-28" />
+   237→          <Skeleton className="h-5 w-16 rounded-full" />
+   238→        </div>
+   239→      </CardHeader>
+   240→      <CardContent className="space-y-3">
+   241→        <div className="flex gap-2">
+   242→          <Skeleton className="h-5 w-16 rounded-full" />
+   243→          <Skeleton className="h-5 w-14 rounded-full" />
+   244→        </div>
+   245→        <Skeleton className="h-10 w-full rounded" />
+   246→        <div className="flex justify-between">
+   247→          <Skeleton className="h-4 w-24" />
+   248→          <Skeleton className="h-4 w-24" />
+   249→        </div>
+   250→      </CardContent>
+   251→      <CardFooter className="gap-2">
+   252→        <Skeleton className="h-8 w-20" />
+   253→        <Skeleton className="h-8 w-20" />
+   254→        <Skeleton className="h-8 w-20" />
+   255→      </CardFooter>
+   256→    </Card>
+   257→  )
+   258→}
+   259→
+   260→function StatCardSkeleton() {
+   261→  return (
+   262→    <Card>
+   263→      <CardContent className="p-4">
+   264→        <div className="flex items-center gap-3">
+   265→          <Skeleton className="h-10 w-10 rounded-lg" />
+   266→          <div className="space-y-1.5">
+   267→            <Skeleton className="h-4 w-20" />
+   268→            <Skeleton className="h-6 w-12" />
+   269→          </div>
+   270→        </div>
+   271→      </CardContent>
+   272→    </Card>
+   273→  )
+   274→}
+   275→
+   276→function BedVisualization({ beds }: { beds: BedData[] }) {
+   277→  return (
+   278→    <div className="flex flex-wrap gap-1.5">
+   279→      {beds.map((bed) => (
+   280→        <div
+   281→          key={bed.id}
+   282→          className={`h-6 w-6 rounded-sm border flex items-center justify-center text-[8px] font-bold text-white ${BED_STATUS_COLORS[bed.status]}`}
+   283→          title={`${bed.name} - ${bed.status}${bed.tenant ? ` (${bed.tenant.name})` : ''}`}
+   284→        >
+   285→          {bed.number}
+   286→        </div>
+   287→      ))}
+   288→    </div>
+   289→  )
+   290→}
+   291→
+   292→function VacancyMap({ rooms }: { rooms: RoomData[] }) {
+   293→  const statusColor = (status: RoomStatus) => {
+   294→    switch (status) {
+   295→      case 'available': return 'bg-emerald-500 hover:bg-emerald-400'
+   296→      case 'occupied': return 'bg-blue-500 hover:bg-blue-400'
+   297→      case 'maintenance': return 'bg-red-500 hover:bg-red-400'
+   298→      case 'blocked': return 'bg-gray-400 hover:bg-gray-300'
+   299→    }
+   300→  }
+   301→
+   302→  return (
+   303→    <Card>
+   304→      <CardHeader className="pb-3">
+   305→        <div className="flex items-center justify-between">
+   306→          <div>
+   307→            <CardTitle className="text-base flex items-center gap-2">
+   308→              <Grid3X3 className="h-4 w-4 text-emerald-600" />
+   309→              Vacancy Map
+   310→            </CardTitle>
+   311→            <CardDescription className="text-xs mt-1">Color-coded room status overview</CardDescription>
+   312→          </div>
+   313→          <div className="flex items-center gap-3 text-[10px]">
+   314→            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Available</span>
+   315→            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-blue-500" /> Occupied</span>
+   316→            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-red-500" /> Maintenance</span>
+   317→            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-sm bg-gray-400" /> Blocked</span>
+   318→          </div>
+   319→        </div>
+   320→      </CardHeader>
+   321→      <CardContent>
+   322→        {rooms.length === 0 ? (
+   323→          <p className="text-sm text-muted-foreground text-center py-8">No rooms to display</p>
+   324→        ) : (
+   325→          <div className="flex flex-wrap gap-1.5">
+   326→            {rooms.map((room) => (
+   327→              <div
+   328→                key={room.id}
+   329→                className={`h-8 w-8 rounded text-[9px] font-bold text-white flex items-center justify-center cursor-default transition-colors ${statusColor(room.status)}`}
+   330→                title={`${room.name} (${room.number}) - ${STATUS_CONFIG[room.status].label} | ${room.property?.name || 'Unknown'}`}
+   331→              >
+   332→                {room.number.slice(0, 3)}
+   333→              </div>
+   334→            ))}
+   335→          </div>
+   336→        )}
+   337→      </CardContent>
+   338→    </Card>
+   339→  )
+   340→}
+   341→
+   342→// ── Main Component ───────────────────────────────────────────────────────────
+   343→
+   344→export function RoomsPage() {
+   345→  const { currentUser } = useAppStore()
+   346→
+   347→  // ── State ────────────────────────────────────────────────────────────────
+   348→  const [rooms, setRooms] = useState<RoomData[]>([])
+   349→  const [properties, setProperties] = useState<PropertyInfo[]>([])
+   350→  const [loading, setLoading] = useState(true)
+   351→  const [searchQuery, setSearchQuery] = useState('')
+   352→  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+   353→  const [showVacancyMap, setShowVacancyMap] = useState(true)
+   354→  const [dialogOpen, setDialogOpen] = useState(false)
+   355→  const [submitting, setSubmitting] = useState(false)
+   356→
+   357→  // Filters
+   358→  const [filterProperty, setFilterProperty] = useState('all')
+   359→  const [filterFloor, setFilterFloor] = useState('all')
+   360→  const [filterRoomType, setFilterRoomType] = useState('all')
+   361→  const [filterSharingType, setFilterSharingType] = useState('all')
+   362→  const [filterStatus, setFilterStatus] = useState('all')
+   363→
+   364→  // Form
+   365→  const [formData, setFormData] = useState<RoomFormData>({
+   366→    propertyId: '',
+   367→    buildingId: '',
+   368→    floorId: '',
+   369→    name: '',
+   370→    number: '',
+   371→    sharingType: 'single',
+   372→    roomType: 'non_ac',
+   373→    totalBeds: 1,
+   374→    rent: 0,
+   375→    deposit: 0,
+   376→    amenities: [],
+   377→  })
+   378→
+   379→  // ── Derived Data ─────────────────────────────────────────────────────────
+   380→  const selectedProperty = useMemo(
+   381→    () => properties.find((p) => p.id === formData.propertyId),
+   382→    [properties, formData.propertyId]
+   383→  )
+   384→
+   385→  const availableBuildings = useMemo(() => selectedProperty?.buildings ?? [], [selectedProperty])
+   386→
+   387→  const selectedBuilding = useMemo(
+   388→    () => availableBuildings.find((b) => b.id === formData.buildingId),
+   389→    [availableBuildings, formData.buildingId]
+   390→  )
+   391→
+   392→  const availableFloors = useMemo(() => selectedBuilding?.floors ?? [], [selectedBuilding])
+   393→
+   394→  // Floor options for filter
+   395→  const floorOptions = useMemo(() => {
+   396→    const floors = new Set<string>()
+   397→    rooms.forEach((r) => {
+   398→      if (r.floor?.name) floors.add(r.floor.name)
+   399→    })
+   400→    return Array.from(floors).sort()
+   401→  }, [rooms])
+   402→
+   403→  // ── Data Fetching ────────────────────────────────────────────────────────
+   404→  useEffect(() => {
+   405→    Promise.all([fetchRooms(), fetchProperties()])
+   406→  }, [])
+   407→
+   408→  async function fetchRooms() {
+   409→    try {
+   410→      setLoading(true)
+   411→      const res = await fetch('/api/rooms')
+   412→      if (res.ok) {
+   413→        const data = await res.json()
+   414→        setRooms(data)
+   415→      }
+   416→    } catch (error) {
+   417→      console.error('Failed to fetch rooms:', error)
+   418→    } finally {
+   419→      setLoading(false)
+   420→    }
+   421→  }
+   422→
+   423→  async function fetchProperties() {
+   424→    try {
+   425→      const res = await fetch('/api/properties')
+   426→      if (res.ok) {
+   427→        setProperties(await res.json())
+   428→      }
+   429→    } catch (error) {
+   430→      console.error('Failed to fetch properties:', error)
+   431→    }
+   432→  }
+   433→
+   434→  // ── Computed Values ──────────────────────────────────────────────────────
+   435→  const stats = useMemo(() => {
+   436→    const totalRooms = rooms.length
+   437→    const totalBeds = rooms.reduce((sum, r) => sum + r.totalBeds, 0)
+   438→    const occupied = rooms.reduce((sum, r) => sum + r.occupiedBedsCount, 0)
+   439→    const vacant = totalBeds - occupied
+   440→    const occupancyPct = totalBeds > 0 ? Math.round((occupied / totalBeds) * 100) : 0
+   441→    return { totalRooms, totalBeds, occupied, vacant, occupancyPct }
+   442→  }, [rooms])
+   443→
+   444→  const filteredRooms = useMemo(() => {
+   445→    let result = rooms
+   446→    if (filterProperty !== 'all') {
+   447→      result = result.filter((r) => r.propertyId === filterProperty)
+   448→    }
+   449→    if (filterFloor !== 'all') {
+   450→      result = result.filter((r) => r.floor?.name === filterFloor)
+   451→    }
+   452→    if (filterRoomType !== 'all') {
+   453→      result = result.filter((r) => r.roomType === filterRoomType)
+   454→    }
+   455→    if (filterSharingType !== 'all') {
+   456→      result = result.filter((r) => r.sharingType === filterSharingType)
+   457→    }
+   458→    if (filterStatus !== 'all') {
+   459→      result = result.filter((r) => r.status === filterStatus)
+   460→    }
+   461→    if (searchQuery.trim()) {
+   462→      const q = searchQuery.toLowerCase()
+   463→      result = result.filter(
+   464→        (r) =>
+   465→          r.name.toLowerCase().includes(q) ||
+   466→          r.number.toLowerCase().includes(q) ||
+   467→          r.property?.name.toLowerCase().includes(q) ||
+   468→          r.building?.name.toLowerCase().includes(q)
+   469→      )
+   470→    }
+   471→    return result
+   472→  }, [rooms, filterProperty, filterFloor, filterRoomType, filterSharingType, filterStatus, searchQuery])
+   473→
+   474→  // ── Form Handlers ────────────────────────────────────────────────────────
+   475→  function handleFormChange(field: keyof RoomFormData, value: string | number | string[]) {
+   476→    setFormData((prev) => {
+   477→      const next = { ...prev, [field]: value }
+   478→      // Reset building when property changes
+   479→      if (field === 'propertyId') {
+   480→        next.buildingId = ''
+   481→        next.floorId = ''
+   482→      }
+   483→      // Reset floor when building changes
+   484→      if (field === 'buildingId') {
+   485→        next.floorId = ''
+   486→      }
+   487→      return next
+   488→    })
+   489→  }
+   490→
+   491→  function handleAmenityToggle(amenity: string) {
+   492→    setFormData((prev) => ({
+   493→      ...prev,
+   494→      amenities: prev.amenities.includes(amenity)
+   495→        ? prev.amenities.filter((a) => a !== amenity)
+   496→        : [...prev.amenities, amenity],
+   497→    }))
+   498→  }
+   499→
+   500→  async function handleSubmit(e: React.FormEvent) {
+   501→    e.preventDefault()
+   502→    if (!formData.name || !formData.number || !formData.floorId || !formData.buildingId || !formData.propertyId) return
+   503→
+   504→    try {
+   505→      setSubmitting(true)
+   506→      const res = await fetch('/api/rooms', {
+   507→        method: 'POST',
+   508→        headers: { 'Content-Type': 'application/json' },
+   509→        body: JSON.stringify({
+   510→          ...formData,
+   511→          amenities: formData.amenities.length > 0 ? JSON.stringify(formData.amenities) : null,
+   512→          status: 'available',
+   513→        }),
+   514→      })
+   515→
+   516→      if (res.ok) {
+   517→        const newRoom = await res.json()
+   518→        setRooms((prev) => [newRoom, ...prev])
+   519→        setDialogOpen(false)
+   520→        resetForm()
+   521→      }
+   522→    } catch (error) {
+   523→      console.error('Failed to create room:', error)
+   524→    } finally {
+   525→      setSubmitting(false)
+   526→    }
+   527→  }
+   528→
+   529→  function resetForm() {
+   530→    setFormData({
+   531→      propertyId: '',
+   532→      buildingId: '',
+   533→      floorId: '',
+   534→      name: '',
+   535→      number: '',
+   536→      sharingType: 'single',
+   537→      roomType: 'non_ac',
+   538→      totalBeds: 1,
+   539→      rent: 0,
+   540→      deposit: 0,
+   541→      amenities: [],
+   542→    })
+   543→  }
+   544→
+   545→  function clearFilters() {
+   546→    setFilterProperty('all')
+   547→    setFilterFloor('all')
+   548→    setFilterRoomType('all')
+   549→    setFilterSharingType('all')
+   550→    setFilterStatus('all')
+   551→    setSearchQuery('')
+   552→  }
+   553→
+   554→  const hasActiveFilters = filterProperty !== 'all' || filterFloor !== 'all' || filterRoomType !== 'all' || filterSharingType !== 'all' || filterStatus !== 'all' || searchQuery.trim() !== ''
+   555→
+   556→  // ── Render ───────────────────────────────────────────────────────────────
+   557→  return (
+   558→    <ScrollArea className="h-full">
+   559→      <div className="p-4 md:p-6 space-y-6">
+   560→        {/* ── Page Header ─────────────────────────────────────────────────── */}
+   561→        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   562→          <div>
+   563→            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+   564→              Rooms & Beds
+   565→            </h1>
+   566→            <p className="text-muted-foreground mt-1">
+   567→              Manage room inventory, bed allocation, and occupancy across all properties
+   568→            </p>
+   569→          </div>
+   570→          <div className="flex items-center gap-2">
+   571→            <Button
+   572→              variant="outline"
+   573→              size="sm"
+   574→              onClick={() => setShowVacancyMap(!showVacancyMap)}
+   575→              className={showVacancyMap ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800' : ''}
+   576→            >
+   577→              <MapIcon className="mr-1.5 h-4 w-4" />
+   578→              Vacancy Map
+   579→            </Button>
+   580→            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
+   581→              <DialogTrigger asChild>
+   582→                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+   583→                  <Plus className="mr-2 h-4 w-4" />
+   584→                  Add Room
+   585→                </Button>
+   586→              </DialogTrigger>
+   587→              <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+   588→                <DialogHeader>
+   589→                  <DialogTitle>Add New Room</DialogTitle>
+   590→                  <DialogDescription>
+   591→                    Configure a new room with beds, pricing, and amenities.
+   592→                  </DialogDescription>
+   593→                </DialogHeader>
+   594→                <form onSubmit={handleSubmit} className="space-y-4">
+   595→                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   596→                    {/* Property */}
+   597→                    <div className="space-y-2">
+   598→                      <Label>Property *</Label>
+   599→                      <Select
+   600→                        value={formData.propertyId}
+   601→                        onValueChange={(v) => handleFormChange('propertyId', v)}
+   602→                      >
+   603→                        <SelectTrigger className="w-full">
+   604→                          <SelectValue placeholder="Select property" />
+   605→                        </SelectTrigger>
+   606→                        <SelectContent>
+   607→                          {properties.map((p) => (
+   608→                            <SelectItem key={p.id} value={p.id}>
+   609→                              {p.name}
+   610→                            </SelectItem>
+   611→                          ))}
+   612→                        </SelectContent>
+   613→                      </Select>
+   614→                    </div>
+   615→                    {/* Building */}
+   616→                    <div className="space-y-2">
+   617→                      <Label>Building *</Label>
+   618→                      <Select
+   619→                        value={formData.buildingId}
+   620→                        onValueChange={(v) => handleFormChange('buildingId', v)}
+   621→                        disabled={!formData.propertyId || availableBuildings.length === 0}
+   622→                      >
+   623→                        <SelectTrigger className="w-full">
+   624→                          <SelectValue placeholder={formData.propertyId ? 'Select building' : 'Select property first'} />
+   625→                        </SelectTrigger>
+   626→                        <SelectContent>
+   627→                          {availableBuildings.map((b) => (
+   628→                            <SelectItem key={b.id} value={b.id}>
+   629→                              {b.name}
+   630→                            </SelectItem>
+   631→                          ))}
+   632→                        </SelectContent>
+   633→                      </Select>
+   634→                    </div>
+   635→                    {/* Floor */}
+   636→                    <div className="space-y-2">
+   637→                      <Label>Floor *</Label>
+   638→                      <Select
+   639→                        value={formData.floorId}
+   640→                        onValueChange={(v) => handleFormChange('floorId', v)}
+   641→                        disabled={!formData.buildingId || availableFloors.length === 0}
+   642→                      >
+   643→                        <SelectTrigger className="w-full">
+   644→                          <SelectValue placeholder={formData.buildingId ? 'Select floor' : 'Select building first'} />
+   645→                        </SelectTrigger>
+   646→                        <SelectContent>
+   647→                          {availableFloors.map((f) => (
+   648→                            <SelectItem key={f.id} value={f.id}>
+   649→                              {f.name}
+   650→                            </SelectItem>
+   651→                          ))}
+   652→                        </SelectContent>
+   653→                      </Select>
+   654→                    </div>
+   655→                    {/* Room Name */}
+   656→                    <div className="space-y-2">
+   657→                      <Label htmlFor="room-name">Room Name *</Label>
+   658→                      <Input
+   659→                        id="room-name"
+   660→                        placeholder="e.g. Room 101"
+   661→                        value={formData.name}
+   662→                        onChange={(e) => handleFormChange('name', e.target.value)}
+   663→                        required
+   664→                      />
+   665→                    </div>
+   666→                    {/* Room Number */}
+   667→                    <div className="space-y-2">
+   668→                      <Label htmlFor="room-number">Room Number *</Label>
+   669→                      <Input
+   670→                        id="room-number"
+   671→                        placeholder="e.g. 101"
+   672→                        value={formData.number}
+   673→                        onChange={(e) => handleFormChange('number', e.target.value)}
+   674→                        required
+   675→                      />
+   676→                    </div>
+   677→                    {/* Sharing Type */}
+   678→                    <div className="space-y-2">
+   679→                      <Label>Sharing Type</Label>
+   680→                      <Select
+   681→                        value={formData.sharingType}
+   682→                        onValueChange={(v) => handleFormChange('sharingType', v)}
+   683→                      >
+   684→                        <SelectTrigger className="w-full">
+   685→                          <SelectValue />
+   686→                        </SelectTrigger>
+   687→                        <SelectContent>
+   688→                          {Object.entries(SHARING_TYPE_CONFIG).map(([key, cfg]) => (
+   689→                            <SelectItem key={key} value={key}>
+   690→                              {cfg.label}
+   691→                            </SelectItem>
+   692→                          ))}
+   693→                        </SelectContent>
+   694→                      </Select>
+   695→                    </div>
+   696→                    {/* Room Type */}
+   697→                    <div className="space-y-2">
+   698→                      <Label>Room Type</Label>
+   699→                      <Select
+   700→                        value={formData.roomType}
+   701→                        onValueChange={(v) => handleFormChange('roomType', v)}
+   702→                      >
+   703→                        <SelectTrigger className="w-full">
+   704→                          <SelectValue />
+   705→                        </SelectTrigger>
+   706→                        <SelectContent>
+   707→                          {Object.entries(ROOM_TYPE_CONFIG).map(([key, cfg]) => (
+   708→                            <SelectItem key={key} value={key}>
+   709→                              {cfg.label}
+   710→                            </SelectItem>
+   711→                          ))}
+   712→                        </SelectContent>
+   713→                      </Select>
+   714→                    </div>
+   715→                    {/* Total Beds */}
+   716→                    <div className="space-y-2">
+   717→                      <Label htmlFor="room-beds">Total Beds</Label>
+   718→                      <Input
+   719→                        id="room-beds"
+   720→                        type="number"
+   721→                        min={1}
+   722→                        max={10}
+   723→                        value={formData.totalBeds}
+   724→                        onChange={(e) => handleFormChange('totalBeds', parseInt(e.target.value) || 1)}
+   725→                      />
+   726→                    </div>
+   727→                    {/* Rent */}
+   728→                    <div className="space-y-2">
+   729→                      <Label htmlFor="room-rent">Rent (₹/month)</Label>
+   730→                      <Input
+   731→                        id="room-rent"
+   732→                        type="number"
+   733→                        min={0}
+   734→                        value={formData.rent}
+   735→                        onChange={(e) => handleFormChange('rent', parseFloat(e.target.value) || 0)}
+   736→                      />
+   737→                    </div>
+   738→                    {/* Deposit */}
+   739→                    <div className="space-y-2">
+   740→                      <Label htmlFor="room-deposit">Deposit (₹)</Label>
+   741→                      <Input
+   742→                        id="room-deposit"
+   743→                        type="number"
+   744→                        min={0}
+   745→                        value={formData.deposit}
+   746→                        onChange={(e) => handleFormChange('deposit', parseFloat(e.target.value) || 0)}
+   747→                      />
+   748→                    </div>
+   749→                  </div>
+   750→                  {/* Amenities */}
+   751→                  <div className="space-y-3">
+   752→                    <Label>Amenities</Label>
+   753→                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+   754→                      {ROOM_AMENITIES.map((amenity) => (
+   755→                        <label
+   756→                          key={amenity}
+   757→                          className="flex items-center gap-2 text-sm cursor-pointer rounded-md border px-3 py-2 hover:bg-accent/50 transition-colors"
+   758→                        >
+   759→                          <Checkbox
+   760→                            checked={formData.amenities.includes(amenity)}
+   761→                            onCheckedChange={() => handleAmenityToggle(amenity)}
+   762→                          />
+   763→                          <span>{amenity}</span>
+   764→                        </label>
+   765→                      ))}
+   766→                    </div>
+   767→                  </div>
+   768→                  <DialogFooter>
+   769→                    <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+   770→                      Cancel
+   771→                    </Button>
+   772→                    <Button
+   773→                      type="submit"
+   774→                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   775→                      disabled={submitting}
+   776→                    >
+   777→                      {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   778→                      Create Room
+   779→                    </Button>
+   780→                  </DialogFooter>
+   781→                </form>
+   782→              </DialogContent>
+   783→            </Dialog>
+   784→          </div>
+   785→        </div>
+   786→
+   787→        {/* ── Stats Cards ─────────────────────────────────────────────────── */}
+   788→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+   789→          {loading ? (
+   790→            <>
+   791→              <StatCardSkeleton />
+   792→              <StatCardSkeleton />
+   793→              <StatCardSkeleton />
+   794→              <StatCardSkeleton />
+   795→              <StatCardSkeleton />
+   796→            </>
+   797→          ) : (
+   798→            <>
+   799→              <Card className="border-l-4 border-l-emerald-500">
+   800→                <CardContent className="p-4">
+   801→                  <div className="flex items-center gap-3">
+   802→                    <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/50 p-2.5">
+   803→                      <DoorOpen className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   804→                    </div>
+   805→                    <div>
+   806→                      <p className="text-sm text-muted-foreground">Total Rooms</p>
+   807→                      <p className="text-2xl font-bold">{stats.totalRooms}</p>
+   808→                    </div>
+   809→                  </div>
+   810→                </CardContent>
+   811→              </Card>
+   812→              <Card className="border-l-4 border-l-teal-500">
+   813→                <CardContent className="p-4">
+   814→                  <div className="flex items-center gap-3">
+   815→                    <div className="rounded-lg bg-teal-100 dark:bg-teal-950/50 p-2.5">
+   816→                      <BedDouble className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+   817→                    </div>
+   818→                    <div>
+   819→                      <p className="text-sm text-muted-foreground">Total Beds</p>
+   820→                      <p className="text-2xl font-bold">{stats.totalBeds}</p>
+   821→                    </div>
+   822→                  </div>
+   823→                </CardContent>
+   824→              </Card>
+   825→              <Card className="border-l-4 border-l-blue-500">
+   826→                <CardContent className="p-4">
+   827→                  <div className="flex items-center gap-3">
+   828→                    <div className="rounded-lg bg-blue-100 dark:bg-blue-950/50 p-2.5">
+   829→                      <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+   830→                    </div>
+   831→                    <div>
+   832→                      <p className="text-sm text-muted-foreground">Occupied</p>
+   833→                      <p className="text-2xl font-bold">{stats.occupied}</p>
+   834→                    </div>
+   835→                  </div>
+   836→                </CardContent>
+   837→              </Card>
+   838→              <Card className="border-l-4 border-l-amber-500">
+   839→                <CardContent className="p-4">
+   840→                  <div className="flex items-center gap-3">
+   841→                    <div className="rounded-lg bg-amber-100 dark:bg-amber-950/50 p-2.5">
+   842→                      <BedSingle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+   843→                    </div>
+   844→                    <div>
+   845→                      <p className="text-sm text-muted-foreground">Vacant</p>
+   846→                      <p className="text-2xl font-bold">{stats.vacant}</p>
+   847→                    </div>
+   848→                  </div>
+   849→                </CardContent>
+   850→              </Card>
+   851→              <Card className="border-l-4 border-l-emerald-500 sm:col-span-3 lg:col-span-1">
+   852→                <CardContent className="p-4">
+   853→                  <div className="flex items-center gap-3">
+   854→                    <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/50 p-2.5">
+   855→                      <CircleDot className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   856→                    </div>
+   857→                    <div>
+   858→                      <p className="text-sm text-muted-foreground">Occupancy</p>
+   859→                      <p className="text-2xl font-bold">{stats.occupancyPct}%</p>
+   860→                    </div>
+   861→                  </div>
+   862→                </CardContent>
+   863→              </Card>
+   864→            </>
+   865→          )}
+   866→        </div>
+   867→
+   868→        {/* ── Vacancy Map ──────────────────────────────────────────────────── */}
+   869→        {showVacancyMap && !loading && (
+   870→          <VacancyMap rooms={filteredRooms} />
+   871→        )}
+   872→
+   873→        {/* ── Filter Bar ──────────────────────────────────────────────────── */}
+   874→        <Card>
+   875→          <CardContent className="p-4">
+   876→            <div className="flex flex-col gap-3">
+   877→              <div className="flex items-center justify-between">
+   878→                <div className="flex items-center gap-2 text-sm font-medium">
+   879→                  <Filter className="h-4 w-4 text-muted-foreground" />
+   880→                  Filters
+   881→                </div>
+   882→                {hasActiveFilters && (
+   883→                  <Button variant="ghost" size="sm" onClick={clearFilters} className="text-xs">
+   884→                    Clear all
+   885→                  </Button>
+   886→                )}
+   887→              </div>
+   888→              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+   889→                {/* Property filter */}
+   890→                <Select value={filterProperty} onValueChange={setFilterProperty}>
+   891→                  <SelectTrigger className="w-full">
+   892→                    <SelectValue placeholder="Property" />
+   893→                  </SelectTrigger>
+   894→                  <SelectContent>
+   895→                    <SelectItem value="all">All Properties</SelectItem>
+   896→                    {properties.map((p) => (
+   897→                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   898→                    ))}
+   899→                  </SelectContent>
+   900→                </Select>
+   901→                {/* Floor filter */}
+   902→                <Select value={filterFloor} onValueChange={setFilterFloor}>
+   903→                  <SelectTrigger className="w-full">
+   904→                    <SelectValue placeholder="Floor" />
+   905→                  </SelectTrigger>
+   906→                  <SelectContent>
+   907→                    <SelectItem value="all">All Floors</SelectItem>
+   908→                    {floorOptions.map((f) => (
+   909→                      <SelectItem key={f} value={f}>{f}</SelectItem>
+   910→                    ))}
+   911→                  </SelectContent>
+   912→                </Select>
+   913→                {/* Room Type filter */}
+   914→                <Select value={filterRoomType} onValueChange={setFilterRoomType}>
+   915→                  <SelectTrigger className="w-full">
+   916→                    <SelectValue placeholder="Room Type" />
+   917→                  </SelectTrigger>
+   918→                  <SelectContent>
+   919→                    <SelectItem value="all">All Types</SelectItem>
+   920→                    {Object.entries(ROOM_TYPE_CONFIG).map(([key, cfg]) => (
+   921→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   922→                    ))}
+   923→                  </SelectContent>
+   924→                </Select>
+   925→                {/* Sharing Type filter */}
+   926→                <Select value={filterSharingType} onValueChange={setFilterSharingType}>
+   927→                  <SelectTrigger className="w-full">
+   928→                    <SelectValue placeholder="Sharing" />
+   929→                  </SelectTrigger>
+   930→                  <SelectContent>
+   931→                    <SelectItem value="all">All Sharing</SelectItem>
+   932→                    {Object.entries(SHARING_TYPE_CONFIG).map(([key, cfg]) => (
+   933→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   934→                    ))}
+   935→                  </SelectContent>
+   936→                </Select>
+   937→                {/* Status filter */}
+   938→                <Select value={filterStatus} onValueChange={setFilterStatus}>
+   939→                  <SelectTrigger className="w-full">
+   940→                    <SelectValue placeholder="Status" />
+   941→                  </SelectTrigger>
+   942→                  <SelectContent>
+   943→                    <SelectItem value="all">All Status</SelectItem>
+   944→                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+   945→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   946→                    ))}
+   947→                  </SelectContent>
+   948→                </Select>
+   949→                {/* Search */}
+   950→                <div className="relative">
+   951→                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   952→                  <Input
+   953→                    placeholder="Search rooms..."
+   954→                    value={searchQuery}
+   955→                    onChange={(e) => setSearchQuery(e.target.value)}
+   956→                    className="pl-9"
+   957→                  />
+   958→                </div>
+   959→              </div>
+   960→            </div>
+   961→          </CardContent>
+   962→        </Card>
+   963→
+   964→        {/* ── View Toggle ──────────────────────────────────────────────────── */}
+   965→        <div className="flex items-center justify-between">
+   966→          <p className="text-sm text-muted-foreground">
+   967→            Showing {filteredRooms.length} of {rooms.length} rooms
+   968→          </p>
+   969→          <div className="flex items-center rounded-md border">
+   970→            <Button
+   971→              variant="ghost"
+   972→              size="sm"
+   973→              className={viewMode === 'grid' ? 'bg-accent' : ''}
+   974→              onClick={() => setViewMode('grid')}
+   975→            >
+   976→              <LayoutGrid className="h-4 w-4" />
+   977→            </Button>
+   978→            <Button
+   979→              variant="ghost"
+   980→              size="sm"
+   981→              className={viewMode === 'list' ? 'bg-accent' : ''}
+   982→              onClick={() => setViewMode('list')}
+   983→            >
+   984→              <List className="h-4 w-4" />
+   985→            </Button>
+   986→          </div>
+   987→        </div>
+   988→
+   989→        {/* ── Room Grid / List ─────────────────────────────────────────────── */}
+   990→        {loading ? (
+   991→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   992→            <RoomCardSkeleton />
+   993→            <RoomCardSkeleton />
+   994→            <RoomCardSkeleton />
+   995→            <RoomCardSkeleton />
+   996→            <RoomCardSkeleton />
+   997→            <RoomCardSkeleton />
+   998→          </div>
+   999→        ) : filteredRooms.length === 0 ? (
+  1000→          <Card className="border-dashed">
+  1001→            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+  1002→              <DoorOpen className="h-12 w-12 text-muted-foreground/50 mb-4" />
+  1003→              <h3 className="text-lg font-semibold">No rooms found</h3>
+  1004→              <p className="text-muted-foreground mt-1 max-w-sm">
+  1005→                {hasActiveFilters
+  1006→                  ? 'Try adjusting your filters to find what you\'re looking for.'
+  1007→                  : 'Get started by adding your first room to the system.'}
+  1008→              </p>
+  1009→              {!hasActiveFilters && (
+  1010→                <Button
+  1011→                  className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white"
+  1012→                  onClick={() => setDialogOpen(true)}
+  1013→                >
+  1014→                  <Plus className="mr-2 h-4 w-4" />
+  1015→                  Add Room
+  1016→                </Button>
+  1017→              )}
+  1018→            </CardContent>
+  1019→          </Card>
+  1020→        ) : viewMode === 'grid' ? (
+  1021→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+  1022→            {filteredRooms.map((room) => (
+  1023→              <RoomCard key={room.id} room={room} />
+  1024→            ))}
+  1025→          </div>
+  1026→        ) : (
+  1027→          <div className="space-y-3">
+  1028→            {filteredRooms.map((room) => (
+  1029→              <RoomListItem key={room.id} room={room} />
+  1030→            ))}
+  1031→          </div>
+  1032→        )}
+  1033→      </div>
+  1034→    </ScrollArea>
+  1035→  )
+  1036→}
+  1037→
+  1038→// ── Room Card (Grid View) ────────────────────────────────────────────────────
+  1039→
+  1040→function RoomCard({ room }: { room: RoomData }) {
+  1041→  const roomTypeConfig = ROOM_TYPE_CONFIG[room.roomType] || ROOM_TYPE_CONFIG.non_ac
+  1042→  const sharingConfig = SHARING_TYPE_CONFIG[room.sharingType] || SHARING_TYPE_CONFIG.single
+  1043→  const statusConfig = STATUS_CONFIG[room.status] || STATUS_CONFIG.available
+  1044→  const TypeIcon = roomTypeConfig.icon
+  1045→  const amenities = parseAmenities(room.amenities)
+  1046→  const occupancyPct = room.totalBeds > 0 ? Math.round((room.occupiedBedsCount / room.totalBeds) * 100) : 0
+  1047→
+  1048→  // Find the first occupied bed's tenant
+  1049→  const occupiedBed = room.beds?.find((b) => b.status === 'occupied' && b.tenant)
+  1050→
+  1051→  return (
+  1052→    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+  1053→      {/* Status color bar */}
+  1054→      <div className={`h-1.5 ${statusConfig.dotClass}`} />
+  1055→      <CardHeader className="pb-3">
+  1056→        <div className="flex items-start justify-between gap-2">
+  1057→          <div className="flex items-start gap-2.5 min-w-0">
+  1058→            <div className={`rounded-lg p-2 ${roomTypeConfig.bgClass} shrink-0`}>
+  1059→              <TypeIcon className={`h-4 w-4 ${roomTypeConfig.textClass}`} />
+  1060→            </div>
+  1061→            <div className="min-w-0">
+  1062→              <CardTitle className="text-base truncate">{room.name}</CardTitle>
+  1063→              <p className="text-xs text-muted-foreground mt-0.5">#{room.number}</p>
+  1064→            </div>
+  1065→          </div>
+  1066→          <div className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusConfig.bgClass} ${statusConfig.textClass}`}>
+  1067→            <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotClass}`} />
+  1068→            {statusConfig.label}
+  1069→          </div>
+  1070→        </div>
+  1071→      </CardHeader>
+  1072→      <CardContent className="space-y-3">
+  1073→        {/* Type badges */}
+  1074→        <div className="flex flex-wrap gap-1.5">
+  1075→          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium ${roomTypeConfig.bgClass} ${roomTypeConfig.textClass}`}>
+  1076→            <TypeIcon className="h-3 w-3" />
+  1077→            {roomTypeConfig.label}
+  1078→          </span>
+  1079→          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+  1080→            {sharingConfig.label}
+  1081→          </Badge>
+  1082→          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+  1083→            {room.property?.name || 'Unknown'}
+  1084→          </Badge>
+  1085→        </div>
+  1086→
+  1087→        {/* Bed visualization */}
+  1088→        {room.beds && room.beds.length > 0 && (
+  1089→          <div className="space-y-1.5">
+  1090→            <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Bed Layout</p>
+  1091→            <BedVisualization beds={room.beds} />
+  1092→          </div>
+  1093→        )}
+  1094→
+  1095→        {/* Rent & Deposit */}
+  1096→        <div className="flex items-center justify-between text-sm">
+  1097→          <div className="flex items-center gap-1.5">
+  1098→            <IndianRupee className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+  1099→            <span className="font-semibold">{formatCurrency(room.rent)}</span>
+  1100→            <span className="text-muted-foreground text-xs">/mo</span>
+  1101→          </div>
+  1102→          <div className="text-xs text-muted-foreground">
+  1103→            Deposit: {formatCurrency(room.deposit)}
+  1104→          </div>
+  1105→        </div>
+  1106→
+  1107→        {/* Occupancy bar */}
+  1108→        <div className="space-y-1">
+  1109→          <div className="flex items-center justify-between text-xs">
+  1110→            <span className="text-muted-foreground">Occupancy</span>
+  1111→            <span className="font-medium">{room.occupiedBedsCount}/{room.totalBeds} beds</span>
+  1112→          </div>
+  1113→          <Progress value={occupancyPct} className="h-1.5" />
+  1114→        </div>
+  1115→
+  1116→        {/* Current tenant */}
+  1117→        {occupiedBed?.tenant && (
+  1118→          <div className="flex items-center gap-2 text-xs text-muted-foreground rounded-md bg-muted/50 px-2.5 py-1.5">
+  1119→            <User className="h-3.5 w-3.5" />
+  1120→            <span>
+  1121→              <span className="font-medium text-foreground">{occupiedBed.tenant.name}</span>
+  1122→            </span>
+  1123→          </div>
+  1124→        )}
+  1125→
+  1126→        {/* Amenities */}
+  1127→        {amenities.length > 0 && (
+  1128→          <div className="flex flex-wrap gap-1">
+  1129→            {amenities.slice(0, 3).map((a) => (
+  1130→              <Badge key={a} variant="secondary" className="text-[10px] px-1.5 py-0">{a}</Badge>
+  1131→            ))}
+  1132→            {amenities.length > 3 && (
+  1133→              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">+{amenities.length - 3}</Badge>
+  1134→            )}
+  1135→          </div>
+  1136→        )}
+  1137→      </CardContent>
+  1138→      <CardFooter className="gap-2 pt-0">
+  1139→        <Button variant="outline" size="sm" className="flex-1">
+  1140→          <Eye className="mr-1.5 h-3.5 w-3.5" />
+  1141→          View
+  1142→        </Button>
+  1143→        <Button variant="outline" size="sm" className="flex-1">
+  1144→          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+  1145→          Edit
+  1146→        </Button>
+  1147→        <Button variant="outline" size="sm" className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50">
+  1148→          <Ban className="mr-1.5 h-3.5 w-3.5" />
+  1149→          Block
+  1150→        </Button>
+  1151→      </CardFooter>
+  1152→    </Card>
+  1153→  )
+  1154→}
+  1155→
+  1156→// ── Room List Item (List View) ──────────────────────────────────────────────
+  1157→
+  1158→function RoomListItem({ room }: { room: RoomData }) {
+  1159→  const roomTypeConfig = ROOM_TYPE_CONFIG[room.roomType] || ROOM_TYPE_CONFIG.non_ac
+  1160→  const sharingConfig = SHARING_TYPE_CONFIG[room.sharingType] || SHARING_TYPE_CONFIG.single
+  1161→  const statusConfig = STATUS_CONFIG[room.status] || STATUS_CONFIG.available
+  1162→  const TypeIcon = roomTypeConfig.icon
+  1163→  const occupancyPct = room.totalBeds > 0 ? Math.round((room.occupiedBedsCount / room.totalBeds) * 100) : 0
+  1164→  const occupiedBed = room.beds?.find((b) => b.status === 'occupied' && b.tenant)
+  1165→
+  1166→  return (
+  1167→    <Card className="hover:shadow-md transition-shadow">
+  1168→      <CardContent className="p-4">
+  1169→        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+  1170→          {/* Room info */}
+  1171→          <div className="flex items-start gap-3 min-w-0">
+  1172→            <div className={`rounded-lg p-2.5 ${roomTypeConfig.bgClass} shrink-0`}>
+  1173→              <TypeIcon className={`h-5 w-5 ${roomTypeConfig.textClass}`} />
+  1174→            </div>
+  1175→            <div className="min-w-0">
+  1176→              <div className="flex items-center gap-2 flex-wrap">
+  1177→                <h3 className="font-semibold">{room.name}</h3>
+  1178→                <span className="text-sm text-muted-foreground">#{room.number}</span>
+  1179→                <div className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusConfig.bgClass} ${statusConfig.textClass}`}>
+  1180→                  <span className={`h-1.5 w-1.5 rounded-full ${statusConfig.dotClass}`} />
+  1181→                  {statusConfig.label}
+  1182→                </div>
+  1183→              </div>
+  1184→              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+  1185→                <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium ${roomTypeConfig.bgClass} ${roomTypeConfig.textClass}`}>
+  1186→                  <TypeIcon className="h-3 w-3" />
+  1187→                  {roomTypeConfig.label}
+  1188→                </span>
+  1189→                <Badge variant="outline" className="text-[10px] px-1.5 py-0">{sharingConfig.label}</Badge>
+  1190→                <span className="text-xs text-muted-foreground">
+  1191→                  <Building2 className="h-3 w-3 inline mr-1" />
+  1192→                  {room.property?.name || 'Unknown'}
+  1193→                </span>
+  1194→              </div>
+  1195→              {occupiedBed?.tenant && (
+  1196→                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1.5">
+  1197→                  <User className="h-3 w-3" />
+  1198→                  <span>{occupiedBed.tenant.name}</span>
+  1199→                </div>
+  1200→              )}
+  1201→            </div>
+  1202→          </div>
+  1203→
+  1204→          {/* Bed visualization */}
+  1205→          {room.beds && room.beds.length > 0 && (
+  1206→            <div className="shrink-0">
+  1207→              <BedVisualization beds={room.beds} />
+  1208→            </div>
+  1209→          )}
+  1210→
+  1211→          {/* Stats */}
+  1212→          <div className="flex items-center gap-5 shrink-0">
+  1213→            <div className="text-center min-w-[60px]">
+  1214→              <p className="text-lg font-bold">{formatCurrency(room.rent)}</p>
+  1215→              <p className="text-[10px] text-muted-foreground">Rent/mo</p>
+  1216→            </div>
+  1217→            <div className="text-center min-w-[50px]">
+  1218→              <p className="text-lg font-bold">{room.occupiedBedsCount}/{room.totalBeds}</p>
+  1219→              <p className="text-[10px] text-muted-foreground">Beds</p>
+  1220→            </div>
+  1221→            <div className="text-center min-w-[50px]">
+  1222→              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{occupancyPct}%</p>
+  1223→              <p className="text-[10px] text-muted-foreground">Occupied</p>
+  1224→            </div>
+  1225→            <div className="flex gap-1.5">
+  1226→              <Button variant="outline" size="sm"><Eye className="h-3.5 w-3.5" /></Button>
+  1227→              <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+  1228→              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50">
+  1229→                <Ban className="h-3.5 w-3.5" />
+  1230→              </Button>
+  1231→            </div>
+  1232→          </div>
+  1233→        </div>
+  1234→      </CardContent>
+  1235→    </Card>
+  1236→  )
+  1237→}
+  1238→

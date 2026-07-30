@@ -1,0 +1,1530 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Checkbox } from '@/components/ui/checkbox'
+    12→import { Skeleton } from '@/components/ui/skeleton'
+    13→import { ScrollArea } from '@/components/ui/scroll-area'
+    14→import { Calendar } from '@/components/ui/calendar'
+    15→import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
+    16→import {
+    17→  Dialog,
+    18→  DialogContent,
+    19→  DialogDescription,
+    20→  DialogFooter,
+    21→  DialogHeader,
+    22→  DialogTitle,
+    23→} from '@/components/ui/dialog'
+    24→import {
+    25→  Select,
+    26→  SelectContent,
+    27→  SelectItem,
+    28→  SelectTrigger,
+    29→  SelectValue,
+    30→} from '@/components/ui/select'
+    31→import {
+    32→  Table,
+    33→  TableBody,
+    34→  TableCell,
+    35→  TableHead,
+    36→  TableHeader,
+    37→  TableRow,
+    38→} from '@/components/ui/table'
+    39→import {
+    40→  DropdownMenu,
+    41→  DropdownMenuContent,
+    42→  DropdownMenuItem,
+    43→  DropdownMenuTrigger,
+    44→} from '@/components/ui/dropdown-menu'
+    45→import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+    46→import {
+    47→  ChartContainer,
+    48→  ChartTooltip,
+    49→  ChartTooltipContent,
+    50→} from '@/components/ui/chart'
+    51→import type { ChartConfig } from '@/components/ui/chart'
+    52→import {
+    53→  UtensilsCrossed,
+    54→  Users,
+    55→  UserCheck,
+    56→  Trash2,
+    57→  Leaf,
+    58→  Plus,
+    59→  CalendarIcon,
+    60→  Loader2,
+    61→  Search,
+    62→  MoreVertical,
+    63→  AlertTriangle,
+    64→  TrendingUp,
+    65→  IndianRupee,
+    66→  Clock,
+    67→  Apple,
+    68→  Sun,
+    69→  Moon,
+    70→  Coffee,
+    71→  Cookie,
+    72→  Edit3,
+    73→  Trash,
+    74→  CheckCircle2,
+    75→  XCircle,
+    76→  BarChart3,
+    77→  Package,
+    78→  Recycle,
+    79→  Gift,
+    80→} from 'lucide-react'
+    81→import { format } from 'date-fns'
+    82→import { Bar, BarChart, XAxis, YAxis, CartesianGrid } from 'recharts'
+    83→import { useToast } from '@/hooks/use-toast'
+    84→
+    85→// ─── Types ─────────────────────────────────────────────────────
+    86→interface Tenant {
+    87→  id: string
+    88→  name: string
+    89→  phone?: string
+    90→  email?: string
+    91→  user?: { id: string; name: string; email: string; phone: string }
+    92→  property?: { id: string; name: string }
+    93→  room?: { id: string; name: string; number: string }
+    94→}
+    95→
+    96→interface InventoryItem {
+    97→  id: string
+    98→  name: string
+    99→  unit: string
+   100→  unitPrice: number
+   101→  currentStock: number
+   102→  category?: { id: string; name: string; slug: string }
+   103→}
+   104→
+   105→interface AttendanceRecord {
+   106→  id: string
+   107→  date: string
+   108→  mealType: string
+   109→  tenantId: string | null
+   110→  tenant?: { name: string }
+   111→  present: boolean
+   112→  guestCount: number
+   113→  notes?: string
+   114→  markedById?: string
+   115→  markedBy?: { name: string }
+   116→}
+   117→
+   118→interface MealAttendance {
+   119→  present: number
+   120→  absent: number
+   121→  guests: number
+   122→  records: AttendanceRecord[]
+   123→}
+   124→
+   125→interface ConsumptionLog {
+   126→  id: string
+   127→  date: string
+   128→  item: { name: string; unit: string }
+   129→  mealType: string
+   130→  issuedQty: number
+   131→  consumedQty: number
+   132→  returnedQty: number
+   133→  wastageQty: number
+   134→  unit: string
+   135→  costPerUnit: number
+   136→  totalCost: number
+   137→}
+   138→
+   139→interface WasteRecord {
+   140→  id: string
+   141→  date: string
+   142→  category: string
+   143→  item?: { name: string }
+   144→  description: string
+   145→  quantity: number
+   146→  unit?: string
+   147→  estimatedCost: number
+   148→  disposalMethod?: string
+   149→  recordedBy?: { name: string }
+   150→}
+   151→
+   152→interface WasteStats {
+   153→  totalWaste: number
+   154→  foodWaste: number
+   155→  expired: number
+   156→  damaged: number
+   157→}
+   158→
+   159→interface MessData {
+   160→  attendance?: Record<string, MealAttendance>
+   161→  totalPresent?: number
+   162→  totalGuests?: number
+   163→  consumption?: ConsumptionLog[]
+   164→  waste?: WasteRecord[]
+   165→  wasteStats?: WasteStats
+   166→}
+   167→
+   168→// ─── Meal type config ──────────────────────────────────────────
+   169→const MEAL_TYPES = [
+   170→  { value: 'breakfast', label: 'Breakfast', icon: Coffee, color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300', activeColor: 'bg-amber-500 text-white', border: 'border-amber-300 dark:border-amber-700' },
+   171→  { value: 'lunch', label: 'Lunch', icon: Sun, color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300', activeColor: 'bg-orange-500 text-white', border: 'border-orange-300 dark:border-orange-700' },
+   172→  { value: 'snacks', label: 'Snacks', icon: Cookie, color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300', activeColor: 'bg-emerald-500 text-white', border: 'border-emerald-300 dark:border-emerald-700' },
+   173→  { value: 'dinner', label: 'Dinner', icon: Moon, color: 'bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300', activeColor: 'bg-violet-500 text-white', border: 'border-violet-300 dark:border-violet-700' },
+   174→] as const
+   175→
+   176→const WASTE_CATEGORIES = [
+   177→  { value: 'food_waste', label: 'Food Waste' },
+   178→  { value: 'expired', label: 'Expired' },
+   179→  { value: 'damaged', label: 'Damaged' },
+   180→  { value: 'spoilage', label: 'Spoilage' },
+   181→  { value: 'other', label: 'Other' },
+   182→]
+   183→
+   184→const DISPOSAL_METHODS = [
+   185→  { value: 'compost', label: 'Compost', icon: Leaf },
+   186→  { value: 'trash', label: 'Trash', icon: Trash2 },
+   187→  { value: 'donation', label: 'Donation', icon: Gift },
+   188→  { value: 'recycling', label: 'Recycling', icon: Recycle },
+   189→]
+   190→
+   191→const consumptionChartConfig: ChartConfig = {
+   192→  consumed: { label: 'Consumed', color: 'hsl(var(--chart-1))' },
+   193→  wastage: { label: 'Wastage', color: 'hsl(var(--chart-5))' },
+   194→}
+   195→
+   196→// ─── Helpers ───────────────────────────────────────────────────
+   197→function formatCurrency(amount: number) {
+   198→  return `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`
+   199→}
+   200→
+   201→function formatDate(dateStr: string) {
+   202→  try {
+   203→    return format(new Date(dateStr), 'dd MMM yyyy')
+   204→  } catch {
+   205→    return dateStr
+   206→  }
+   207→}
+   208→
+   209→function getMealColor(mealType: string) {
+   210→  return MEAL_TYPES.find(m => m.value === mealType) || MEAL_TYPES[0]
+   211→}
+   212→
+   213→function getWasteCategoryLabel(cat: string) {
+   214→  return WASTE_CATEGORIES.find(c => c.value === cat)?.label || cat
+   215→}
+   216→
+   217→function getDisposalLabel(method: string) {
+   218→  return DISPOSAL_METHODS.find(d => d.value === method)?.label || method
+   219→}
+   220→
+   221→// ─── Component ─────────────────────────────────────────────────
+   222→export function MessPage() {
+   223→  const { selectedPropertyId, currentUser } = useAppStore()
+   224→  const { toast } = useToast()
+   225→
+   226→  // ─── State ─────────────────────────────────────────────────
+   227→  const [activeTab, setActiveTab] = useState('attendance')
+   228→  const [loading, setLoading] = useState(true)
+   229→  const [messData, setMessData] = useState<MessData>({})
+   230→
+   231→  // Attendance state
+   232→  const [attendanceDate, setAttendanceDate] = useState<Date>(new Date())
+   233→  const [selectedMeal, setSelectedMeal] = useState<string>('breakfast')
+   234→  const [tenants, setTenants] = useState<Tenant[]>([])
+   235→  const [attendanceRows, setAttendanceRows] = useState<{
+   236→    tenantId: string
+   237→    name: string
+   238→    present: boolean
+   239→    guestCount: number
+   240→    notes: string
+   241→  }[]>([])
+   242→  const [savingAttendance, setSavingAttendance] = useState(false)
+   243→
+   244→  // Consumption state
+   245→  const [consumptionDays, setConsumptionDays] = useState(7)
+   246→  const [consumptionSearch, setConsumptionSearch] = useState('')
+   247→  const [showConsumptionDialog, setShowConsumptionDialog] = useState(false)
+   248→  const [savingConsumption, setSavingConsumption] = useState(false)
+   249→  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+   250→
+   251→  // Waste state
+   252→  const [wasteDays, setWasteDays] = useState(7)
+   253→  const [showWasteDialog, setShowWasteDialog] = useState(false)
+   254→  const [savingWaste, setSavingWaste] = useState(false)
+   255→
+   256→  // Consumption form
+   257→  const [consumptionForm, setConsumptionForm] = useState({
+   258→    itemId: '',
+   259→    mealType: 'breakfast',
+   260→    issuedQty: 0,
+   261→    consumedQty: 0,
+   262→    returnedQty: 0,
+   263→    wastageQty: 0,
+   264→    date: format(new Date(), 'yyyy-MM-dd'),
+   265→    notes: '',
+   266→  })
+   267→
+   268→  // Waste form
+   269→  const [wasteForm, setWasteForm] = useState({
+   270→    category: 'food_waste',
+   271→    description: '',
+   272→    itemId: '',
+   273→    quantity: 0,
+   274→    unit: 'kg',
+   275→    estimatedCost: 0,
+   276→    disposalMethod: 'trash',
+   277→    date: format(new Date(), 'yyyy-MM-dd'),
+   278→    notes: '',
+   279→  })
+   280→
+   281→  // ─── Data fetching ─────────────────────────────────────────
+   282→  const fetchMessData = useCallback(async (type: string = 'all') => {
+   283→    setLoading(true)
+   284→    try {
+   285→      const params = new URLSearchParams()
+   286→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   287→      params.set('type', type)
+   288→      if (type === 'all' || type === 'attendance') {
+   289→        params.set('date', format(attendanceDate, 'yyyy-MM-dd'))
+   290→      }
+   291→      if (type === 'all' || type === 'consumption') {
+   292→        params.set('days', String(consumptionDays))
+   293→      }
+   294→      if (type === 'all' || type === 'waste') {
+   295→        params.set('days', String(wasteDays))
+   296→      }
+   297→
+   298→      const res = await fetch(`/api/mess?${params.toString()}`)
+   299→      if (!res.ok) throw new Error('Failed to fetch mess data')
+   300→      const data = await res.json()
+   301→      setMessData(prev => ({ ...prev, ...data }))
+   302→    } catch (error) {
+   303→      console.error('Error fetching mess data:', error)
+   304→      toast({ title: 'Error', description: 'Failed to fetch mess data', variant: 'destructive' })
+   305→    } finally {
+   306→      setLoading(false)
+   307→    }
+   308→  }, [selectedPropertyId, attendanceDate, consumptionDays, wasteDays, toast])
+   309→
+   310→  const fetchTenants = useCallback(async () => {
+   311→    try {
+   312→      const params = new URLSearchParams()
+   313→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   314→      const res = await fetch(`/api/tenants?${params.toString()}`)
+   315→      if (!res.ok) throw new Error('Failed to fetch tenants')
+   316→      const data = await res.json()
+   317→      const tenantList = Array.isArray(data) ? data : []
+   318→      setTenants(tenantList)
+   319→      // Initialize attendance rows
+   320→      setAttendanceRows(
+   321→        tenantList.map((t: Tenant) => ({
+   322→          tenantId: t.id,
+   323→          name: t.user?.name || t.name,
+   324→          present: true,
+   325→          guestCount: 0,
+   326→          notes: '',
+   327→        }))
+   328→      )
+   329→    } catch (error) {
+   330→      console.error('Error fetching tenants:', error)
+   331→    }
+   332→  }, [selectedPropertyId])
+   333→
+   334→  const fetchInventoryItems = useCallback(async () => {
+   335→    try {
+   336→      const params = new URLSearchParams()
+   337→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   338→      const res = await fetch(`/api/inventory?${params.toString()}`)
+   339→      if (!res.ok) throw new Error('Failed to fetch inventory')
+   340→      const data = await res.json()
+   341→      setInventoryItems(Array.isArray(data.items) ? data.items : [])
+   342→    } catch (error) {
+   343→      console.error('Error fetching inventory:', error)
+   344→    }
+   345→  }, [selectedPropertyId])
+   346→
+   347→  // ─── Effects ───────────────────────────────────────────────
+   348→  useEffect(() => {
+   349→    fetchMessData(activeTab)
+   350→  }, [activeTab, attendanceDate, consumptionDays, wasteDays, fetchMessData])
+   351→
+   352→  useEffect(() => {
+   353→    fetchTenants()
+   354→  }, [selectedPropertyId, fetchTenants])
+   355→
+   356→  useEffect(() => {
+   357→    fetchInventoryItems()
+   358→  }, [selectedPropertyId, fetchInventoryItems])
+   359→
+   360→  // Load existing attendance records into the rows when data changes
+   361→  useEffect(() => {
+   362→    if (messData.attendance && tenants.length > 0) {
+   363→      const mealData = messData.attendance[selectedMeal]
+   364→      if (mealData?.records?.length) {
+   365→        setAttendanceRows(prev =>
+   366→          prev.map(row => {
+   367→            const existing = mealData.records.find(
+   368→              (r: AttendanceRecord) => r.tenantId === row.tenantId
+   369→            )
+   370→            if (existing) {
+   371→              return {
+   372→                ...row,
+   373→                present: existing.present,
+   374→                guestCount: existing.guestCount,
+   375→                notes: existing.notes || '',
+   376→              }
+   377→            }
+   378→            return row
+   379→          })
+   380→        )
+   381→      }
+   382→    }
+   383→  }, [messData.attendance, selectedMeal, tenants.length])
+   384→
+   385→  // ─── Computed values ───────────────────────────────────────
+   386→  const attendanceStats = useMemo(() => {
+   387→    const mealData = messData.attendance?.[selectedMeal]
+   388→    if (!mealData) {
+   389→      return { totalPresent: 0, totalGuests: 0, attendanceRate: 0, totalTenants: tenants.length }
+   390→    }
+   391→    const totalPresent = mealData.present
+   392→    const totalGuests = mealData.guests
+   393→    const total = mealData.present + mealData.absent
+   394→    const rate = total > 0 ? Math.round((totalPresent / total) * 100) : 0
+   395→    return { totalPresent, totalGuests, attendanceRate: rate, totalTenants: total }
+   396→  }, [messData.attendance, selectedMeal, tenants.length])
+   397→
+   398→  const filteredConsumption = useMemo(() => {
+   399→    const logs = messData.consumption || []
+   400→    if (!consumptionSearch) return logs
+   401→    const q = consumptionSearch.toLowerCase()
+   402→    return logs.filter(
+   403→      (c: ConsumptionLog) =>
+   404→        c.item?.name?.toLowerCase().includes(q) ||
+   405→        c.mealType?.toLowerCase().includes(q)
+   406→    )
+   407→  }, [messData.consumption, consumptionSearch])
+   408→
+   409→  const consumptionTotals = useMemo(() => {
+   410→    return filteredConsumption.reduce(
+   411→      (acc: { issued: number; consumed: number; returned: number; wastage: number; cost: number }, c: ConsumptionLog) => ({
+   412→        issued: acc.issued + c.issuedQty,
+   413→        consumed: acc.consumed + c.consumedQty,
+   414→        returned: acc.returned + c.returnedQty,
+   415→        wastage: acc.wastage + c.wastageQty,
+   416→        cost: acc.cost + c.totalCost,
+   417→      }),
+   418→      { issued: 0, consumed: 0, returned: 0, wastage: 0, cost: 0 }
+   419→    )
+   420→  }, [filteredConsumption])
+   421→
+   422→  const consumptionChartData = useMemo(() => {
+   423→    if (!messData.consumption?.length) return []
+   424→    const grouped: Record<string, { consumed: number; wastage: number; label: string }> = {}
+   425→    for (const log of messData.consumption) {
+   426→      try {
+   427→        const dayKey = format(new Date(log.date), 'dd MMM')
+   428→        if (!grouped[dayKey]) grouped[dayKey] = { consumed: 0, wastage: 0, label: dayKey }
+   429→        grouped[dayKey].consumed += log.consumedQty
+   430→        grouped[dayKey].wastage += log.wastageQty
+   431→      } catch {
+   432→        // skip invalid dates
+   433→      }
+   434→    }
+   435→    return Object.values(grouped).sort((a, b) => a.label.localeCompare(b.label))
+   436→  }, [messData.consumption])
+   437→
+   438→  const wasteStats = useMemo(() => {
+   439→    return messData.wasteStats || { totalWaste: 0, foodWaste: 0, expired: 0, damaged: 0 }
+   440→  }, [messData.wasteStats])
+   441→
+   442→  // ─── Handlers ──────────────────────────────────────────────
+   443→  const handleMarkAttendance = async () => {
+   444→    if (!attendanceRows.length) return
+   445→    setSavingAttendance(true)
+   446→    try {
+   447→      const res = await fetch('/api/mess', {
+   448→        method: 'POST',
+   449→        headers: { 'Content-Type': 'application/json' },
+   450→        body: JSON.stringify({
+   451→          type: 'attendance',
+   452→          propertyId: selectedPropertyId,
+   453→          date: format(attendanceDate, 'yyyy-MM-dd'),
+   454→          mealType: selectedMeal,
+   455→          userId: currentUser?.id,
+   456→          records: attendanceRows.map(r => ({
+   457→            tenantId: r.tenantId,
+   458→            present: r.present,
+   459→            guestCount: r.guestCount,
+   460→            notes: r.notes,
+   461→          })),
+   462→        }),
+   463→      })
+   464→      if (!res.ok) throw new Error('Failed to mark attendance')
+   465→      const data = await res.json()
+   466→      toast({
+   467→        title: 'Attendance Marked',
+   468→        description: `Successfully marked attendance for ${data.count} tenant(s)`,
+   469→      })
+   470→      fetchMessData('attendance')
+   471→    } catch (error) {
+   472→      console.error('Error marking attendance:', error)
+   473→      toast({ title: 'Error', description: 'Failed to mark attendance', variant: 'destructive' })
+   474→    } finally {
+   475→      setSavingAttendance(false)
+   476→    }
+   477→  }
+   478→
+   479→  const handleAddConsumption = async () => {
+   480→    if (!consumptionForm.itemId) {
+   481→      toast({ title: 'Validation Error', description: 'Please select an inventory item', variant: 'destructive' })
+   482→      return
+   483→    }
+   484→    setSavingConsumption(true)
+   485→    try {
+   486→      const selectedItem = inventoryItems.find(i => i.id === consumptionForm.itemId)
+   487→      const totalCost = (consumptionForm.consumedQty + consumptionForm.wastageQty) * (selectedItem?.unitPrice || 0)
+   488→
+   489→      const res = await fetch('/api/mess', {
+   490→        method: 'POST',
+   491→        headers: { 'Content-Type': 'application/json' },
+   492→        body: JSON.stringify({
+   493→          type: 'consumption',
+   494→          propertyId: selectedPropertyId,
+   495→          date: consumptionForm.date,
+   496→          itemId: consumptionForm.itemId,
+   497→          mealType: consumptionForm.mealType,
+   498→          issuedQty: consumptionForm.issuedQty,
+   499→          consumedQty: consumptionForm.consumedQty,
+   500→          returnedQty: consumptionForm.returnedQty,
+   501→          wastageQty: consumptionForm.wastageQty,
+   502→          unit: selectedItem?.unit || 'kg',
+   503→          costPerUnit: selectedItem?.unitPrice || 0,
+   504→          totalCost,
+   505→          notes: consumptionForm.notes,
+   506→          userId: currentUser?.id,
+   507→        }),
+   508→      })
+   509→      if (!res.ok) throw new Error('Failed to add consumption log')
+   510→      toast({ title: 'Success', description: 'Consumption log added successfully' })
+   511→      setShowConsumptionDialog(false)
+   512→      setConsumptionForm({
+   513→        itemId: '',
+   514→        mealType: 'breakfast',
+   515→        issuedQty: 0,
+   516→        consumedQty: 0,
+   517→        returnedQty: 0,
+   518→        wastageQty: 0,
+   519→        date: format(new Date(), 'yyyy-MM-dd'),
+   520→        notes: '',
+   521→      })
+   522→      fetchMessData('consumption')
+   523→    } catch (error) {
+   524→      console.error('Error adding consumption:', error)
+   525→      toast({ title: 'Error', description: 'Failed to add consumption log', variant: 'destructive' })
+   526→    } finally {
+   527→      setSavingConsumption(false)
+   528→    }
+   529→  }
+   530→
+   531→  const handleAddWaste = async () => {
+   532→    if (!wasteForm.description) {
+   533→      toast({ title: 'Validation Error', description: 'Please enter a description', variant: 'destructive' })
+   534→      return
+   535→    }
+   536→    setSavingWaste(true)
+   537→    try {
+   538→      const res = await fetch('/api/mess', {
+   539→        method: 'POST',
+   540→        headers: { 'Content-Type': 'application/json' },
+   541→        body: JSON.stringify({
+   542→          type: 'waste',
+   543→          propertyId: selectedPropertyId,
+   544→          date: wasteForm.date,
+   545→          category: wasteForm.category,
+   546→          itemId: wasteForm.itemId || null,
+   547→          description: wasteForm.description,
+   548→          quantity: wasteForm.quantity,
+   549→          unit: wasteForm.unit,
+   550→          estimatedCost: wasteForm.estimatedCost,
+   551→          disposalMethod: wasteForm.disposalMethod,
+   552→          notes: wasteForm.notes,
+   553→          userId: currentUser?.id,
+   554→        }),
+   555→      })
+   556→      if (!res.ok) throw new Error('Failed to add waste record')
+   557→      toast({ title: 'Success', description: 'Waste record added successfully' })
+   558→      setShowWasteDialog(false)
+   559→      setWasteForm({
+   560→        category: 'food_waste',
+   561→        description: '',
+   562→        itemId: '',
+   563→        quantity: 0,
+   564→        unit: 'kg',
+   565→        estimatedCost: 0,
+   566→        disposalMethod: 'trash',
+   567→        date: format(new Date(), 'yyyy-MM-dd'),
+   568→        notes: '',
+   569→      })
+   570→      fetchMessData('waste')
+   571→    } catch (error) {
+   572→      console.error('Error adding waste:', error)
+   573→      toast({ title: 'Error', description: 'Failed to add waste record', variant: 'destructive' })
+   574→    } finally {
+   575→      setSavingWaste(false)
+   576→    }
+   577→  }
+   578→
+   579→  const toggleAttendanceRow = (tenantId: string, checked: boolean) => {
+   580→    setAttendanceRows(prev =>
+   581→      prev.map(r => (r.tenantId === tenantId ? { ...r, present: checked } : r))
+   582→    )
+   583→  }
+   584→
+   585→  const updateAttendanceRow = (tenantId: string, field: 'guestCount' | 'notes', value: string | number) => {
+   586→    setAttendanceRows(prev =>
+   587→      prev.map(r => (r.tenantId === tenantId ? { ...r, [field]: value } : r))
+   588→    )
+   589→  }
+   590→
+   591→  // ─── Stats Cards ───────────────────────────────────────────
+   592→  const statsCards = [
+   593→    {
+   594→      title: 'Present Today',
+   595→      value: messData.totalPresent ?? 0,
+   596→      icon: UserCheck,
+   597→      color: 'text-emerald-600 dark:text-emerald-400',
+   598→      bg: 'bg-emerald-50 dark:bg-emerald-950/30',
+   599→    },
+   600→    {
+   601→      title: 'Total Guests',
+   602→      value: messData.totalGuests ?? 0,
+   603→      icon: Users,
+   604→      color: 'text-blue-600 dark:text-blue-400',
+   605→      bg: 'bg-blue-50 dark:bg-blue-950/30',
+   606→    },
+   607→    {
+   608→      title: 'Total Waste Value',
+   609→      value: formatCurrency(wasteStats.totalWaste),
+   610→      icon: IndianRupee,
+   611→      color: 'text-red-600 dark:text-red-400',
+   612→      bg: 'bg-red-50 dark:bg-red-950/30',
+   613→    },
+   614→    {
+   615→      title: 'Food Waste',
+   616→      value: formatCurrency(wasteStats.foodWaste),
+   617→      icon: Apple,
+   618→      color: 'text-amber-600 dark:text-amber-400',
+   619→      bg: 'bg-amber-50 dark:bg-amber-950/30',
+   620→    },
+   621→  ]
+   622→
+   623→  // ─── Render ────────────────────────────────────────────────
+   624→  return (
+   625→    <div className="space-y-6">
+   626→      {/* Header */}
+   627→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   628→        <div>
+   629→          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+   630→            <UtensilsCrossed className="size-6" />
+   631→            Mess & Dining Management
+   632→          </h1>
+   633→          <p className="text-slate-500 dark:text-slate-400 mt-1">
+   634→            Track attendance, consumption, and waste management
+   635→          </p>
+   636→        </div>
+   637→      </div>
+   638→
+   639→      {/* Stats Cards */}
+   640→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   641→        {statsCards.map((card) => (
+   642→          <Card key={card.title} className="relative overflow-hidden">
+   643→            <CardContent className="p-4">
+   644→              <div className="flex items-center gap-3">
+   645→                <div className={`p-2 rounded-lg ${card.bg}`}>
+   646→                  <card.icon className={`size-5 ${card.color}`} />
+   647→                </div>
+   648→                <div className="min-w-0 flex-1">
+   649→                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+   650→                    {card.title}
+   651→                  </p>
+   652→                  <p className="text-lg font-bold text-slate-900 dark:text-slate-100 truncate">
+   653→                    {card.value}
+   654→                  </p>
+   655→                </div>
+   656→              </div>
+   657→            </CardContent>
+   658→          </Card>
+   659→        ))}
+   660→      </div>
+   661→
+   662→      {/* Tabs */}
+   663→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   664→        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+   665→          <TabsTrigger value="attendance" className="gap-1.5">
+   666→            <UserCheck className="size-4" />
+   667→            <span className="hidden sm:inline">Attendance</span>
+   668→          </TabsTrigger>
+   669→          <TabsTrigger value="consumption" className="gap-1.5">
+   670→            <BarChart3 className="size-4" />
+   671→            <span className="hidden sm:inline">Consumption</span>
+   672→          </TabsTrigger>
+   673→          <TabsTrigger value="waste" className="gap-1.5">
+   674→            <Trash2 className="size-4" />
+   675→            <span className="hidden sm:inline">Waste</span>
+   676→          </TabsTrigger>
+   677→        </TabsList>
+   678→
+   679→        {/* ─── Attendance Tab ─────────────────────────────────── */}
+   680→        <TabsContent value="attendance" className="space-y-4 mt-4">
+   681→          {/* Date & Meal Selector */}
+   682→          <Card>
+   683→            <CardContent className="p-4">
+   684→              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end">
+   685→                <div className="space-y-2">
+   686→                  <Label className="text-sm font-medium">Date</Label>
+   687→                  <Popover>
+   688→                    <PopoverTrigger asChild>
+   689→                      <Button
+   690→                        variant="outline"
+   691→                        className="w-full sm:w-[200px] justify-start text-left font-normal"
+   692→                      >
+   693→                        <CalendarIcon className="size-4 mr-2" />
+   694→                        {format(attendanceDate, 'dd MMM yyyy')}
+   695→                      </Button>
+   696→                    </PopoverTrigger>
+   697→                    <PopoverContent className="w-auto p-0" align="start">
+   698→                      <Calendar
+   699→                        mode="single"
+   700→                        selected={attendanceDate}
+   701→                        onSelect={(d) => d && setAttendanceDate(d)}
+   702→                        initialFocus
+   703→                      />
+   704→                    </PopoverContent>
+   705→                  </Popover>
+   706→                </div>
+   707→
+   708→                <div className="space-y-2 flex-1">
+   709→                  <Label className="text-sm font-medium">Meal Type</Label>
+   710→                  <div className="flex flex-wrap gap-2">
+   711→                    {MEAL_TYPES.map((meal) => {
+   712→                      const Icon = meal.icon
+   713→                      const isActive = selectedMeal === meal.value
+   714→                      return (
+   715→                        <Button
+   716→                          key={meal.value}
+   717→                          variant="outline"
+   718→                          size="sm"
+   719→                          className={`gap-1.5 transition-all ${
+   720→                            isActive
+   721→                              ? meal.activeColor + ' border-transparent hover:opacity-90'
+   722→                              : meal.color + ' ' + meal.border
+   723→                          }`}
+   724→                          onClick={() => setSelectedMeal(meal.value)}
+   725→                        >
+   726→                          <Icon className="size-4" />
+   727→                          {meal.label}
+   728→                        </Button>
+   729→                      )
+   730→                    })}
+   731→                  </div>
+   732→                </div>
+   733→              </div>
+   734→            </CardContent>
+   735→          </Card>
+   736→
+   737→          {/* Attendance Summary */}
+   738→          <div className="grid grid-cols-3 gap-4">
+   739→            <Card>
+   740→              <CardContent className="p-4 text-center">
+   741→                <p className="text-xs text-slate-500 dark:text-slate-400">Total Present</p>
+   742→                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+   743→                  {attendanceStats.totalPresent}
+   744→                </p>
+   745→              </CardContent>
+   746→            </Card>
+   747→            <Card>
+   748→              <CardContent className="p-4 text-center">
+   749→                <p className="text-xs text-slate-500 dark:text-slate-400">Total Guests</p>
+   750→                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+   751→                  {attendanceStats.totalGuests}
+   752→                </p>
+   753→              </CardContent>
+   754→            </Card>
+   755→            <Card>
+   756→              <CardContent className="p-4 text-center">
+   757→                <p className="text-xs text-slate-500 dark:text-slate-400">Attendance Rate</p>
+   758→                <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+   759→                  {attendanceStats.attendanceRate}%
+   760→                </p>
+   761→              </CardContent>
+   762→            </Card>
+   763→          </div>
+   764→
+   765→          {/* Attendance Table */}
+   766→          <Card>
+   767→            <CardHeader className="pb-3">
+   768→              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+   769→                <CardTitle className="text-base">
+   770→                  {getMealColor(selectedMeal).label} Attendance — {format(attendanceDate, 'dd MMM yyyy')}
+   771→                </CardTitle>
+   772→                <Button
+   773→                  onClick={handleMarkAttendance}
+   774→                  disabled={savingAttendance || attendanceRows.length === 0}
+   775→                  className="gap-2"
+   776→                >
+   777→                  {savingAttendance ? (
+   778→                    <Loader2 className="size-4 animate-spin" />
+   779→                  ) : (
+   780→                    <CheckCircle2 className="size-4" />
+   781→                  )}
+   782→                  Mark Attendance
+   783→                </Button>
+   784→              </div>
+   785→            </CardHeader>
+   786→            <CardContent className="p-0">
+   787→              {loading ? (
+   788→                <div className="p-6 space-y-3">
+   789→                  {Array.from({ length: 5 }).map((_, i) => (
+   790→                    <Skeleton key={i} className="h-12 w-full" />
+   791→                  ))}
+   792→                </div>
+   793→              ) : attendanceRows.length === 0 ? (
+   794→                <div className="p-8 text-center">
+   795→                  <Users className="size-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+   796→                  <p className="text-slate-500 dark:text-slate-400">No tenants found for this property</p>
+   797→                </div>
+   798→              ) : (
+   799→                <ScrollArea className="max-h-96">
+   800→                  <Table>
+   801→                    <TableHeader>
+   802→                      <TableRow>
+   803→                        <TableHead className="w-12">Present</TableHead>
+   804→                        <TableHead>Name</TableHead>
+   805→                        <TableHead className="w-28 text-center">Guests</TableHead>
+   806→                        <TableHead className="w-48">Notes</TableHead>
+   807→                      </TableRow>
+   808→                    </TableHeader>
+   809→                    <TableBody>
+   810→                      {attendanceRows.map((row) => (
+   811→                        <TableRow key={row.tenantId}>
+   812→                          <TableCell>
+   813→                            <Checkbox
+   814→                              checked={row.present}
+   815→                              onCheckedChange={(checked) =>
+   816→                                toggleAttendanceRow(row.tenantId, checked === true)
+   817→                              }
+   818→                            />
+   819→                          </TableCell>
+   820→                          <TableCell>
+   821→                            <div className="flex items-center gap-2">
+   822→                              {row.present ? (
+   823→                                <CheckCircle2 className="size-4 text-emerald-500" />
+   824→                              ) : (
+   825→                                <XCircle className="size-4 text-slate-300 dark:text-slate-600" />
+   826→                              )}
+   827→                              <span className="font-medium text-sm">{row.name}</span>
+   828→                            </div>
+   829→                          </TableCell>
+   830→                          <TableCell>
+   831→                            <Input
+   832→                              type="number"
+   833→                              min={0}
+   834→                              max={20}
+   835→                              value={row.guestCount}
+   836→                              onChange={(e) =>
+   837→                                updateAttendanceRow(
+   838→                                  row.tenantId,
+   839→                                  'guestCount',
+   840→                                  parseInt(e.target.value) || 0
+   841→                                )
+   842→                              }
+   843→                              className="w-20 text-center h-8"
+   844→                            />
+   845→                          </TableCell>
+   846→                          <TableCell>
+   847→                            <Input
+   848→                              placeholder="Notes..."
+   849→                              value={row.notes}
+   850→                              onChange={(e) =>
+   851→                                updateAttendanceRow(row.tenantId, 'notes', e.target.value)
+   852→                              }
+   853→                              className="h-8 text-sm"
+   854→                            />
+   855→                          </TableCell>
+   856→                        </TableRow>
+   857→                      ))}
+   858→                    </TableBody>
+   859→                  </Table>
+   860→                </ScrollArea>
+   861→              )}
+   862→            </CardContent>
+   863→          </Card>
+   864→        </TabsContent>
+   865→
+   866→        {/* ─── Consumption Tab ────────────────────────────────── */}
+   867→        <TabsContent value="consumption" className="space-y-4 mt-4">
+   868→          {/* Controls */}
+   869→          <Card>
+   870→            <CardContent className="p-4">
+   871→              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-end justify-between">
+   872→                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+   873→                  <div className="space-y-2">
+   874→                    <Label className="text-sm font-medium">Period</Label>
+   875→                    <Select
+   876→                      value={String(consumptionDays)}
+   877→                      onValueChange={(v) => setConsumptionDays(Number(v))}
+   878→                    >
+   879→                      <SelectTrigger className="w-[140px]">
+   880→                        <SelectValue />
+   881→                      </SelectTrigger>
+   882→                      <SelectContent>
+   883→                        <SelectItem value="7">Last 7 days</SelectItem>
+   884→                        <SelectItem value="14">Last 14 days</SelectItem>
+   885→                        <SelectItem value="30">Last 30 days</SelectItem>
+   886→                      </SelectContent>
+   887→                    </Select>
+   888→                  </div>
+   889→                  <div className="relative">
+   890→                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+   891→                    <Input
+   892→                      placeholder="Search items..."
+   893→                      value={consumptionSearch}
+   894→                      onChange={(e) => setConsumptionSearch(e.target.value)}
+   895→                      className="pl-9 w-full sm:w-[200px]"
+   896→                    />
+   897→                  </div>
+   898→                </div>
+   899→                <Button onClick={() => setShowConsumptionDialog(true)} className="gap-2">
+   900→                  <Plus className="size-4" />
+   901→                  Add Consumption Log
+   902→                </Button>
+   903→              </div>
+   904→            </CardContent>
+   905→          </Card>
+   906→
+   907→          {/* Consumption Chart */}
+   908→          {consumptionChartData.length > 0 && (
+   909→            <Card>
+   910→              <CardHeader className="pb-2">
+   911→                <CardTitle className="text-base flex items-center gap-2">
+   912→                  <TrendingUp className="size-4" />
+   913→                  Daily Consumption Trend
+   914→                </CardTitle>
+   915→              </CardHeader>
+   916→              <CardContent className="p-4">
+   917→                <ChartContainer config={consumptionChartConfig} className="h-[250px] w-full">
+   918→                  <BarChart data={consumptionChartData} accessibilityLayer>
+   919→                    <CartesianGrid vertical={false} />
+   920→                    <XAxis
+   921→                      dataKey="label"
+   922→                      tickLine={false}
+   923→                      axisLine={false}
+   924→                      tickMargin={8}
+   925→                      fontSize={12}
+   926→                    />
+   927→                    <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
+   928→                    <ChartTooltip content={<ChartTooltipContent />} />
+   929→                    <Bar dataKey="consumed" fill="var(--color-consumed)" radius={[4, 4, 0, 0]} />
+   930→                    <Bar dataKey="wastage" fill="var(--color-wastage)" radius={[4, 4, 0, 0]} />
+   931→                  </BarChart>
+   932→                </ChartContainer>
+   933→              </CardContent>
+   934→            </Card>
+   935→          )}
+   936→
+   937→          {/* Consumption Table */}
+   938→          <Card>
+   939→            <CardHeader className="pb-3">
+   940→              <CardTitle className="text-base">Consumption Logs</CardTitle>
+   941→              <CardDescription>
+   942→                {filteredConsumption.length} record(s) in the last {consumptionDays} days
+   943→              </CardDescription>
+   944→            </CardHeader>
+   945→            <CardContent className="p-0">
+   946→              {loading ? (
+   947→                <div className="p-6 space-y-3">
+   948→                  {Array.from({ length: 5 }).map((_, i) => (
+   949→                    <Skeleton key={i} className="h-12 w-full" />
+   950→                  ))}
+   951→                </div>
+   952→              ) : filteredConsumption.length === 0 ? (
+   953→                <div className="p-8 text-center">
+   954→                  <Package className="size-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+   955→                  <p className="text-slate-500 dark:text-slate-400">No consumption logs found</p>
+   956→                </div>
+   957→              ) : (
+   958→                <ScrollArea className="max-h-96">
+   959→                  <Table>
+   960→                    <TableHeader>
+   961→                      <TableRow>
+   962→                        <TableHead>Item Name</TableHead>
+   963→                        <TableHead>Meal</TableHead>
+   964→                        <TableHead className="text-right">Issued</TableHead>
+   965→                        <TableHead className="text-right">Consumed</TableHead>
+   966→                        <TableHead className="text-right">Returned</TableHead>
+   967→                        <TableHead className="text-right">Wastage</TableHead>
+   968→                        <TableHead>Unit</TableHead>
+   969→                        <TableHead className="text-right">Cost/Unit</TableHead>
+   970→                        <TableHead className="text-right">Total Cost</TableHead>
+   971→                      </TableRow>
+   972→                    </TableHeader>
+   973→                    <TableBody>
+   974→                      {filteredConsumption.map((log: ConsumptionLog) => {
+   975→                        const mealInfo = getMealColor(log.mealType)
+   976→                        return (
+   977→                          <TableRow key={log.id}>
+   978→                            <TableCell className="font-medium text-sm">
+   979→                              {log.item?.name || '—'}
+   980→                            </TableCell>
+   981→                            <TableCell>
+   982→                              <Badge variant="outline" className={`text-xs ${mealInfo.color} ${mealInfo.border}`}>
+   983→                                {mealInfo.label}
+   984→                              </Badge>
+   985→                            </TableCell>
+   986→                            <TableCell className="text-right">{log.issuedQty}</TableCell>
+   987→                            <TableCell className="text-right">{log.consumedQty}</TableCell>
+   988→                            <TableCell className="text-right">{log.returnedQty}</TableCell>
+   989→                            <TableCell className="text-right">
+   990→                              <span className={log.wastageQty > 0 ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+   991→                                {log.wastageQty}
+   992→                              </span>
+   993→                            </TableCell>
+   994→                            <TableCell className="text-sm">{log.unit}</TableCell>
+   995→                            <TableCell className="text-right text-sm">{formatCurrency(log.costPerUnit)}</TableCell>
+   996→                            <TableCell className="text-right font-medium text-sm">
+   997→                              {formatCurrency(log.totalCost)}
+   998→                            </TableCell>
+   999→                          </TableRow>
+  1000→                        )
+  1001→                      })}
+  1002→                      {/* Totals row */}
+  1003→                      <TableRow className="bg-slate-50 dark:bg-slate-800/50 font-semibold">
+  1004→                        <TableCell colSpan={2}>Totals</TableCell>
+  1005→                        <TableCell className="text-right">{consumptionTotals.issued.toFixed(1)}</TableCell>
+  1006→                        <TableCell className="text-right">{consumptionTotals.consumed.toFixed(1)}</TableCell>
+  1007→                        <TableCell className="text-right">{consumptionTotals.returned.toFixed(1)}</TableCell>
+  1008→                        <TableCell className="text-right">
+  1009→                          <span className={consumptionTotals.wastage > 0 ? 'text-red-600 dark:text-red-400' : ''}>
+  1010→                            {consumptionTotals.wastage.toFixed(1)}
+  1011→                          </span>
+  1012→                        </TableCell>
+  1013→                        <TableCell />
+  1014→                        <TableCell />
+  1015→                        <TableCell className="text-right">{formatCurrency(consumptionTotals.cost)}</TableCell>
+  1016→                      </TableRow>
+  1017→                    </TableBody>
+  1018→                  </Table>
+  1019→                </ScrollArea>
+  1020→              )}
+  1021→            </CardContent>
+  1022→          </Card>
+  1023→        </TabsContent>
+  1024→
+  1025→        {/* ─── Waste Management Tab ───────────────────────────── */}
+  1026→        <TabsContent value="waste" className="space-y-4 mt-4">
+  1027→          {/* Waste Stats */}
+  1028→          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+  1029→            <Card>
+  1030→              <CardContent className="p-4">
+  1031→                <div className="flex items-center gap-2">
+  1032→                  <Trash2 className="size-4 text-red-500" />
+  1033→                  <p className="text-xs text-slate-500 dark:text-slate-400">Total Waste Cost</p>
+  1034→                </div>
+  1035→                <p className="text-xl font-bold text-red-600 dark:text-red-400 mt-1">
+  1036→                  {formatCurrency(wasteStats.totalWaste)}
+  1037→                </p>
+  1038→              </CardContent>
+  1039→            </Card>
+  1040→            <Card>
+  1041→              <CardContent className="p-4">
+  1042→                <div className="flex items-center gap-2">
+  1043→                  <Apple className="size-4 text-amber-500" />
+  1044→                  <p className="text-xs text-slate-500 dark:text-slate-400">Food Waste</p>
+  1045→                </div>
+  1046→                <p className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">
+  1047→                  {formatCurrency(wasteStats.foodWaste)}
+  1048→                </p>
+  1049→              </CardContent>
+  1050→            </Card>
+  1051→            <Card>
+  1052→              <CardContent className="p-4">
+  1053→                <div className="flex items-center gap-2">
+  1054→                  <Clock className="size-4 text-orange-500" />
+  1055→                  <p className="text-xs text-slate-500 dark:text-slate-400">Expired</p>
+  1056→                </div>
+  1057→                <p className="text-xl font-bold text-orange-600 dark:text-orange-400 mt-1">
+  1058→                  {formatCurrency(wasteStats.expired)}
+  1059→                </p>
+  1060→              </CardContent>
+  1061→            </Card>
+  1062→            <Card>
+  1063→              <CardContent className="p-4">
+  1064→                <div className="flex items-center gap-2">
+  1065→                  <AlertTriangle className="size-4 text-rose-500" />
+  1066→                  <p className="text-xs text-slate-500 dark:text-slate-400">Damaged</p>
+  1067→                </div>
+  1068→                <p className="text-xl font-bold text-rose-600 dark:text-rose-400 mt-1">
+  1069→                  {formatCurrency(wasteStats.damaged)}
+  1070→                </p>
+  1071→              </CardContent>
+  1072→            </Card>
+  1073→          </div>
+  1074→
+  1075→          {/* Controls */}
+  1076→          <Card>
+  1077→            <CardContent className="p-4">
+  1078→              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end justify-between">
+  1079→                <div className="space-y-2">
+  1080→                  <Label className="text-sm font-medium">Period</Label>
+  1081→                  <Select
+  1082→                    value={String(wasteDays)}
+  1083→                    onValueChange={(v) => setWasteDays(Number(v))}
+  1084→                  >
+  1085→                    <SelectTrigger className="w-[140px]">
+  1086→                      <SelectValue />
+  1087→                    </SelectTrigger>
+  1088→                    <SelectContent>
+  1089→                      <SelectItem value="7">Last 7 days</SelectItem>
+  1090→                      <SelectItem value="14">Last 14 days</SelectItem>
+  1091→                      <SelectItem value="30">Last 30 days</SelectItem>
+  1092→                    </SelectContent>
+  1093→                  </Select>
+  1094→                </div>
+  1095→                <Button onClick={() => setShowWasteDialog(true)} className="gap-2">
+  1096→                  <Plus className="size-4" />
+  1097→                  Add Waste Record
+  1098→                </Button>
+  1099→              </div>
+  1100→            </CardContent>
+  1101→          </Card>
+  1102→
+  1103→          {/* Waste Table */}
+  1104→          <Card>
+  1105→            <CardHeader className="pb-3">
+  1106→              <CardTitle className="text-base">Waste Records</CardTitle>
+  1107→              <CardDescription>
+  1108→                {(messData.waste || []).length} record(s) in the last {wasteDays} days
+  1109→              </CardDescription>
+  1110→            </CardHeader>
+  1111→            <CardContent className="p-0">
+  1112→              {loading ? (
+  1113→                <div className="p-6 space-y-3">
+  1114→                  {Array.from({ length: 5 }).map((_, i) => (
+  1115→                    <Skeleton key={i} className="h-12 w-full" />
+  1116→                  ))}
+  1117→                </div>
+  1118→              ) : (messData.waste || []).length === 0 ? (
+  1119→                <div className="p-8 text-center">
+  1120→                  <Leaf className="size-10 mx-auto text-slate-300 dark:text-slate-600 mb-2" />
+  1121→                  <p className="text-slate-500 dark:text-slate-400">No waste records found</p>
+  1122→                </div>
+  1123→              ) : (
+  1124→                <ScrollArea className="max-h-96">
+  1125→                  <Table>
+  1126→                    <TableHeader>
+  1127→                      <TableRow>
+  1128→                        <TableHead>Date</TableHead>
+  1129→                        <TableHead>Category</TableHead>
+  1130→                        <TableHead>Description</TableHead>
+  1131→                        <TableHead>Item</TableHead>
+  1132→                        <TableHead className="text-right">Qty</TableHead>
+  1133→                        <TableHead>Unit</TableHead>
+  1134→                        <TableHead className="text-right">Est. Cost</TableHead>
+  1135→                        <TableHead>Disposal</TableHead>
+  1136→                        <TableHead>Recorded By</TableHead>
+  1137→                        <TableHead className="w-12" />
+  1138→                      </TableRow>
+  1139→                    </TableHeader>
+  1140→                    <TableBody>
+  1141→                      {(messData.waste || []).map((record: WasteRecord) => {
+  1142→                        const catColor: Record<string, string> = {
+  1143→                          food_waste: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+  1144→                          expired: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300',
+  1145→                          damaged: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+  1146→                          spoilage: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
+  1147→                          other: 'bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300',
+  1148→                        }
+  1149→                        const disposalIcon: Record<string, React.ReactNode> = {
+  1150→                          compost: <Leaf className="size-3" />,
+  1151→                          trash: <Trash2 className="size-3" />,
+  1152→                          donation: <Gift className="size-3" />,
+  1153→                          recycling: <Recycle className="size-3" />,
+  1154→                        }
+  1155→                        return (
+  1156→                          <TableRow key={record.id}>
+  1157→                            <TableCell className="text-sm">{formatDate(record.date)}</TableCell>
+  1158→                            <TableCell>
+  1159→                              <Badge
+  1160→                                variant="outline"
+  1161→                                className={`text-xs ${catColor[record.category] || catColor.other}`}
+  1162→                              >
+  1163→                                {getWasteCategoryLabel(record.category)}
+  1164→                              </Badge>
+  1165→                            </TableCell>
+  1166→                            <TableCell className="text-sm max-w-[200px] truncate" title={record.description}>
+  1167→                              {record.description}
+  1168→                            </TableCell>
+  1169→                            <TableCell className="text-sm">{record.item?.name || '—'}</TableCell>
+  1170→                            <TableCell className="text-right">{record.quantity}</TableCell>
+  1171→                            <TableCell className="text-sm">{record.unit || '—'}</TableCell>
+  1172→                            <TableCell className="text-right text-sm font-medium text-red-600 dark:text-red-400">
+  1173→                              {formatCurrency(record.estimatedCost)}
+  1174→                            </TableCell>
+  1175→                            <TableCell>
+  1176→                              {record.disposalMethod ? (
+  1177→                                <Badge variant="outline" className="text-xs gap-1">
+  1178→                                  {disposalIcon[record.disposalMethod]}
+  1179→                                  {getDisposalLabel(record.disposalMethod)}
+  1180→                                </Badge>
+  1181→                              ) : (
+  1182→                                '—'
+  1183→                              )}
+  1184→                            </TableCell>
+  1185→                            <TableCell className="text-sm">{record.recordedBy?.name || '—'}</TableCell>
+  1186→                            <TableCell>
+  1187→                              <DropdownMenu>
+  1188→                                <DropdownMenuTrigger asChild>
+  1189→                                  <Button variant="ghost" size="icon" className="size-8">
+  1190→                                    <MoreVertical className="size-4" />
+  1191→                                  </Button>
+  1192→                                </DropdownMenuTrigger>
+  1193→                                <DropdownMenuContent align="end">
+  1194→                                  <DropdownMenuItem className="gap-2 text-slate-600 dark:text-slate-400">
+  1195→                                    <Edit3 className="size-3.5" />
+  1196→                                    View Details
+  1197→                                  </DropdownMenuItem>
+  1198→                                  <DropdownMenuItem className="gap-2 text-red-600 dark:text-red-400">
+  1199→                                    <Trash className="size-3.5" />
+  1200→                                    Delete
+  1201→                                  </DropdownMenuItem>
+  1202→                                </DropdownMenuContent>
+  1203→                              </DropdownMenu>
+  1204→                            </TableCell>
+  1205→                          </TableRow>
+  1206→                        )
+  1207→                      })}
+  1208→                    </TableBody>
+  1209→                  </Table>
+  1210→                </ScrollArea>
+  1211→              )}
+  1212→            </CardContent>
+  1213→          </Card>
+  1214→        </TabsContent>
+  1215→      </Tabs>
+  1216→
+  1217→      {/* ─── Add Consumption Dialog ────────────────────────────── */}
+  1218→      <Dialog open={showConsumptionDialog} onOpenChange={setShowConsumptionDialog}>
+  1219→        <DialogContent className="sm:max-w-[500px]">
+  1220→          <DialogHeader>
+  1221→            <DialogTitle className="flex items-center gap-2">
+  1222→              <Package className="size-5" />
+  1223→              Add Consumption Log
+  1224→            </DialogTitle>
+  1225→            <DialogDescription>
+  1226→              Record daily consumption of inventory items
+  1227→            </DialogDescription>
+  1228→          </DialogHeader>
+  1229→          <div className="grid gap-4 py-4">
+  1230→            <div className="grid gap-2">
+  1231→              <Label htmlFor="cons-item">Inventory Item *</Label>
+  1232→              <Select
+  1233→                value={consumptionForm.itemId}
+  1234→                onValueChange={(v) => setConsumptionForm(prev => ({ ...prev, itemId: v }))}
+  1235→              >
+  1236→                <SelectTrigger id="cons-item">
+  1237→                  <SelectValue placeholder="Select an item" />
+  1238→                </SelectTrigger>
+  1239→                <SelectContent>
+  1240→                  {inventoryItems.map((item) => (
+  1241→                    <SelectItem key={item.id} value={item.id}>
+  1242→                      {item.name} ({item.unit}) — Stock: {item.currentStock}
+  1243→                    </SelectItem>
+  1244→                  ))}
+  1245→                </SelectContent>
+  1246→              </Select>
+  1247→            </div>
+  1248→
+  1249→            <div className="grid gap-2">
+  1250→              <Label htmlFor="cons-meal">Meal Type</Label>
+  1251→              <Select
+  1252→                value={consumptionForm.mealType}
+  1253→                onValueChange={(v) => setConsumptionForm(prev => ({ ...prev, mealType: v }))}
+  1254→              >
+  1255→                <SelectTrigger id="cons-meal">
+  1256→                  <SelectValue />
+  1257→                </SelectTrigger>
+  1258→                <SelectContent>
+  1259→                  {MEAL_TYPES.map((meal) => (
+  1260→                    <SelectItem key={meal.value} value={meal.value}>
+  1261→                      {meal.label}
+  1262→                    </SelectItem>
+  1263→                  ))}
+  1264→                </SelectContent>
+  1265→              </Select>
+  1266→            </div>
+  1267→
+  1268→            <div className="grid grid-cols-2 gap-3">
+  1269→              <div className="grid gap-2">
+  1270→                <Label htmlFor="cons-date">Date</Label>
+  1271→                <Input
+  1272→                  id="cons-date"
+  1273→                  type="date"
+  1274→                  value={consumptionForm.date}
+  1275→                  onChange={(e) => setConsumptionForm(prev => ({ ...prev, date: e.target.value }))}
+  1276→                />
+  1277→              </div>
+  1278→              <div className="grid gap-2">
+  1279→                <Label htmlFor="cons-issued">Issued Qty</Label>
+  1280→                <Input
+  1281→                  id="cons-issued"
+  1282→                  type="number"
+  1283→                  min={0}
+  1284→                  step="0.1"
+  1285→                  value={consumptionForm.issuedQty}
+  1286→                  onChange={(e) => setConsumptionForm(prev => ({ ...prev, issuedQty: parseFloat(e.target.value) || 0 }))}
+  1287→                />
+  1288→              </div>
+  1289→            </div>
+  1290→
+  1291→            <div className="grid grid-cols-3 gap-3">
+  1292→              <div className="grid gap-2">
+  1293→                <Label htmlFor="cons-consumed">Consumed</Label>
+  1294→                <Input
+  1295→                  id="cons-consumed"
+  1296→                  type="number"
+  1297→                  min={0}
+  1298→                  step="0.1"
+  1299→                  value={consumptionForm.consumedQty}
+  1300→                  onChange={(e) => setConsumptionForm(prev => ({ ...prev, consumedQty: parseFloat(e.target.value) || 0 }))}
+  1301→                />
+  1302→              </div>
+  1303→              <div className="grid gap-2">
+  1304→                <Label htmlFor="cons-returned">Returned</Label>
+  1305→                <Input
+  1306→                  id="cons-returned"
+  1307→                  type="number"
+  1308→                  min={0}
+  1309→                  step="0.1"
+  1310→                  value={consumptionForm.returnedQty}
+  1311→                  onChange={(e) => setConsumptionForm(prev => ({ ...prev, returnedQty: parseFloat(e.target.value) || 0 }))}
+  1312→                />
+  1313→              </div>
+  1314→              <div className="grid gap-2">
+  1315→                <Label htmlFor="cons-wastage">Wastage</Label>
+  1316→                <Input
+  1317→                  id="cons-wastage"
+  1318→                  type="number"
+  1319→                  min={0}
+  1320→                  step="0.1"
+  1321→                  value={consumptionForm.wastageQty}
+  1322→                  onChange={(e) => setConsumptionForm(prev => ({ ...prev, wastageQty: parseFloat(e.target.value) || 0 }))}
+  1323→                />
+  1324→              </div>
+  1325→            </div>
+  1326→
+  1327→            <div className="grid gap-2">
+  1328→              <Label htmlFor="cons-notes">Notes</Label>
+  1329→              <Textarea
+  1330→                id="cons-notes"
+  1331→                placeholder="Optional notes..."
+  1332→                value={consumptionForm.notes}
+  1333→                onChange={(e) => setConsumptionForm(prev => ({ ...prev, notes: e.target.value }))}
+  1334→                rows={2}
+  1335→              />
+  1336→            </div>
+  1337→          </div>
+  1338→          <DialogFooter>
+  1339→            <Button variant="outline" onClick={() => setShowConsumptionDialog(false)}>
+  1340→              Cancel
+  1341→            </Button>
+  1342→            <Button onClick={handleAddConsumption} disabled={savingConsumption} className="gap-2">
+  1343→              {savingConsumption ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+  1344→              Add Log
+  1345→            </Button>
+  1346→          </DialogFooter>
+  1347→        </DialogContent>
+  1348→      </Dialog>
+  1349→
+  1350→      {/* ─── Add Waste Record Dialog ──────────────────────────── */}
+  1351→      <Dialog open={showWasteDialog} onOpenChange={setShowWasteDialog}>
+  1352→        <DialogContent className="sm:max-w-[500px]">
+  1353→          <DialogHeader>
+  1354→            <DialogTitle className="flex items-center gap-2">
+  1355→              <Trash2 className="size-5" />
+  1356→              Add Waste Record
+  1357→            </DialogTitle>
+  1358→            <DialogDescription>
+  1359→              Record waste items. Stock will be automatically deducted if an inventory item is selected.
+  1360→            </DialogDescription>
+  1361→          </DialogHeader>
+  1362→          <div className="grid gap-4 py-4">
+  1363→            <div className="grid grid-cols-2 gap-3">
+  1364→              <div className="grid gap-2">
+  1365→                <Label htmlFor="waste-date">Date *</Label>
+  1366→                <Input
+  1367→                  id="waste-date"
+  1368→                  type="date"
+  1369→                  value={wasteForm.date}
+  1370→                  onChange={(e) => setWasteForm(prev => ({ ...prev, date: e.target.value }))}
+  1371→                />
+  1372→              </div>
+  1373→              <div className="grid gap-2">
+  1374→                <Label htmlFor="waste-category">Category *</Label>
+  1375→                <Select
+  1376→                  value={wasteForm.category}
+  1377→                  onValueChange={(v) => setWasteForm(prev => ({ ...prev, category: v }))}
+  1378→                >
+  1379→                  <SelectTrigger id="waste-category">
+  1380→                    <SelectValue />
+  1381→                  </SelectTrigger>
+  1382→                  <SelectContent>
+  1383→                    {WASTE_CATEGORIES.map((cat) => (
+  1384→                      <SelectItem key={cat.value} value={cat.value}>
+  1385→                        {cat.label}
+  1386→                      </SelectItem>
+  1387→                    ))}
+  1388→                  </SelectContent>
+  1389→                </Select>
+  1390→              </div>
+  1391→            </div>
+  1392→
+  1393→            <div className="grid gap-2">
+  1394→              <Label htmlFor="waste-desc">Description *</Label>
+  1395→              <Textarea
+  1396→                id="waste-desc"
+  1397→                placeholder="Describe the waste..."
+  1398→                value={wasteForm.description}
+  1399→                onChange={(e) => setWasteForm(prev => ({ ...prev, description: e.target.value }))}
+  1400→                rows={2}
+  1401→              />
+  1402→            </div>
+  1403→
+  1404→            <div className="grid gap-2">
+  1405→              <Label htmlFor="waste-item">Inventory Item (optional)</Label>
+  1406→              <Select
+  1407→                value={wasteForm.itemId}
+  1408→                onValueChange={(v) => {
+  1409→                  const item = inventoryItems.find(i => i.id === v)
+  1410→                  setWasteForm(prev => ({
+  1411→                    ...prev,
+  1412→                    itemId: v,
+  1413→                    unit: item?.unit || 'kg',
+  1414→                    estimatedCost: item ? prev.quantity * item.unitPrice : prev.estimatedCost,
+  1415→                  }))
+  1416→                }}
+  1417→              >
+  1418→                <SelectTrigger id="waste-item">
+  1419→                  <SelectValue placeholder="Select item (optional)" />
+  1420→                </SelectTrigger>
+  1421→                <SelectContent>
+  1422→                  {inventoryItems.map((item) => (
+  1423→                    <SelectItem key={item.id} value={item.id}>
+  1424→                      {item.name} ({item.unit}) — Stock: {item.currentStock}
+  1425→                    </SelectItem>
+  1426→                  ))}
+  1427→                </SelectContent>
+  1428→              </Select>
+  1429→            </div>
+  1430→
+  1431→            <div className="grid grid-cols-3 gap-3">
+  1432→              <div className="grid gap-2">
+  1433→                <Label htmlFor="waste-qty">Quantity</Label>
+  1434→                <Input
+  1435→                  id="waste-qty"
+  1436→                  type="number"
+  1437→                  min={0}
+  1438→                  step="0.1"
+  1439→                  value={wasteForm.quantity}
+  1440→                  onChange={(e) => {
+  1441→                    const qty = parseFloat(e.target.value) || 0
+  1442→                    const item = inventoryItems.find(i => i.id === wasteForm.itemId)
+  1443→                    setWasteForm(prev => ({
+  1444→                      ...prev,
+  1445→                      quantity: qty,
+  1446→                      estimatedCost: item ? qty * item.unitPrice : prev.estimatedCost,
+  1447→                    }))
+  1448→                  }}
+  1449→                />
+  1450→              </div>
+  1451→              <div className="grid gap-2">
+  1452→                <Label htmlFor="waste-unit">Unit</Label>
+  1453→                <Select
+  1454→                  value={wasteForm.unit}
+  1455→                  onValueChange={(v) => setWasteForm(prev => ({ ...prev, unit: v }))}
+  1456→                >
+  1457→                  <SelectTrigger id="waste-unit">
+  1458→                    <SelectValue />
+  1459→                  </SelectTrigger>
+  1460→                  <SelectContent>
+  1461→                    <SelectItem value="kg">Kg</SelectItem>
+  1462→                    <SelectItem value="litres">Litres</SelectItem>
+  1463→                    <SelectItem value="pieces">Pieces</SelectItem>
+  1464→                    <SelectItem value="packets">Packets</SelectItem>
+  1465→                    <SelectItem value="grams">Grams</SelectItem>
+  1466→                  </SelectContent>
+  1467→                </Select>
+  1468→              </div>
+  1469→              <div className="grid gap-2">
+  1470→                <Label htmlFor="waste-cost">Est. Cost (₹)</Label>
+  1471→                <Input
+  1472→                  id="waste-cost"
+  1473→                  type="number"
+  1474→                  min={0}
+  1475→                  step="0.01"
+  1476→                  value={wasteForm.estimatedCost}
+  1477→                  onChange={(e) => setWasteForm(prev => ({ ...prev, estimatedCost: parseFloat(e.target.value) || 0 }))}
+  1478→                />
+  1479→              </div>
+  1480→            </div>
+  1481→
+  1482→            <div className="grid gap-2">
+  1483→              <Label>Disposal Method</Label>
+  1484→              <div className="flex flex-wrap gap-2">
+  1485→                {DISPOSAL_METHODS.map((method) => {
+  1486→                  const Icon = method.icon
+  1487→                  const isActive = wasteForm.disposalMethod === method.value
+  1488→                  return (
+  1489→                    <Button
+  1490→                      key={method.value}
+  1491→                      type="button"
+  1492→                      variant={isActive ? 'default' : 'outline'}
+  1493→                      size="sm"
+  1494→                      className="gap-1.5"
+  1495→                      onClick={() => setWasteForm(prev => ({ ...prev, disposalMethod: method.value }))}
+  1496→                    >
+  1497→                      <Icon className="size-3.5" />
+  1498→                      {method.label}
+  1499→                    </Button>
+  1500→                  )
+  1501→                })}
+  1502→              </div>
+  1503→            </div>
+  1504→
+  1505→            <div className="grid gap-2">
+  1506→              <Label htmlFor="waste-notes">Notes</Label>
+  1507→              <Textarea
+  1508→                id="waste-notes"
+  1509→                placeholder="Optional notes..."
+  1510→                value={wasteForm.notes}
+  1511→                onChange={(e) => setWasteForm(prev => ({ ...prev, notes: e.target.value }))}
+  1512→                rows={2}
+  1513→              />
+  1514→            </div>
+  1515→          </div>
+  1516→          <DialogFooter>
+  1517→            <Button variant="outline" onClick={() => setShowWasteDialog(false)}>
+  1518→              Cancel
+  1519→            </Button>
+  1520→            <Button onClick={handleAddWaste} disabled={savingWaste} className="gap-2">
+  1521→              {savingWaste ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+  1522→              Add Record
+  1523→            </Button>
+  1524→          </DialogFooter>
+  1525→        </DialogContent>
+  1526→      </Dialog>
+  1527→    </div>
+  1528→  )
+  1529→}
+  1530→

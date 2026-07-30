@@ -105,3 +105,84 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create room' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json()
+    const { id, name, number, sharingType, roomType, totalBeds, rent, deposit, amenities, status, images } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Room id is required' }, { status: 400 })
+    }
+
+    const existingRoom = await db.room.findUnique({ where: { id } })
+    if (!existingRoom) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (name !== undefined) updateData.name = name
+    if (number !== undefined) updateData.number = number
+    if (sharingType !== undefined) updateData.sharingType = sharingType
+    if (roomType !== undefined) updateData.roomType = roomType
+    if (totalBeds !== undefined) updateData.totalBeds = totalBeds
+    if (rent !== undefined) updateData.rent = rent
+    if (deposit !== undefined) updateData.deposit = deposit
+    if (amenities !== undefined) updateData.amenities = amenities
+    if (status !== undefined) updateData.status = status
+    if (images !== undefined) updateData.images = images
+
+    const room = await db.room.update({
+      where: { id },
+      data: updateData,
+      include: {
+        floor: { select: { id: true, name: true, number: true } },
+        building: { select: { id: true, name: true } },
+        property: { select: { id: true, name: true } },
+        beds: true,
+      },
+    })
+
+    return NextResponse.json(room)
+  } catch (error) {
+    console.error('Rooms PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update room' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Room id is required' }, { status: 400 })
+    }
+
+    const existingRoom = await db.room.findUnique({
+      where: { id },
+      include: { tenants: true, beds: true },
+    })
+    if (!existingRoom) {
+      return NextResponse.json({ error: 'Room not found' }, { status: 404 })
+    }
+
+    // Check for active tenants
+    const activeTenants = existingRoom.tenants.filter((t) => t.status === 'active')
+    if (activeTenants.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete room with active tenants. Please move out tenants first.' },
+        { status: 400 }
+      )
+    }
+
+    // Delete beds first, then the room
+    await db.bed.deleteMany({ where: { roomId: id } })
+    await db.room.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Room deleted successfully', id })
+  } catch (error) {
+    console.error('Rooms DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete room' }, { status: 500 })
+  }
+}

@@ -1,0 +1,1634 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Skeleton } from '@/components/ui/skeleton'
+    11→import { ScrollArea } from '@/components/ui/scroll-area'
+    12→import {
+    13→  Select,
+    14→  SelectContent,
+    15→  SelectItem,
+    16→  SelectTrigger,
+    17→  SelectValue,
+    18→} from '@/components/ui/select'
+    19→import {
+    20→  Table,
+    21→  TableBody,
+    22→  TableCell,
+    23→  TableHead,
+    24→  TableHeader,
+    25→  TableRow,
+    26→} from '@/components/ui/table'
+    27→import {
+    28→  ChartContainer,
+    29→  ChartTooltip,
+    30→  ChartTooltipContent,
+    31→  ChartLegend,
+    32→  ChartLegendContent,
+    33→  type ChartConfig,
+    34→} from '@/components/ui/chart'
+    35→import {
+    36→  BarChart,
+    37→  Bar,
+    38→  PieChart,
+    39→  Pie,
+    40→  Cell,
+    41→  AreaChart,
+    42→  Area,
+    43→  XAxis,
+    44→  YAxis,
+    45→  CartesianGrid,
+    46→} from 'recharts'
+    47→import { format } from 'date-fns'
+    48→import {
+    49→  FileText,
+    50→  TrendingUp,
+    51→  TrendingDown,
+    52→  IndianRupee,
+    53→  Download,
+    54→  FileSpreadsheet,
+    55→  Filter,
+    56→  Building2,
+    57→  Calendar,
+    58→  PieChartIcon,
+    59→  BarChart3,
+    60→  Activity,
+    61→  Users,
+    62→  BedDouble,
+    63→  CreditCard,
+    64→  Receipt,
+    65→  Loader2,
+    66→  Package,
+    67→  ChefHat,
+    68→  AlertTriangle,
+    69→  Armchair,
+    70→  Trash2,
+    71→} from 'lucide-react'
+    72→
+    73→// ── Types ────────────────────────────────────────────────────────────────────
+    74→
+    75→type ReportType = 'income' | 'expense' | 'profit' | 'collection' | 'due' | 'vacancy' | 'occupancy' | 'tenant_ledger' | 'payment_report' | 'stock_report' | 'consumption_report' | 'waste_report' | 'kitchen_cost' | 'asset_report' | 'low_stock' | 'expiry_report'
+    76→
+    77→interface Property {
+    78→  id: string
+    79→  name: string
+    80→}
+    81→
+    82→interface ReportTypeInfo {
+    83→  key: ReportType
+    84→  label: string
+    85→  icon: React.ReactNode
+    86→  description: string
+    87→  color: string
+    88→}
+    89→
+    90→// ── Constants ────────────────────────────────────────────────────────────────
+    91→
+    92→const REPORT_TYPES: ReportTypeInfo[] = [
+    93→  { key: 'income', label: 'Income', icon: <TrendingUp className="h-4 w-4" />, description: 'Monthly income breakdown', color: 'emerald' },
+    94→  { key: 'expense', label: 'Expense', icon: <TrendingDown className="h-4 w-4" />, description: 'Expense by category', color: 'rose' },
+    95→  { key: 'profit', label: 'Profit', icon: <Activity className="h-4 w-4" />, description: 'Profit & loss trend', color: 'teal' },
+    96→  { key: 'collection', label: 'Collection', icon: <IndianRupee className="h-4 w-4" />, description: 'Collection rate & summary', color: 'cyan' },
+    97→  { key: 'due', label: 'Due', icon: <Receipt className="h-4 w-4" />, description: 'Overdue payments', color: 'orange' },
+    98→  { key: 'vacancy', label: 'Vacancy', icon: <BedDouble className="h-4 w-4" />, description: 'Room & bed vacancy', color: 'violet' },
+    99→  { key: 'occupancy', label: 'Occupancy', icon: <Building2 className="h-4 w-4" />, description: 'Occupancy rates', color: 'blue' },
+   100→  { key: 'tenant_ledger', label: 'Tenant Ledger', icon: <Users className="h-4 w-4" />, description: 'Tenant transaction history', color: 'indigo' },
+   101→  { key: 'payment_report', label: 'Payment Report', icon: <CreditCard className="h-4 w-4" />, description: 'Detailed payment report', color: 'amber' },
+   102→  { key: 'stock_report', label: 'Stock Report', icon: <Package className="h-4 w-4" />, description: 'Current stock levels & values', color: 'emerald' },
+   103→  { key: 'consumption_report', label: 'Consumption', icon: <ChefHat className="h-4 w-4" />, description: 'Item-wise consumption tracking', color: 'orange' },
+   104→  { key: 'waste_report', label: 'Wastage', icon: <Trash2 className="h-4 w-4" />, description: 'Food waste & spoilage analysis', color: 'rose' },
+   105→  { key: 'kitchen_cost', label: 'Kitchen Cost', icon: <ChefHat className="h-4 w-4" />, description: 'Cost per student analysis', color: 'cyan' },
+   106→  { key: 'asset_report', label: 'Assets', icon: <Armchair className="h-4 w-4" />, description: 'Asset inventory & depreciation', color: 'violet' },
+   107→  { key: 'low_stock', label: 'Low Stock', icon: <AlertTriangle className="h-4 w-4" />, description: 'Items below minimum stock', color: 'red' },
+   108→  { key: 'expiry_report', label: 'Expiry', icon: <Calendar className="h-4 w-4" />, description: 'Items nearing expiry', color: 'amber' },
+   109→]
+   110→
+   111→const MONTHS = [
+   112→  { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
+   113→  { value: '4', label: 'April' }, { value: '5', label: 'May' }, { value: '6', label: 'June' },
+   114→  { value: '7', label: 'July' }, { value: '8', label: 'August' }, { value: '9', label: 'September' },
+   115→  { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' },
+   116→]
+   117→
+   118→const CHART_COLORS = ['#10b981', '#14b8a6', '#06b6d4', '#f59e0b', '#ef4444', '#8b5cf6', '#f97316', '#6366f1']
+   119→
+   120→const incomeChartConfig: ChartConfig = {
+   121→  amount: { label: 'Amount', color: '#10b981' },
+   122→}
+   123→
+   124→const expenseChartConfig: ChartConfig = {
+   125→  amount: { label: 'Amount', color: '#ef4444' },
+   126→  maintenance: { label: 'Maintenance', color: '#10b981' },
+   127→  utilities: { label: 'Utilities', color: '#14b8a6' },
+   128→  salary: { label: 'Salary', color: '#06b6d4' },
+   129→  supplies: { label: 'Supplies', color: '#f59e0b' },
+   130→  food: { label: 'Food', color: '#f97316' },
+   131→  marketing: { label: 'Marketing', color: '#8b5cf6' },
+   132→  other: { label: 'Other', color: '#6366f1' },
+   133→}
+   134→
+   135→const profitChartConfig: ChartConfig = {
+   136→  income: { label: 'Income', color: '#10b981' },
+   137→  expense: { label: 'Expense', color: '#ef4444' },
+   138→  profit: { label: 'Profit', color: '#14b8a6' },
+   139→}
+   140→
+   141→const collectionChartConfig: ChartConfig = {
+   142→  collected: { label: 'Collected', color: '#10b981' },
+   143→  pending: { label: 'Pending', color: '#f59e0b' },
+   144→}
+   145→
+   146→const occupancyChartConfig: ChartConfig = {
+   147→  occupied: { label: 'Occupied', color: '#10b981' },
+   148→  vacant: { label: 'Vacant', color: '#e5e7eb' },
+   149→}
+   150→
+   151→const paymentStatusChartConfig: ChartConfig = {
+   152→  paid: { label: 'Paid', color: '#10b981' },
+   153→  pending: { label: 'Pending', color: '#f59e0b' },
+   154→  overdue: { label: 'Overdue', color: '#ef4444' },
+   155→}
+   156→
+   157→// ── Helpers ──────────────────────────────────────────────────────────────────
+   158→
+   159→function formatCurrency(amount: number) {
+   160→  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount)
+   161→}
+   162→
+   163→function formatDate(date: string | Date) {
+   164→  return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   165→}
+   166→
+   167→// ── Inventory Report Components ─────────────────────────────────────────────
+   168→
+   169→function StockReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   170→  const [invData, setInvData] = useState<any>(null)
+   171→  const [invLoading, setInvLoading] = useState(true)
+   172→
+   173→  useEffect(() => {
+   174→    const fetchInventory = async () => {
+   175→      try {
+   176→        const pid = selectedPropertyId || ''
+   177→        const res = await fetch(`/api/inventory?propertyId=${pid}`)
+   178→        const data = await res.json()
+   179→        setInvData(data)
+   180→      } catch (e) { console.error(e) }
+   181→      finally { setInvLoading(false) }
+   182→    }
+   183→    fetchInventory()
+   184→  }, [selectedPropertyId])
+   185→
+   186→  if (invLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   187→  if (!invData) return <div className="text-center text-muted-foreground p-12">No data available</div>
+   188→
+   189→  const items = invData.items || []
+   190→  const categories = invData.categories || []
+   191→  const stats = invData.stats || {}
+   192→
+   193→  const categoryData = categories.map((c: any) => {
+   194→    const catItems = items.filter((i: any) => i.categoryId === c.id)
+   195→    return { name: c.name, count: catItems.length, value: catItems.reduce((s: number, i: any) => s + i.currentStock * i.unitPrice, 0) }
+   196→  }).filter((c: any) => c.count > 0)
+   197→
+   198→  return (
+   199→    <div className="space-y-6">
+   200→      <div className="grid gap-4 md:grid-cols-4">
+   201→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Items</p><p className="text-2xl font-bold">{stats.totalItems || 0}</p></CardContent></Card>
+   202→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Low Stock</p><p className="text-2xl font-bold text-red-500">{stats.lowStockCount || 0}</p></CardContent></Card>
+   203→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Value</p><p className="text-2xl font-bold">{formatCurrency(stats.totalValue || 0)}</p></CardContent></Card>
+   204→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Expiring Soon</p><p className="text-2xl font-bold text-amber-500">{stats.expiringSoon || 0}</p></CardContent></Card>
+   205→      </div>
+   206→      {categoryData.length > 0 && (
+   207→        <Card>
+   208→          <CardHeader><CardTitle>Stock Value by Category</CardTitle></CardHeader>
+   209→          <CardContent>
+   210→            <ChartContainer config={{ value: { label: 'Value', color: '#10b981' } }} className="h-[300px]">
+   211→              <BarChart data={categoryData}>
+   212→                <CartesianGrid strokeDasharray="3 3" />
+   213→                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+   214→                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+   215→                <ChartTooltip content={<ChartTooltipContent />} />
+   216→                <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+   217→              </BarChart>
+   218→            </ChartContainer>
+   219→          </CardContent>
+   220→        </Card>
+   221→      )}
+   222→      <Card>
+   223→        <CardHeader><CardTitle>Current Stock Levels</CardTitle></CardHeader>
+   224→        <CardContent>
+   225→          <div className="overflow-x-auto">
+   226→            <Table>
+   227→              <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Category</TableHead><TableHead>Unit</TableHead><TableHead>Current Stock</TableHead><TableHead>Min Stock</TableHead><TableHead>Unit Price</TableHead><TableHead>Value</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+   228→              <TableBody>
+   229→                {items.map((item: any) => (
+   230→                  <TableRow key={item.id}>
+   231→                    <TableCell className="font-medium">{item.name}</TableCell>
+   232→                    <TableCell><Badge variant="outline">{item.category?.name || '-'}</Badge></TableCell>
+   233→                    <TableCell>{item.unit}</TableCell>
+   234→                    <TableCell className={item.currentStock <= item.minStock ? 'text-red-500 font-bold' : ''}>{item.currentStock}</TableCell>
+   235→                    <TableCell>{item.minStock}</TableCell>
+   236→                    <TableCell>{formatCurrency(item.unitPrice)}</TableCell>
+   237→                    <TableCell>{formatCurrency(item.currentStock * item.unitPrice)}</TableCell>
+   238→                    <TableCell><Badge variant={item.currentStock <= item.minStock ? 'destructive' : 'secondary'}>{item.currentStock <= item.minStock ? 'Low' : 'OK'}</Badge></TableCell>
+   239→                  </TableRow>
+   240→                ))}
+   241→              </TableBody>
+   242→            </Table>
+   243→          </div>
+   244→        </CardContent>
+   245→      </Card>
+   246→    </div>
+   247→  )
+   248→}
+   249→
+   250→function ConsumptionReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   251→  const [messData, setMessData] = useState<any>(null)
+   252→  const [messLoading, setMessLoading] = useState(true)
+   253→
+   254→  useEffect(() => {
+   255→    const fetchMess = async () => {
+   256→      try {
+   257→        const pid = selectedPropertyId || ''
+   258→        const res = await fetch(`/api/mess?propertyId=${pid}&type=consumption&days=30`)
+   259→        const data = await res.json()
+   260→        setMessData(data)
+   261→      } catch (e) { console.error(e) }
+   262→      finally { setMessLoading(false) }
+   263→    }
+   264→    fetchMess()
+   265→  }, [selectedPropertyId])
+   266→
+   267→  if (messLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   268→
+   269→  const logs = messData?.consumption || []
+   270→  const totalIssued = logs.reduce((s: number, l: any) => s + l.issuedQty, 0)
+   271→  const totalConsumed = logs.reduce((s: number, l: any) => s + l.consumedQty, 0)
+   272→  const totalWastage = logs.reduce((s: number, l: any) => s + l.wastageQty, 0)
+   273→  const totalCost = logs.reduce((s: number, l: any) => s + l.totalCost, 0)
+   274→
+   275→  return (
+   276→    <div className="space-y-6">
+   277→      <div className="grid gap-4 md:grid-cols-4">
+   278→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Issued</p><p className="text-2xl font-bold">{totalIssued.toFixed(1)}</p></CardContent></Card>
+   279→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Consumed</p><p className="text-2xl font-bold text-emerald-600">{totalConsumed.toFixed(1)}</p></CardContent></Card>
+   280→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Wastage</p><p className="text-2xl font-bold text-red-500">{totalWastage.toFixed(1)}</p></CardContent></Card>
+   281→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Cost</p><p className="text-2xl font-bold">{formatCurrency(totalCost)}</p></CardContent></Card>
+   282→      </div>
+   283→      <Card>
+   284→        <CardHeader><CardTitle>Consumption Log</CardTitle></CardHeader>
+   285→        <CardContent>
+   286→          <div className="overflow-x-auto">
+   287→            <Table>
+   288→              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Item</TableHead><TableHead>Meal</TableHead><TableHead>Issued</TableHead><TableHead>Consumed</TableHead><TableHead>Returned</TableHead><TableHead>Wastage</TableHead><TableHead>Cost</TableHead></TableRow></TableHeader>
+   289→              <TableBody>
+   290→                {logs.map((log: any) => (
+   291→                  <TableRow key={log.id}>
+   292→                    <TableCell>{format(new Date(log.date), 'dd MMM')}</TableCell>
+   293→                    <TableCell className="font-medium">{log.item?.name || '-'}</TableCell>
+   294→                    <TableCell><Badge variant="outline">{log.mealType || '-'}</Badge></TableCell>
+   295→                    <TableCell>{log.issuedQty} {log.unit}</TableCell>
+   296→                    <TableCell>{log.consumedQty} {log.unit}</TableCell>
+   297→                    <TableCell>{log.returnedQty} {log.unit}</TableCell>
+   298→                    <TableCell className="text-red-500">{log.wastageQty} {log.unit}</TableCell>
+   299→                    <TableCell>{formatCurrency(log.totalCost)}</TableCell>
+   300→                  </TableRow>
+   301→                ))}
+   302→                {logs.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No consumption data available</TableCell></TableRow>}
+   303→              </TableBody>
+   304→            </Table>
+   305→          </div>
+   306→        </CardContent>
+   307→      </Card>
+   308→    </div>
+   309→  )
+   310→}
+   311→
+   312→function WasteReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   313→  const [messData, setMessData] = useState<any>(null)
+   314→  const [messLoading, setMessLoading] = useState(true)
+   315→
+   316→  useEffect(() => {
+   317→    const fetchMess = async () => {
+   318→      try {
+   319→        const pid = selectedPropertyId || ''
+   320→        const res = await fetch(`/api/mess?propertyId=${pid}&type=waste&days=30`)
+   321→        const data = await res.json()
+   322→        setMessData(data)
+   323→      } catch (e) { console.error(e) }
+   324→      finally { setMessLoading(false) }
+   325→    }
+   326→    fetchMess()
+   327→  }, [selectedPropertyId])
+   328→
+   329→  if (messLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   330→
+   331→  const waste = messData?.waste || []
+   332→  const wasteStats = messData?.wasteStats || {}
+   333→  const wasteByCategory = waste.reduce((acc: any, w: any) => {
+   334→    acc[w.category] = (acc[w.category] || 0) + w.estimatedCost
+   335→    return acc
+   336→  }, {})
+   337→  const pieData = Object.entries(wasteByCategory).map(([k, v]) => ({ name: k.replace('_', ' '), value: v as number }))
+   338→
+   339→  return (
+   340→    <div className="space-y-6">
+   341→      <div className="grid gap-4 md:grid-cols-4">
+   342→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Waste</p><p className="text-2xl font-bold">{formatCurrency(wasteStats.totalWaste || 0)}</p></CardContent></Card>
+   343→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Food Waste</p><p className="text-2xl font-bold text-orange-500">{formatCurrency(wasteStats.foodWaste || 0)}</p></CardContent></Card>
+   344→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Expired</p><p className="text-2xl font-bold text-amber-500">{formatCurrency(wasteStats.expired || 0)}</p></CardContent></Card>
+   345→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Damaged</p><p className="text-2xl font-bold text-red-500">{formatCurrency(wasteStats.damaged || 0)}</p></CardContent></Card>
+   346→      </div>
+   347→      <div className="grid gap-6 md:grid-cols-2">
+   348→        {pieData.length > 0 && (
+   349→          <Card>
+   350→            <CardHeader><CardTitle>Waste by Category</CardTitle></CardHeader>
+   351→            <CardContent>
+   352→              <ChartContainer config={{ value: { label: 'Cost', color: '#ef4444' } }} className="h-[300px]">
+   353→                <PieChart>
+   354→                  <ChartTooltip content={<ChartTooltipContent />} />
+   355→                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+   356→                    {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+   357→                  </Pie>
+   358→                </PieChart>
+   359→              </ChartContainer>
+   360→            </CardContent>
+   361→          </Card>
+   362→        )}
+   363→        <Card>
+   364→          <CardHeader><CardTitle>Waste Records</CardTitle></CardHeader>
+   365→          <CardContent>
+   366→            <div className="overflow-x-auto">
+   367→              <Table>
+   368→                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead>Qty</TableHead><TableHead>Cost</TableHead><TableHead>Disposal</TableHead></TableRow></TableHeader>
+   369→                <TableBody>
+   370→                  {waste.map((w: any) => (
+   371→                    <TableRow key={w.id}>
+   372→                      <TableCell>{format(new Date(w.date), 'dd MMM')}</TableCell>
+   373→                      <TableCell><Badge variant="outline" className="capitalize">{w.category.replace('_', ' ')}</Badge></TableCell>
+   374→                      <TableCell>{w.description}</TableCell>
+   375→                      <TableCell>{w.quantity} {w.unit || ''}</TableCell>
+   376→                      <TableCell className="text-red-500">{formatCurrency(w.estimatedCost)}</TableCell>
+   377→                      <TableCell>{w.disposalMethod || '-'}</TableCell>
+   378→                    </TableRow>
+   379→                  ))}
+   380→                  {waste.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No waste records</TableCell></TableRow>}
+   381→                </TableBody>
+   382→              </Table>
+   383→            </div>
+   384→          </CardContent>
+   385→        </Card>
+   386→      </div>
+   387→    </div>
+   388→  )
+   389→}
+   390→
+   391→function KitchenCostReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   392→  const [invData, setInvData] = useState<any>(null)
+   393→  const [kitchenData, setKitchenData] = useState<any>(null)
+   394→  const [dataLoading, setDataLoading] = useState(true)
+   395→
+   396→  useEffect(() => {
+   397→    const fetchData = async () => {
+   398→      try {
+   399→        const pid = selectedPropertyId || ''
+   400→        const [invRes, kitchenRes] = await Promise.all([
+   401→          fetch(`/api/inventory?propertyId=${pid}`),
+   402→          fetch(`/api/kitchen?propertyId=${pid}&type=issues`),
+   403→        ])
+   404→        setInvData(await invRes.json())
+   405→        setKitchenData(await kitchenRes.json())
+   406→      } catch (e) { console.error(e) }
+   407→      finally { setDataLoading(false) }
+   408→    }
+   409→    fetchData()
+   410→  }, [selectedPropertyId])
+   411→
+   412→  if (dataLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   413→
+   414→  const totalStockValue = invData?.stats?.totalValue || 0
+   415→  const issues = kitchenData?.issues || []
+   416→  const totalIssuedCost = issues.reduce((s: number, i: any) => s + (i.quantity * (i.item?.unitPrice || 0)), 0)
+   417→  const tenants = 80 // approximate
+   418→  const costPerStudent = tenants > 0 ? totalIssuedCost / tenants : 0
+   419→
+   420→  return (
+   421→    <div className="space-y-6">
+   422→      <div className="grid gap-4 md:grid-cols-4">
+   423→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Stock Value</p><p className="text-2xl font-bold">{formatCurrency(totalStockValue)}</p></CardContent></Card>
+   424→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Issued Cost</p><p className="text-2xl font-bold text-orange-500">{formatCurrency(totalIssuedCost)}</p></CardContent></Card>
+   425→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Est. Residents</p><p className="text-2xl font-bold">{tenants}</p></CardContent></Card>
+   426→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Cost per Student</p><p className="text-2xl font-bold text-emerald-600">{formatCurrency(costPerStudent)}</p></CardContent></Card>
+   427→      </div>
+   428→      <Card>
+   429→        <CardHeader><CardTitle>Recent Kitchen Issues</CardTitle></CardHeader>
+   430→        <CardContent>
+   431→          <div className="overflow-x-auto">
+   432→            <Table>
+   433→              <TableHeader><TableRow><TableHead>Issue #</TableHead><TableHead>Item</TableHead><TableHead>Qty</TableHead><TableHead>Purpose</TableHead><TableHead>Date</TableHead><TableHead>Est. Cost</TableHead></TableRow></TableHeader>
+   434→              <TableBody>
+   435→                {issues.slice(0, 20).map((issue: any) => (
+   436→                  <TableRow key={issue.id}>
+   437→                    <TableCell className="font-mono text-sm">{issue.issueNumber}</TableCell>
+   438→                    <TableCell className="font-medium">{issue.item?.name || '-'}</TableCell>
+   439→                    <TableCell>{issue.quantity} {issue.unit}</TableCell>
+   440→                    <TableCell><Badge variant="outline" className="capitalize">{issue.purpose || '-'}</Badge></TableCell>
+   441→                    <TableCell>{format(new Date(issue.createdAt), 'dd MMM yyyy')}</TableCell>
+   442→                    <TableCell>{formatCurrency(issue.quantity * (issue.item?.unitPrice || 0))}</TableCell>
+   443→                  </TableRow>
+   444→                ))}
+   445→              </TableBody>
+   446→            </Table>
+   447→          </div>
+   448→        </CardContent>
+   449→      </Card>
+   450→    </div>
+   451→  )
+   452→}
+   453→
+   454→function AssetReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   455→  const [assetData, setAssetData] = useState<any>(null)
+   456→  const [assetLoading, setAssetLoading] = useState(true)
+   457→
+   458→  useEffect(() => {
+   459→    const fetchAssets = async () => {
+   460→      try {
+   461→        const pid = selectedPropertyId || ''
+   462→        const res = await fetch(`/api/assets?propertyId=${pid}&type=assets`)
+   463→        const data = await res.json()
+   464→        setAssetData(data)
+   465→      } catch (e) { console.error(e) }
+   466→      finally { setAssetLoading(false) }
+   467→    }
+   468→    fetchAssets()
+   469→  }, [selectedPropertyId])
+   470→
+   471→  if (assetLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   472→
+   473→  const assets = assetData?.assets || []
+   474→  const stats = assetData?.assetStats || {}
+   475→  const byCategory = stats.byCategory || {}
+   476→  const catData = Object.entries(byCategory).map(([k, v]) => ({ name: k.replace('_', ' '), count: v as number }))
+   477→
+   478→  return (
+   479→    <div className="space-y-6">
+   480→      <div className="grid gap-4 md:grid-cols-4">
+   481→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Assets</p><p className="text-2xl font-bold">{stats.total || 0}</p></CardContent></Card>
+   482→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Active</p><p className="text-2xl font-bold text-emerald-600">{stats.active || 0}</p></CardContent></Card>
+   483→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Under Maintenance</p><p className="text-2xl font-bold text-amber-500">{stats.underMaintenance || 0}</p></CardContent></Card>
+   484→        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Value</p><p className="text-2xl font-bold">{formatCurrency(stats.totalValue || 0)}</p></CardContent></Card>
+   485→      </div>
+   486→      <div className="grid gap-6 md:grid-cols-2">
+   487→        {catData.length > 0 && (
+   488→          <Card>
+   489→            <CardHeader><CardTitle>Assets by Category</CardTitle></CardHeader>
+   490→            <CardContent>
+   491→              <ChartContainer config={{ count: { label: 'Count', color: '#8b5cf6' } }} className="h-[300px]">
+   492→                <PieChart>
+   493→                  <ChartTooltip content={<ChartTooltipContent />} />
+   494→                  <Pie data={catData} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+   495→                    {catData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+   496→                  </Pie>
+   497→                </PieChart>
+   498→              </ChartContainer>
+   499→            </CardContent>
+   500→          </Card>
+   501→        )}
+   502→        <Card>
+   503→          <CardHeader><CardTitle>Asset List</CardTitle></CardHeader>
+   504→          <CardContent>
+   505→            <div className="overflow-x-auto">
+   506→              <Table>
+   507→                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Category</TableHead><TableHead>Room</TableHead><TableHead>Value</TableHead><TableHead>Condition</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+   508→                <TableBody>
+   509→                  {assets.map((a: any) => (
+   510→                    <TableRow key={a.id}>
+   511→                      <TableCell className="font-medium">{a.name}</TableCell>
+   512→                      <TableCell><Badge variant="outline" className="capitalize">{a.category.replace('_', ' ')}</Badge></TableCell>
+   513→                      <TableCell>{a.room?.name || '-'}</TableCell>
+   514→                      <TableCell>{formatCurrency(a.currentValue || a.purchasePrice || 0)}</TableCell>
+   515→                      <TableCell><Badge variant={a.condition === 'broken' ? 'destructive' : a.condition === 'poor' ? 'secondary' : 'outline'} className="capitalize">{a.condition}</Badge></TableCell>
+   516→                      <TableCell><Badge variant={a.status === 'active' ? 'default' : 'secondary'} className="capitalize">{a.status.replace('_', ' ')}</Badge></TableCell>
+   517→                    </TableRow>
+   518→                  ))}
+   519→                </TableBody>
+   520→              </Table>
+   521→            </div>
+   522→          </CardContent>
+   523→        </Card>
+   524→      </div>
+   525→    </div>
+   526→  )
+   527→}
+   528→
+   529→function LowStockReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   530→  const [invData, setInvData] = useState<any>(null)
+   531→  const [invLoading, setInvLoading] = useState(true)
+   532→
+   533→  useEffect(() => {
+   534→    const fetchInventory = async () => {
+   535→      try {
+   536→        const pid = selectedPropertyId || ''
+   537→        const res = await fetch(`/api/inventory?propertyId=${pid}&lowStock=true`)
+   538→        const data = await res.json()
+   539→        setInvData(data)
+   540→      } catch (e) { console.error(e) }
+   541→      finally { setInvLoading(false) }
+   542→    }
+   543→    fetchInventory()
+   544→  }, [selectedPropertyId])
+   545→
+   546→  if (invLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   547→
+   548→  const lowStockItems = (invData?.items || []).filter((i: any) => i.currentStock <= i.minStock)
+   549→
+   550→  return (
+   551→    <div className="space-y-6">
+   552→      <Card>
+   553→        <CardHeader>
+   554→          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-500" /> Low Stock Alert - {lowStockItems.length} Items</CardTitle>
+   555→        </CardHeader>
+   556→        <CardContent>
+   557→          <div className="overflow-x-auto">
+   558→            <Table>
+   559→              <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Category</TableHead><TableHead>Current Stock</TableHead><TableHead>Min Stock</TableHead><TableHead>Shortage</TableHead><TableHead>Unit</TableHead><TableHead>Reorder Qty</TableHead><TableHead>Est. Cost</TableHead></TableRow></TableHeader>
+   560→              <TableBody>
+   561→                {lowStockItems.map((item: any) => {
+   562→                  const shortage = item.minStock - item.currentStock
+   563→                  const reorderQty = (item.maxStock || item.minStock * 2) - item.currentStock
+   564→                  return (
+   565→                    <TableRow key={item.id} className="bg-red-50/50">
+   566→                      <TableCell className="font-medium">{item.name}</TableCell>
+   567→                      <TableCell><Badge variant="outline">{item.category?.name || '-'}</Badge></TableCell>
+   568→                      <TableCell className="text-red-600 font-bold">{item.currentStock}</TableCell>
+   569→                      <TableCell>{item.minStock}</TableCell>
+   570→                      <TableCell className="text-red-500">{shortage > 0 ? shortage.toFixed(1) : '0'}</TableCell>
+   571→                      <TableCell>{item.unit}</TableCell>
+   572→                      <TableCell>{reorderQty > 0 ? reorderQty.toFixed(1) : '-'}</TableCell>
+   573→                      <TableCell>{reorderQty > 0 ? formatCurrency(reorderQty * item.unitPrice) : '-'}</TableCell>
+   574→                    </TableRow>
+   575→                  )
+   576→                })}
+   577→                {lowStockItems.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">All items are above minimum stock levels</TableCell></TableRow>}
+   578→              </TableBody>
+   579→            </Table>
+   580→          </div>
+   581→        </CardContent>
+   582→      </Card>
+   583→    </div>
+   584→  )
+   585→}
+   586→
+   587→function ExpiryReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+   588→  const [invData, setInvData] = useState<any>(null)
+   589→  const [invLoading, setInvLoading] = useState(true)
+   590→
+   591→  useEffect(() => {
+   592→    const fetchInventory = async () => {
+   593→      try {
+   594→        const pid = selectedPropertyId || ''
+   595→        const res = await fetch(`/api/inventory?propertyId=${pid}`)
+   596→        const data = await res.json()
+   597→        setInvData(data)
+   598→      } catch (e) { console.error(e) }
+   599→      finally { setInvLoading(false) }
+   600→    }
+   601→    fetchInventory()
+   602→  }, [selectedPropertyId])
+   603→
+   604→  if (invLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+   605→
+   606→  const now = new Date()
+   607→  const items = (invData?.items || []).filter((i: any) => i.expiryDate).map((i: any) => ({
+   608→    ...i,
+   609→    daysUntilExpiry: Math.ceil((new Date(i.expiryDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+   610→  })).sort((a: any, b: any) => a.daysUntilExpiry - b.daysUntilExpiry)
+   611→
+   612→  return (
+   613→    <div className="space-y-6">
+   614→      <Card>
+   615→        <CardHeader><CardTitle>Items with Expiry Dates</CardTitle></CardHeader>
+   616→        <CardContent>
+   617→          <div className="overflow-x-auto">
+   618→            <Table>
+   619→              <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Category</TableHead><TableHead>Batch</TableHead><TableHead>Current Stock</TableHead><TableHead>Expiry Date</TableHead><TableHead>Days Left</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+   620→              <TableBody>
+   621→                {items.map((item: any) => (
+   622→                  <TableRow key={item.id} className={item.daysUntilExpiry <= 0 ? 'bg-red-50/50' : item.daysUntilExpiry <= 7 ? 'bg-amber-50/50' : ''}>
+   623→                    <TableCell className="font-medium">{item.name}</TableCell>
+   624→                    <TableCell><Badge variant="outline">{item.category?.name || '-'}</Badge></TableCell>
+   625→                    <TableCell>{item.batchNumber || '-'}</TableCell>
+   626→                    <TableCell>{item.currentStock} {item.unit}</TableCell>
+   627→                    <TableCell>{format(new Date(item.expiryDate), 'dd MMM yyyy')}</TableCell>
+   628→                    <TableCell className={item.daysUntilExpiry <= 0 ? 'text-red-600 font-bold' : item.daysUntilExpiry <= 7 ? 'text-amber-600 font-semibold' : ''}>{item.daysUntilExpiry} days</TableCell>
+   629→                    <TableCell><Badge variant={item.daysUntilExpiry <= 0 ? 'destructive' : item.daysUntilExpiry <= 7 ? 'secondary' : 'outline'}>{item.daysUntilExpiry <= 0 ? 'Expired' : item.daysUntilExpiry <= 7 ? 'Expiring Soon' : 'OK'}</Badge></TableCell>
+   630→                  </TableRow>
+   631→                ))}
+   632→                {items.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No items with expiry dates</TableCell></TableRow>}
+   633→              </TableBody>
+   634→            </Table>
+   635→          </div>
+   636→        </CardContent>
+   637→      </Card>
+   638→    </div>
+   639→  )
+   640→}
+   641→
+   642→// ── Component ────────────────────────────────────────────────────────────────
+   643→
+   644→export function ReportsPage() {
+   645→  const { currentUser, selectedPropertyId } = useAppStore()
+   646→  const [properties, setProperties] = useState<Property[]>([])
+   647→  const [loading, setLoading] = useState(true)
+   648→  const [reportData, setReportData] = useState<Record<string, unknown> | null>(null)
+   649→  const [reportLoading, setReportLoading] = useState(false)
+   650→
+   651→  // Filters
+   652→  const [selectedReport, setSelectedReport] = useState<ReportType>('income')
+   653→  const [filterProperty, setFilterProperty] = useState<string>('all')
+   654→  const [filterMonth, setFilterMonth] = useState<string>(String(new Date().getMonth() + 1))
+   655→  const [filterYear, setFilterYear] = useState<string>(String(new Date().getFullYear()))
+   656→  const [filterTenantId, setFilterTenantId] = useState<string>('')
+   657→  const [tenants, setTenants] = useState<{ id: string; name: string }[]>([])
+   658→
+   659→  // Fetch properties
+   660→  useEffect(() => {
+   661→    async function fetchProperties() {
+   662→      try {
+   663→        const res = await fetch('/api/properties')
+   664→        if (res.ok) {
+   665→          const data = await res.json()
+   666→          setProperties(Array.isArray(data) ? data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })) : [])
+   667→        }
+   668→      } catch { /* ignore */ }
+   669→    }
+   670→    fetchProperties()
+   671→  }, [])
+   672→
+   673→  // Fetch tenants for tenant ledger
+   674→  useEffect(() => {
+   675→    if (selectedReport === 'tenant_ledger') {
+   676→      async function fetchTenants() {
+   677→        try {
+   678→          const res = await fetch('/api/tenants')
+   679→          if (res.ok) {
+   680→            const data = await res.json()
+   681→            setTenants(Array.isArray(data) ? data.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name })) : [])
+   682→          }
+   683→        } catch { /* ignore */ }
+   684→      }
+   685→      fetchTenants()
+   686→    }
+   687→  }, [selectedReport])
+   688→
+   689→  // Fetch report data
+   690→  const fetchReport = useCallback(async () => {
+   691→    setReportLoading(true)
+   692→    try {
+   693→      const params = new URLSearchParams({
+   694→        type: selectedReport,
+   695→        ...(filterProperty !== 'all' && { propertyId: filterProperty }),
+   696→        ...(filterMonth && { month: filterMonth }),
+   697→        ...(filterYear && { year: filterYear }),
+   698→        ...(selectedReport === 'tenant_ledger' && filterTenantId && { tenantId: filterTenantId }),
+   699→      })
+   700→      const res = await fetch(`/api/reports?${params}`)
+   701→      if (res.ok) {
+   702→        const data = await res.json()
+   703→        setReportData(data)
+   704→      }
+   705→    } catch { /* ignore */ }
+   706→    setReportLoading(false)
+   707→    setLoading(false)
+   708→  }, [selectedReport, filterProperty, filterMonth, filterYear, filterTenantId])
+   709→
+   710→  // Fetch on mount and when deps change
+   711→  const [lastFetchKey, setLastFetchKey] = useState('')
+   712→  const currentKey = `${selectedReport}-${filterProperty}-${filterMonth}-${filterYear}-${filterTenantId}`
+   713→  if (lastFetchKey !== currentKey && !reportLoading) {
+   714→    setLastFetchKey(currentKey)
+   715→    fetchReport()
+   716→  }
+   717→
+   718→  // ── Report Renderers ────────────────────────────────────────────────────
+   719→
+   720→  const renderIncomeReport = () => {
+   721→    const data = reportData as { totalIncome?: number; payments?: unknown[]; month?: number; year?: number } | null
+   722→    if (!data) return null
+   723→
+   724→    const payments = (data.payments || []) as { amount: number; tenant?: { name: string; room?: { name: string } }; month?: number }[]
+   725→
+   726→    // Group by month for chart
+   727→    const monthlyData = payments.length > 0
+   728→      ? [{ month: MONTHS[(data.month || 1) - 1]?.label || '', amount: data.totalIncome || 0 }]
+   729→      : [{ month: MONTHS[(data.month || 1) - 1]?.label || '', amount: 0 }]
+   730→
+   731→    return (
+   732→      <div className="space-y-6">
+   733→        <div className="grid gap-4 md:grid-cols-3">
+   734→          <Card className="border-emerald-200 bg-emerald-50/50">
+   735→            <CardContent className="p-4">
+   736→              <div className="flex items-center gap-2">
+   737→                <IndianRupee className="h-4 w-4 text-emerald-600" />
+   738→                <span className="text-sm text-emerald-600">Total Income</span>
+   739→              </div>
+   740→              <p className="mt-1 text-2xl font-bold text-emerald-700">{formatCurrency(data.totalIncome || 0)}</p>
+   741→            </CardContent>
+   742→          </Card>
+   743→          <Card className="border-teal-200 bg-teal-50/50">
+   744→            <CardContent className="p-4">
+   745→              <div className="flex items-center gap-2">
+   746→                <CreditCard className="h-4 w-4 text-teal-600" />
+   747→                <span className="text-sm text-teal-600">Payments Received</span>
+   748→              </div>
+   749→              <p className="mt-1 text-2xl font-bold text-teal-700">{payments.length}</p>
+   750→            </CardContent>
+   751→          </Card>
+   752→          <Card className="border-cyan-200 bg-cyan-50/50">
+   753→            <CardContent className="p-4">
+   754→              <div className="flex items-center gap-2">
+   755→                <Calendar className="h-4 w-4 text-cyan-600" />
+   756→                <span className="text-sm text-cyan-600">Period</span>
+   757→              </div>
+   758→              <p className="mt-1 text-2xl font-bold text-cyan-700">{MONTHS[(data.month || 1) - 1]?.label} {data.year}</p>
+   759→            </CardContent>
+   760→          </Card>
+   761→        </div>
+   762→
+   763→        <Card>
+   764→          <CardHeader>
+   765→            <CardTitle className="text-base">Income by Month</CardTitle>
+   766→          </CardHeader>
+   767→          <CardContent>
+   768→            <ChartContainer config={incomeChartConfig} className="h-[300px] w-full">
+   769→              <BarChart data={monthlyData}>
+   770→                <CartesianGrid strokeDasharray="3 3" />
+   771→                <XAxis dataKey="month" />
+   772→                <YAxis />
+   773→                <ChartTooltip content={<ChartTooltipContent />} />
+   774→                <Bar dataKey="amount" fill="var(--color-amount)" radius={[4, 4, 0, 0]} />
+   775→              </BarChart>
+   776→            </ChartContainer>
+   777→          </CardContent>
+   778→        </Card>
+   779→
+   780→        <Card>
+   781→          <CardHeader>
+   782→            <CardTitle className="text-base">Payment Breakdown</CardTitle>
+   783→          </CardHeader>
+   784→          <CardContent>
+   785→            <Table>
+   786→              <TableHeader>
+   787→                <TableRow>
+   788→                  <TableHead>Tenant</TableHead>
+   789→                  <TableHead>Room</TableHead>
+   790→                  <TableHead className="text-right">Amount</TableHead>
+   791→                </TableRow>
+   792→              </TableHeader>
+   793→              <TableBody>
+   794→                {payments.length === 0 ? (
+   795→                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No payments found</TableCell></TableRow>
+   796→                ) : (
+   797→                  payments.map((p, i) => (
+   798→                    <TableRow key={i}>
+   799→                      <TableCell>{p.tenant?.name || 'N/A'}</TableCell>
+   800→                      <TableCell>{p.tenant?.room?.name || 'N/A'}</TableCell>
+   801→                      <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
+   802→                    </TableRow>
+   803→                  ))
+   804→                )}
+   805→              </TableBody>
+   806→            </Table>
+   807→          </CardContent>
+   808→        </Card>
+   809→      </div>
+   810→    )
+   811→  }
+   812→
+   813→  const renderExpenseReport = () => {
+   814→    const data = reportData as { totalExpense?: number; expenses?: unknown[]; month?: number; year?: number } | null
+   815→    if (!data) return null
+   816→
+   817→    const expenses = (data.expenses || []) as { amount: number; category: string; description: string; property?: { name: string } }[]
+   818→
+   819→    // Group by category for pie chart
+   820→    const categoryMap = new Map<string, number>()
+   821→    expenses.forEach((e) => {
+   822→      categoryMap.set(e.category, (categoryMap.get(e.category) || 0) + e.amount)
+   823→    })
+   824→    const pieData = Array.from(categoryMap.entries()).map(([name, value]) => ({ name, value }))
+   825→
+   826→    return (
+   827→      <div className="space-y-6">
+   828→        <div className="grid gap-4 md:grid-cols-2">
+   829→          <Card className="border-rose-200 bg-rose-50/50">
+   830→            <CardContent className="p-4">
+   831→              <div className="flex items-center gap-2">
+   832→                <TrendingDown className="h-4 w-4 text-rose-600" />
+   833→                <span className="text-sm text-rose-600">Total Expenses</span>
+   834→              </div>
+   835→              <p className="mt-1 text-2xl font-bold text-rose-700">{formatCurrency(data.totalExpense || 0)}</p>
+   836→            </CardContent>
+   837→          </Card>
+   838→          <Card className="border-amber-200 bg-amber-50/50">
+   839→            <CardContent className="p-4">
+   840→              <div className="flex items-center gap-2">
+   841→                <PieChartIcon className="h-4 w-4 text-amber-600" />
+   842→                <span className="text-sm text-amber-600">Categories</span>
+   843→              </div>
+   844→              <p className="mt-1 text-2xl font-bold text-amber-700">{categoryMap.size}</p>
+   845→            </CardContent>
+   846→          </Card>
+   847→        </div>
+   848→
+   849→        <div className="grid gap-6 md:grid-cols-2">
+   850→          <Card>
+   851→            <CardHeader>
+   852→              <CardTitle className="text-base">Expense by Category</CardTitle>
+   853→            </CardHeader>
+   854→            <CardContent>
+   855→              <ChartContainer config={expenseChartConfig} className="h-[300px] w-full">
+   856→                <PieChart>
+   857→                  <ChartTooltip content={<ChartTooltipContent />} />
+   858→                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+   859→                    {pieData.map((_, i) => (
+   860→                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+   861→                    ))}
+   862→                  </Pie>
+   863→                  <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+   864→                </PieChart>
+   865→              </ChartContainer>
+   866→            </CardContent>
+   867→          </Card>
+   868→
+   869→          <Card>
+   870→            <CardHeader>
+   871→              <CardTitle className="text-base">Expense Details</CardTitle>
+   872→            </CardHeader>
+   873→            <CardContent>
+   874→              <Table>
+   875→                <TableHeader>
+   876→                  <TableRow>
+   877→                    <TableHead>Category</TableHead>
+   878→                    <TableHead>Description</TableHead>
+   879→                    <TableHead className="text-right">Amount</TableHead>
+   880→                  </TableRow>
+   881→                </TableHeader>
+   882→                <TableBody>
+   883→                  {expenses.length === 0 ? (
+   884→                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No expenses found</TableCell></TableRow>
+   885→                  ) : (
+   886→                    expenses.map((e, i) => (
+   887→                      <TableRow key={i}>
+   888→                        <TableCell>
+   889→                          <Badge variant="outline" className="capitalize">{e.category}</Badge>
+   890→                        </TableCell>
+   891→                        <TableCell>{e.description}</TableCell>
+   892→                        <TableCell className="text-right font-medium">{formatCurrency(e.amount)}</TableCell>
+   893→                      </TableRow>
+   894→                    ))
+   895→                  )}
+   896→                </TableBody>
+   897→              </Table>
+   898→            </CardContent>
+   899→          </Card>
+   900→        </div>
+   901→      </div>
+   902→    )
+   903→  }
+   904→
+   905→  const renderProfitReport = () => {
+   906→    const data = reportData as { totalIncome?: number; totalExpense?: number; profit?: number; month?: number; year?: number } | null
+   907→    if (!data) return null
+   908→
+   909→    const trendData = [{
+   910→      month: MONTHS[(data.month || 1) - 1]?.label || '',
+   911→      income: data.totalIncome || 0,
+   912→      expense: data.totalExpense || 0,
+   913→      profit: data.profit || 0,
+   914→    }]
+   915→
+   916→    const isProfit = (data.profit || 0) >= 0
+   917→
+   918→    return (
+   919→      <div className="space-y-6">
+   920→        <div className="grid gap-4 md:grid-cols-3">
+   921→          <Card className="border-emerald-200 bg-emerald-50/50">
+   922→            <CardContent className="p-4">
+   923→              <div className="flex items-center gap-2">
+   924→                <TrendingUp className="h-4 w-4 text-emerald-600" />
+   925→                <span className="text-sm text-emerald-600">Income</span>
+   926→              </div>
+   927→              <p className="mt-1 text-2xl font-bold text-emerald-700">{formatCurrency(data.totalIncome || 0)}</p>
+   928→            </CardContent>
+   929→          </Card>
+   930→          <Card className="border-rose-200 bg-rose-50/50">
+   931→            <CardContent className="p-4">
+   932→              <div className="flex items-center gap-2">
+   933→                <TrendingDown className="h-4 w-4 text-rose-600" />
+   934→                <span className="text-sm text-rose-600">Expenses</span>
+   935→              </div>
+   936→              <p className="mt-1 text-2xl font-bold text-rose-700">{formatCurrency(data.totalExpense || 0)}</p>
+   937→            </CardContent>
+   938→          </Card>
+   939→          <Card className={isProfit ? 'border-teal-200 bg-teal-50/50' : 'border-red-200 bg-red-50/50'}>
+   940→            <CardContent className="p-4">
+   941→              <div className="flex items-center gap-2">
+   942→                <Activity className={isProfit ? 'h-4 w-4 text-teal-600' : 'h-4 w-4 text-red-600'} />
+   943→                <span className={isProfit ? 'text-sm text-teal-600' : 'text-sm text-red-600'}>Net Profit</span>
+   944→              </div>
+   945→              <p className={`mt-1 text-2xl font-bold ${isProfit ? 'text-teal-700' : 'text-red-700'}`}>{formatCurrency(data.profit || 0)}</p>
+   946→            </CardContent>
+   947→          </Card>
+   948→        </div>
+   949→
+   950→        <Card>
+   951→          <CardHeader>
+   952→            <CardTitle className="text-base">Profit Trend</CardTitle>
+   953→          </CardHeader>
+   954→          <CardContent>
+   955→            <ChartContainer config={profitChartConfig} className="h-[300px] w-full">
+   956→              <AreaChart data={trendData}>
+   957→                <CartesianGrid strokeDasharray="3 3" />
+   958→                <XAxis dataKey="month" />
+   959→                <YAxis />
+   960→                <ChartTooltip content={<ChartTooltipContent />} />
+   961→                <ChartLegend content={<ChartLegendContent />} />
+   962→                <Area type="monotone" dataKey="income" stroke="var(--color-income)" fill="var(--color-income)" fillOpacity={0.2} />
+   963→                <Area type="monotone" dataKey="expense" stroke="var(--color-expense)" fill="var(--color-expense)" fillOpacity={0.2} />
+   964→                <Area type="monotone" dataKey="profit" stroke="var(--color-profit)" fill="var(--color-profit)" fillOpacity={0.3} />
+   965→              </AreaChart>
+   966→            </ChartContainer>
+   967→          </CardContent>
+   968→        </Card>
+   969→      </div>
+   970→    )
+   971→  }
+   972→
+   973→  const renderCollectionReport = () => {
+   974→    const data = reportData as { totalExpected?: number; collected?: number; pending?: number; collectionRate?: number; month?: number; year?: number } | null
+   975→    if (!data) return null
+   976→
+   977→    const barData = [{
+   978→      month: MONTHS[(data.month || 1) - 1]?.label || '',
+   979→      collected: data.collected || 0,
+   980→      pending: data.pending || 0,
+   981→    }]
+   982→
+   983→    return (
+   984→      <div className="space-y-6">
+   985→        <div className="grid gap-4 md:grid-cols-4">
+   986→          <Card className="border-emerald-200 bg-emerald-50/50">
+   987→            <CardContent className="p-4">
+   988→              <span className="text-sm text-emerald-600">Total Expected</span>
+   989→              <p className="mt-1 text-2xl font-bold text-emerald-700">{formatCurrency(data.totalExpected || 0)}</p>
+   990→            </CardContent>
+   991→          </Card>
+   992→          <Card className="border-teal-200 bg-teal-50/50">
+   993→            <CardContent className="p-4">
+   994→              <span className="text-sm text-teal-600">Collected</span>
+   995→              <p className="mt-1 text-2xl font-bold text-teal-700">{formatCurrency(data.collected || 0)}</p>
+   996→            </CardContent>
+   997→          </Card>
+   998→          <Card className="border-amber-200 bg-amber-50/50">
+   999→            <CardContent className="p-4">
+  1000→              <span className="text-sm text-amber-600">Pending</span>
+  1001→              <p className="mt-1 text-2xl font-bold text-amber-700">{formatCurrency(data.pending || 0)}</p>
+  1002→            </CardContent>
+  1003→          </Card>
+  1004→          <Card className="border-cyan-200 bg-cyan-50/50">
+  1005→            <CardContent className="p-4">
+  1006→              <span className="text-sm text-cyan-600">Collection Rate</span>
+  1007→              <p className="mt-1 text-2xl font-bold text-cyan-700">{data.collectionRate || 0}%</p>
+  1008→            </CardContent>
+  1009→          </Card>
+  1010→        </div>
+  1011→
+  1012→        <Card>
+  1013→          <CardHeader>
+  1014→            <CardTitle className="text-base">Collection Overview</CardTitle>
+  1015→          </CardHeader>
+  1016→          <CardContent>
+  1017→            <ChartContainer config={collectionChartConfig} className="h-[300px] w-full">
+  1018→              <BarChart data={barData}>
+  1019→                <CartesianGrid strokeDasharray="3 3" />
+  1020→                <XAxis dataKey="month" />
+  1021→                <YAxis />
+  1022→                <ChartTooltip content={<ChartTooltipContent />} />
+  1023→                <ChartLegend content={<ChartLegendContent />} />
+  1024→                <Bar dataKey="collected" fill="var(--color-collected)" radius={[4, 4, 0, 0]} />
+  1025→                <Bar dataKey="pending" fill="var(--color-pending)" radius={[4, 4, 0, 0]} />
+  1026→              </BarChart>
+  1027→            </ChartContainer>
+  1028→          </CardContent>
+  1029→        </Card>
+  1030→      </div>
+  1031→    )
+  1032→  }
+  1033→
+  1034→  const renderDueReport = () => {
+  1035→    const data = reportData as { totalDue?: number; dues?: unknown[] } | null
+  1036→    if (!data) return null
+  1037→
+  1038→    const dues = (data.dues || []) as {
+  1039→      id: string; amount: number; status: string; dueDate: string; month: number; year: number
+  1040→      tenant?: { id: string; name: string; phone: string; room?: { name: string; number: string } }
+  1041→    }[]
+  1042→
+  1043→    return (
+  1044→      <div className="space-y-6">
+  1045→        <Card className="border-orange-200 bg-orange-50/50">
+  1046→          <CardContent className="p-4">
+  1047→            <div className="flex items-center gap-2">
+  1048→              <Receipt className="h-4 w-4 text-orange-600" />
+  1049→              <span className="text-sm text-orange-600">Total Overdue</span>
+  1050→            </div>
+  1051→            <p className="mt-1 text-2xl font-bold text-orange-700">{formatCurrency(data.totalDue || 0)}</p>
+  1052→          </CardContent>
+  1053→        </Card>
+  1054→
+  1055→        <Card>
+  1056→          <CardHeader>
+  1057→            <CardTitle className="text-base">Overdue Payments</CardTitle>
+  1058→          </CardHeader>
+  1059→          <CardContent>
+  1060→            <Table>
+  1061→              <TableHeader>
+  1062→                <TableRow>
+  1063→                  <TableHead>Tenant</TableHead>
+  1064→                  <TableHead>Room</TableHead>
+  1065→                  <TableHead>Phone</TableHead>
+  1066→                  <TableHead>Month</TableHead>
+  1067→                  <TableHead>Due Date</TableHead>
+  1068→                  <TableHead>Status</TableHead>
+  1069→                  <TableHead className="text-right">Amount</TableHead>
+  1070→                </TableRow>
+  1071→              </TableHeader>
+  1072→              <TableBody>
+  1073→                {dues.length === 0 ? (
+  1074→                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No overdue payments</TableCell></TableRow>
+  1075→                ) : (
+  1076→                  dues.map((d) => (
+  1077→                    <TableRow key={d.id}>
+  1078→                      <TableCell className="font-medium">{d.tenant?.name || 'N/A'}</TableCell>
+  1079→                      <TableCell>{d.tenant?.room?.name || 'N/A'}</TableCell>
+  1080→                      <TableCell>{d.tenant?.phone || 'N/A'}</TableCell>
+  1081→                      <TableCell>{MONTHS[d.month - 1]?.label} {d.year}</TableCell>
+  1082→                      <TableCell>{formatDate(d.dueDate)}</TableCell>
+  1083→                      <TableCell>
+  1084→                        <Badge variant={d.status === 'overdue' ? 'destructive' : 'secondary'} className="capitalize">
+  1085→                          {d.status}
+  1086→                        </Badge>
+  1087→                      </TableCell>
+  1088→                      <TableCell className="text-right font-medium">{formatCurrency(d.amount)}</TableCell>
+  1089→                    </TableRow>
+  1090→                  ))
+  1091→                )}
+  1092→              </TableBody>
+  1093→            </Table>
+  1094→          </CardContent>
+  1095→        </Card>
+  1096→      </div>
+  1097→    )
+  1098→  }
+  1099→
+  1100→  const renderVacancyReport = () => {
+  1101→    const data = reportData as { totalBeds?: number; vacantBeds?: number; occupiedBeds?: number; vacancyRate?: number; vacantBedDetails?: unknown[] } | null
+  1102→    if (!data) return null
+  1103→
+  1104→    const vacantBedDetails = (data.vacantBedDetails || []) as {
+  1105→      id: string; name: string; number: number; status: string
+  1106→      room?: { name: string; number: string; property?: { name: string } }
+  1107→    }[]
+  1108→
+  1109→    return (
+  1110→      <div className="space-y-6">
+  1111→        <div className="grid gap-4 md:grid-cols-4">
+  1112→          <Card className="border-violet-200 bg-violet-50/50">
+  1113→            <CardContent className="p-4">
+  1114→              <span className="text-sm text-violet-600">Total Beds</span>
+  1115→              <p className="mt-1 text-2xl font-bold text-violet-700">{data.totalBeds || 0}</p>
+  1116→            </CardContent>
+  1117→          </Card>
+  1118→          <Card className="border-emerald-200 bg-emerald-50/50">
+  1119→            <CardContent className="p-4">
+  1120→              <span className="text-sm text-emerald-600">Occupied</span>
+  1121→              <p className="mt-1 text-2xl font-bold text-emerald-700">{data.occupiedBeds || 0}</p>
+  1122→            </CardContent>
+  1123→          </Card>
+  1124→          <Card className="border-amber-200 bg-amber-50/50">
+  1125→            <CardContent className="p-4">
+  1126→              <span className="text-sm text-amber-600">Vacant</span>
+  1127→              <p className="mt-1 text-2xl font-bold text-amber-700">{data.vacantBeds || 0}</p>
+  1128→            </CardContent>
+  1129→          </Card>
+  1130→          <Card className="border-cyan-200 bg-cyan-50/50">
+  1131→            <CardContent className="p-4">
+  1132→              <span className="text-sm text-cyan-600">Vacancy Rate</span>
+  1133→              <p className="mt-1 text-2xl font-bold text-cyan-700">{data.vacancyRate || 0}%</p>
+  1134→            </CardContent>
+  1135→          </Card>
+  1136→        </div>
+  1137→
+  1138→        <Card>
+  1139→          <CardHeader>
+  1140→            <CardTitle className="text-base">Vacant Beds</CardTitle>
+  1141→          </CardHeader>
+  1142→          <CardContent>
+  1143→            <Table>
+  1144→              <TableHeader>
+  1145→                <TableRow>
+  1146→                  <TableHead>Bed</TableHead>
+  1147→                  <TableHead>Room</TableHead>
+  1148→                  <TableHead>Property</TableHead>
+  1149→                  <TableHead>Status</TableHead>
+  1150→                </TableRow>
+  1151→              </TableHeader>
+  1152→              <TableBody>
+  1153→                {vacantBedDetails.length === 0 ? (
+  1154→                  <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No vacant beds</TableCell></TableRow>
+  1155→                ) : (
+  1156→                  vacantBedDetails.map((b) => (
+  1157→                    <TableRow key={b.id}>
+  1158→                      <TableCell className="font-medium">{b.name}</TableCell>
+  1159→                      <TableCell>{b.room?.name || 'N/A'}</TableCell>
+  1160→                      <TableCell>{b.room?.property?.name || 'N/A'}</TableCell>
+  1161→                      <TableCell><Badge className="bg-emerald-100 text-emerald-700">Available</Badge></TableCell>
+  1162→                    </TableRow>
+  1163→                  ))
+  1164→                )}
+  1165→              </TableBody>
+  1166→            </Table>
+  1167→          </CardContent>
+  1168→        </Card>
+  1169→      </div>
+  1170→    )
+  1171→  }
+  1172→
+  1173→  const renderOccupancyReport = () => {
+  1174→    const data = reportData as { totalBeds?: number; occupiedBeds?: number; occupancyRate?: number; propertyWise?: unknown[] } | null
+  1175→    if (!data) return null
+  1176→
+  1177→    const propertyWise = (data.propertyWise || []) as { id: string; name: string; totalBeds: number; occupancy: number }[]
+  1178→
+  1179→    const pieData = [
+  1180→      { name: 'Occupied', value: data.occupiedBeds || 0 },
+  1181→      { name: 'Vacant', value: (data.totalBeds || 0) - (data.occupiedBeds || 0) },
+  1182→    ]
+  1183→
+  1184→    return (
+  1185→      <div className="space-y-6">
+  1186→        <div className="grid gap-4 md:grid-cols-3">
+  1187→          <Card className="border-emerald-200 bg-emerald-50/50">
+  1188→            <CardContent className="p-4">
+  1189→              <span className="text-sm text-emerald-600">Total Beds</span>
+  1190→              <p className="mt-1 text-2xl font-bold text-emerald-700">{data.totalBeds || 0}</p>
+  1191→            </CardContent>
+  1192→          </Card>
+  1193→          <Card className="border-teal-200 bg-teal-50/50">
+  1194→            <CardContent className="p-4">
+  1195→              <span className="text-sm text-teal-600">Occupied Beds</span>
+  1196→              <p className="mt-1 text-2xl font-bold text-teal-700">{data.occupiedBeds || 0}</p>
+  1197→            </CardContent>
+  1198→          </Card>
+  1199→          <Card className="border-cyan-200 bg-cyan-50/50">
+  1200→            <CardContent className="p-4">
+  1201→              <span className="text-sm text-cyan-600">Occupancy Rate</span>
+  1202→              <p className="mt-1 text-2xl font-bold text-cyan-700">{data.occupancyRate || 0}%</p>
+  1203→            </CardContent>
+  1204→          </Card>
+  1205→        </div>
+  1206→
+  1207→        <div className="grid gap-6 md:grid-cols-2">
+  1208→          <Card>
+  1209→            <CardHeader>
+  1210→              <CardTitle className="text-base">Occupancy Distribution</CardTitle>
+  1211→            </CardHeader>
+  1212→            <CardContent>
+  1213→              <ChartContainer config={occupancyChartConfig} className="h-[300px] w-full">
+  1214→                <PieChart>
+  1215→                  <ChartTooltip content={<ChartTooltipContent />} />
+  1216→                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+  1217→                    <Cell fill="#10b981" />
+  1218→                    <Cell fill="#e5e7eb" />
+  1219→                  </Pie>
+  1220→                  <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+  1221→                </PieChart>
+  1222→              </ChartContainer>
+  1223→            </CardContent>
+  1224→          </Card>
+  1225→
+  1226→          <Card>
+  1227→            <CardHeader>
+  1228→              <CardTitle className="text-base">Property-wise Occupancy</CardTitle>
+  1229→            </CardHeader>
+  1230→            <CardContent>
+  1231→              <Table>
+  1232→                <TableHeader>
+  1233→                  <TableRow>
+  1234→                    <TableHead>Property</TableHead>
+  1235→                    <TableHead>Total Beds</TableHead>
+  1236→                    <TableHead>Occupancy</TableHead>
+  1237→                    <TableHead>Rate</TableHead>
+  1238→                  </TableRow>
+  1239→                </TableHeader>
+  1240→                <TableBody>
+  1241→                  {propertyWise.length === 0 ? (
+  1242→                    <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No data</TableCell></TableRow>
+  1243→                  ) : (
+  1244→                    propertyWise.map((p) => (
+  1245→                      <TableRow key={p.id}>
+  1246→                        <TableCell className="font-medium">{p.name}</TableCell>
+  1247→                        <TableCell>{p.totalBeds}</TableCell>
+  1248→                        <TableCell>{p.occupancy}</TableCell>
+  1249→                        <TableCell>
+  1250→                          <Badge variant={p.totalBeds > 0 && p.occupancy / p.totalBeds > 0.7 ? 'default' : 'secondary'}>
+  1251→                            {p.totalBeds > 0 ? Math.round((p.occupancy / p.totalBeds) * 100) : 0}%
+  1252→                          </Badge>
+  1253→                        </TableCell>
+  1254→                      </TableRow>
+  1255→                    ))
+  1256→                  )}
+  1257→                </TableBody>
+  1258→              </Table>
+  1259→            </CardContent>
+  1260→          </Card>
+  1261→        </div>
+  1262→      </div>
+  1263→    )
+  1264→  }
+  1265→
+  1266→  const renderTenantLedger = () => {
+  1267→    const data = reportData as { tenantId?: string; payments?: unknown[]; totalPaid?: number; totalDue?: number; balance?: number } | null
+  1268→    if (!data) return null
+  1269→
+  1270→    const payments = (data.payments || []) as {
+  1271→      id: string; amount: number; status: string; dueDate: string; paidDate?: string; month: number; year: number; paymentMethod: string
+  1272→    }[]
+  1273→
+  1274→    return (
+  1275→      <div className="space-y-6">
+  1276→        {!filterTenantId ? (
+  1277→          <Card className="border-amber-200 bg-amber-50/50">
+  1278→            <CardContent className="p-6 text-center">
+  1279→              <Users className="h-8 w-8 text-amber-500 mx-auto mb-2" />
+  1280→              <p className="text-amber-700 font-medium">Select a tenant to view their ledger</p>
+  1281→            </CardContent>
+  1282→          </Card>
+  1283→        ) : (
+  1284→          <>
+  1285→            <div className="grid gap-4 md:grid-cols-3">
+  1286→              <Card className="border-emerald-200 bg-emerald-50/50">
+  1287→                <CardContent className="p-4">
+  1288→                  <span className="text-sm text-emerald-600">Total Paid</span>
+  1289→                  <p className="mt-1 text-2xl font-bold text-emerald-700">{formatCurrency(data.totalPaid || 0)}</p>
+  1290→                </CardContent>
+  1291→              </Card>
+  1292→              <Card className="border-rose-200 bg-rose-50/50">
+  1293→                <CardContent className="p-4">
+  1294→                  <span className="text-sm text-rose-600">Total Due</span>
+  1295→                  <p className="mt-1 text-2xl font-bold text-rose-700">{formatCurrency(data.totalDue || 0)}</p>
+  1296→                </CardContent>
+  1297→              </Card>
+  1298→              <Card className="border-teal-200 bg-teal-50/50">
+  1299→                <CardContent className="p-4">
+  1300→                  <span className="text-sm text-teal-600">Balance</span>
+  1301→                  <p className="mt-1 text-2xl font-bold text-teal-700">{formatCurrency(data.balance || 0)}</p>
+  1302→                </CardContent>
+  1303→              </Card>
+  1304→            </div>
+  1305→
+  1306→            <Card>
+  1307→              <CardHeader>
+  1308→                <CardTitle className="text-base">Transaction History</CardTitle>
+  1309→              </CardHeader>
+  1310→              <CardContent>
+  1311→                <Table>
+  1312→                  <TableHeader>
+  1313→                    <TableRow>
+  1314→                      <TableHead>Month</TableHead>
+  1315→                      <TableHead>Due Date</TableHead>
+  1316→                      <TableHead>Paid Date</TableHead>
+  1317→                      <TableHead>Method</TableHead>
+  1318→                      <TableHead>Status</TableHead>
+  1319→                      <TableHead className="text-right">Amount</TableHead>
+  1320→                    </TableRow>
+  1321→                  </TableHeader>
+  1322→                  <TableBody>
+  1323→                    {payments.length === 0 ? (
+  1324→                      <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No transactions found</TableCell></TableRow>
+  1325→                    ) : (
+  1326→                      payments.map((p) => (
+  1327→                        <TableRow key={p.id}>
+  1328→                          <TableCell className="font-medium">{MONTHS[p.month - 1]?.label} {p.year}</TableCell>
+  1329→                          <TableCell>{formatDate(p.dueDate)}</TableCell>
+  1330→                          <TableCell>{p.paidDate ? formatDate(p.paidDate) : '-'}</TableCell>
+  1331→                          <TableCell className="capitalize">{p.paymentMethod}</TableCell>
+  1332→                          <TableCell>
+  1333→                            <Badge
+  1334→                              variant={p.status === 'paid' ? 'default' : p.status === 'overdue' ? 'destructive' : 'secondary'}
+  1335→                              className="capitalize"
+  1336→                            >
+  1337→                              {p.status}
+  1338→                            </Badge>
+  1339→                          </TableCell>
+  1340→                          <TableCell className="text-right font-medium">{formatCurrency(p.amount)}</TableCell>
+  1341→                        </TableRow>
+  1342→                      ))
+  1343→                    )}
+  1344→                  </TableBody>
+  1345→                </Table>
+  1346→              </CardContent>
+  1347→            </Card>
+  1348→          </>
+  1349→        )}
+  1350→      </div>
+  1351→    )
+  1352→  }
+  1353→
+  1354→  const renderPaymentReport = () => {
+  1355→    const data = reportData as {
+  1356→      month?: number; year?: number
+  1357→      statusBreakdown?: { status: string; count: number; totalAmount: number }[]
+  1358→      methodBreakdown?: { method: string; count: number; totalAmount: number }[]
+  1359→    } | null
+  1360→    if (!data) return null
+  1361→
+  1362→    const statusData = (data.statusBreakdown || []).map((s) => ({
+  1363→      name: s.status,
+  1364→      value: s.totalAmount,
+  1365→      count: s.count,
+  1366→    }))
+  1367→
+  1368→    const methodData = (data.methodBreakdown || []).map((m) => ({
+  1369→      method: m.method,
+  1370→      count: m.count,
+  1371→      totalAmount: m.totalAmount,
+  1372→    }))
+  1373→
+  1374→    return (
+  1375→      <div className="space-y-6">
+  1376→        <div className="grid gap-6 md:grid-cols-2">
+  1377→          <Card>
+  1378→            <CardHeader>
+  1379→              <CardTitle className="text-base">Payment Status Breakdown</CardTitle>
+  1380→            </CardHeader>
+  1381→            <CardContent>
+  1382→              <ChartContainer config={paymentStatusChartConfig} className="h-[300px] w-full">
+  1383→                <PieChart>
+  1384→                  <ChartTooltip content={<ChartTooltipContent />} />
+  1385→                  <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+  1386→                    {statusData.map((_, i) => (
+  1387→                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+  1388→                    ))}
+  1389→                  </Pie>
+  1390→                  <ChartLegend content={<ChartLegendContent nameKey="name" />} />
+  1391→                </PieChart>
+  1392→              </ChartContainer>
+  1393→            </CardContent>
+  1394→          </Card>
+  1395→
+  1396→          <Card>
+  1397→            <CardHeader>
+  1398→              <CardTitle className="text-base">Payment Method Breakdown</CardTitle>
+  1399→            </CardHeader>
+  1400→            <CardContent>
+  1401→              <ChartContainer config={incomeChartConfig} className="h-[300px] w-full">
+  1402→                <BarChart data={methodData} layout="vertical">
+  1403→                  <CartesianGrid strokeDasharray="3 3" />
+  1404→                  <XAxis type="number" />
+  1405→                  <YAxis dataKey="method" type="category" width={100} />
+  1406→                  <ChartTooltip content={<ChartTooltipContent />} />
+  1407→                  <Bar dataKey="totalAmount" fill="#14b8a6" radius={[0, 4, 4, 0]} />
+  1408→                </BarChart>
+  1409→              </ChartContainer>
+  1410→            </CardContent>
+  1411→          </Card>
+  1412→        </div>
+  1413→
+  1414→        <Card>
+  1415→          <CardHeader>
+  1416→            <CardTitle className="text-base">Detailed Breakdown</CardTitle>
+  1417→          </CardHeader>
+  1418→          <CardContent>
+  1419→            <div className="grid gap-6 md:grid-cols-2">
+  1420→              <div>
+  1421→                <h4 className="font-medium mb-3">By Status</h4>
+  1422→                <Table>
+  1423→                  <TableHeader>
+  1424→                    <TableRow>
+  1425→                      <TableHead>Status</TableHead>
+  1426→                      <TableHead>Count</TableHead>
+  1427→                      <TableHead className="text-right">Amount</TableHead>
+  1428→                    </TableRow>
+  1429→                  </TableHeader>
+  1430→                  <TableBody>
+  1431→                    {statusData.map((s, i) => (
+  1432→                      <TableRow key={i}>
+  1433→                        <TableCell><Badge variant="outline" className="capitalize">{s.name}</Badge></TableCell>
+  1434→                        <TableCell>{s.count}</TableCell>
+  1435→                        <TableCell className="text-right font-medium">{formatCurrency(s.value)}</TableCell>
+  1436→                      </TableRow>
+  1437→                    ))}
+  1438→                  </TableBody>
+  1439→                </Table>
+  1440→              </div>
+  1441→              <div>
+  1442→                <h4 className="font-medium mb-3">By Method</h4>
+  1443→                <Table>
+  1444→                  <TableHeader>
+  1445→                    <TableRow>
+  1446→                      <TableHead>Method</TableHead>
+  1447→                      <TableHead>Count</TableHead>
+  1448→                      <TableHead className="text-right">Amount</TableHead>
+  1449→                    </TableRow>
+  1450→                  </TableHeader>
+  1451→                  <TableBody>
+  1452→                    {methodData.map((m, i) => (
+  1453→                      <TableRow key={i}>
+  1454→                        <TableCell className="capitalize">{m.method}</TableCell>
+  1455→                        <TableCell>{m.count}</TableCell>
+  1456→                        <TableCell className="text-right font-medium">{formatCurrency(m.totalAmount)}</TableCell>
+  1457→                      </TableRow>
+  1458→                    ))}
+  1459→                  </TableBody>
+  1460→                </Table>
+  1461→              </div>
+  1462→            </div>
+  1463→          </CardContent>
+  1464→        </Card>
+  1465→      </div>
+  1466→    )
+  1467→  }
+  1468→
+  1469→  const renderReportContent = () => {
+  1470→    switch (selectedReport) {
+  1471→      case 'income': return renderIncomeReport()
+  1472→      case 'expense': return renderExpenseReport()
+  1473→      case 'profit': return renderProfitReport()
+  1474→      case 'collection': return renderCollectionReport()
+  1475→      case 'due': return renderDueReport()
+  1476→      case 'vacancy': return renderVacancyReport()
+  1477→      case 'occupancy': return renderOccupancyReport()
+  1478→      case 'tenant_ledger': return renderTenantLedger()
+  1479→      case 'payment_report': return renderPaymentReport()
+  1480→      case 'stock_report': return <StockReport selectedPropertyId={selectedPropertyId} />
+  1481→      case 'consumption_report': return <ConsumptionReport selectedPropertyId={selectedPropertyId} />
+  1482→      case 'waste_report': return <WasteReport selectedPropertyId={selectedPropertyId} />
+  1483→      case 'kitchen_cost': return <KitchenCostReport selectedPropertyId={selectedPropertyId} />
+  1484→      case 'asset_report': return <AssetReport selectedPropertyId={selectedPropertyId} />
+  1485→      case 'low_stock': return <LowStockReport selectedPropertyId={selectedPropertyId} />
+  1486→      case 'expiry_report': return <ExpiryReport selectedPropertyId={selectedPropertyId} />
+  1487→      default: return null
+  1488→    }
+  1489→  }
+  1490→
+  1491→  // ── Loading Skeleton ────────────────────────────────────────────────────
+  1492→
+  1493→  if (loading) {
+  1494→    return (
+  1495→      <div className="p-6 space-y-6">
+  1496→        <Skeleton className="h-10 w-64" />
+  1497→        <Skeleton className="h-4 w-96" />
+  1498→        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+  1499→          {Array.from({ length: 17 }).map((_, i) => (
+  1500→            <Skeleton key={i} className="h-24 rounded-lg" />
+  1501→          ))}
+  1502→        </div>
+  1503→        <Skeleton className="h-[300px] rounded-lg" />
+  1504→        <Skeleton className="h-[200px] rounded-lg" />
+  1505→      </div>
+  1506→    )
+  1507→  }
+  1508→
+  1509→  return (
+  1510→    <div className="p-6 space-y-6">
+  1511→      {/* Header */}
+  1512→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  1513→        <div>
+  1514→          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+  1515→            <FileText className="h-6 w-6 text-emerald-600" />
+  1516→            Reports
+  1517→          </h1>
+  1518→          <p className="text-muted-foreground mt-1">Analyze your hostel business performance with detailed reports</p>
+  1519→        </div>
+  1520→        <div className="flex gap-2">
+  1521→          <Button variant="outline" size="sm" className="gap-2" disabled>
+  1522→            <FileSpreadsheet className="h-4 w-4" />
+  1523→            Export Excel
+  1524→          </Button>
+  1525→          <Button variant="outline" size="sm" className="gap-2" disabled>
+  1526→            <Download className="h-4 w-4" />
+  1527→            Export PDF
+  1528→          </Button>
+  1529→        </div>
+  1530→      </div>
+  1531→
+  1532→      {/* Report Type Selector */}
+  1533→      <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9">
+  1534→        {REPORT_TYPES.map((rt) => (
+  1535→          <button
+  1536→            key={rt.key}
+  1537→            onClick={() => setSelectedReport(rt.key)}
+  1538→            className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-center ${
+  1539→              selectedReport === rt.key
+  1540→                ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+  1541→                : 'border-gray-200 bg-white text-gray-600 hover:border-emerald-300 hover:bg-emerald-50/50'
+  1542→            }`}
+  1543→          >
+  1544→            {rt.icon}
+  1545→            <span className="text-xs font-medium">{rt.label}</span>
+  1546→          </button>
+  1547→        ))}
+  1548→      </div>
+  1549→
+  1550→      {/* Filters */}
+  1551→      <Card>
+  1552→        <CardContent className="p-4">
+  1553→          <div className="flex flex-wrap items-end gap-4">
+  1554→            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+  1555→              <Filter className="h-4 w-4 text-emerald-600" />
+  1556→              Filters
+  1557→            </div>
+  1558→            <div className="flex-1 min-w-[160px]">
+  1559→              <Label className="text-xs text-muted-foreground">Property</Label>
+  1560→              <Select value={filterProperty} onValueChange={setFilterProperty}>
+  1561→                <SelectTrigger className="mt-1">
+  1562→                  <SelectValue placeholder="All Properties" />
+  1563→                </SelectTrigger>
+  1564→                <SelectContent>
+  1565→                  <SelectItem value="all">All Properties</SelectItem>
+  1566→                  {properties.map((p) => (
+  1567→                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+  1568→                  ))}
+  1569→                </SelectContent>
+  1570→              </Select>
+  1571→            </div>
+  1572→            <div className="min-w-[140px]">
+  1573→              <Label className="text-xs text-muted-foreground">Month</Label>
+  1574→              <Select value={filterMonth} onValueChange={setFilterMonth}>
+  1575→                <SelectTrigger className="mt-1">
+  1576→                  <SelectValue />
+  1577→                </SelectTrigger>
+  1578→                <SelectContent>
+  1579→                  {MONTHS.map((m) => (
+  1580→                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+  1581→                  ))}
+  1582→                </SelectContent>
+  1583→              </Select>
+  1584→            </div>
+  1585→            <div className="min-w-[100px]">
+  1586→              <Label className="text-xs text-muted-foreground">Year</Label>
+  1587→              <Select value={filterYear} onValueChange={setFilterYear}>
+  1588→                <SelectTrigger className="mt-1">
+  1589→                  <SelectValue />
+  1590→                </SelectTrigger>
+  1591→                <SelectContent>
+  1592→                  <SelectItem value="2024">2024</SelectItem>
+  1593→                  <SelectItem value="2025">2025</SelectItem>
+  1594→                  <SelectItem value="2026">2026</SelectItem>
+  1595→                </SelectContent>
+  1596→              </Select>
+  1597→            </div>
+  1598→            {selectedReport === 'tenant_ledger' && (
+  1599→              <div className="min-w-[200px]">
+  1600→                <Label className="text-xs text-muted-foreground">Tenant</Label>
+  1601→                <Select value={filterTenantId} onValueChange={setFilterTenantId}>
+  1602→                  <SelectTrigger className="mt-1">
+  1603→                    <SelectValue placeholder="Select Tenant" />
+  1604→                  </SelectTrigger>
+  1605→                  <SelectContent>
+  1606→                    {tenants.map((t) => (
+  1607→                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+  1608→                    ))}
+  1609→                  </SelectContent>
+  1610→                </Select>
+  1611→              </div>
+  1612→            )}
+  1613→          </div>
+  1614→        </CardContent>
+  1615→      </Card>
+  1616→
+  1617→      {/* Report Content */}
+  1618→      {reportLoading ? (
+  1619→        <div className="space-y-6">
+  1620→          <div className="grid gap-4 md:grid-cols-3">
+  1621→            {Array.from({ length: 3 }).map((_, i) => (
+  1622→              <Skeleton key={i} className="h-24 rounded-lg" />
+  1623→            ))}
+  1624→          </div>
+  1625→          <Skeleton className="h-[300px] rounded-lg" />
+  1626→          <Skeleton className="h-[200px] rounded-lg" />
+  1627→        </div>
+  1628→      ) : (
+  1629→        renderReportContent()
+  1630→      )}
+  1631→    </div>
+  1632→  )
+  1633→}
+  1634→

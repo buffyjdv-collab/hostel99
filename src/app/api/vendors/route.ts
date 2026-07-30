@@ -93,3 +93,40 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to update vendor' }, { status: 500 })
   }
 }
+
+// DELETE /api/vendors
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json()
+    const { id } = data
+
+    if (!id) {
+      return NextResponse.json({ error: 'Vendor id is required' }, { status: 400 })
+    }
+
+    const existingVendor = await db.vendor.findUnique({
+      where: { id },
+      include: { purchaseOrders: true, quotations: true },
+    })
+    if (!existingVendor) {
+      return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+    }
+
+    // Check for existing purchase orders
+    if (existingVendor.purchaseOrders.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete vendor with existing purchase orders. Please remove or reassign orders first.' },
+        { status: 400 }
+      )
+    }
+
+    // Delete quotations first, then the vendor
+    await db.vendorQuotation.deleteMany({ where: { vendorId: id } })
+    await db.vendor.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Vendor deleted successfully', id })
+  } catch (error) {
+    console.error('Vendors DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete vendor' }, { status: 500 })
+  }
+}

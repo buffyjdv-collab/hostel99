@@ -1,0 +1,907 @@
+     1→generator client {
+     2→  provider = "prisma-client-js"
+     3→}
+     4→
+     5→datasource db {
+     6→  provider = "postgresql"
+     7→  url      = env("DATABASE_URL")
+     8→}
+     9→
+    10→// ─── User & Auth ───────────────────────────────────────────
+    11→model User {
+    12→  id            String   @id @default(cuid())
+    13→  email         String   @unique
+    14→  name          String
+    15→  phone         String?
+    16→  password      String
+    17→  role          String   @default("manager") // super_admin, owner, manager, staff, tenant
+    18→  avatar        String?
+    19→  isActive      Boolean  @default(true)
+    20→  lastLogin     DateTime?
+    21→  createdAt     DateTime @default(now())
+    22→  updatedAt     DateTime @updatedAt
+    23→
+    24→  ownedProperties     Property[]      @relation("PropertyOwner")
+    25→  staffProfile        Staff?
+    26→  tenantProfile       Tenant?
+    27→  ledActivities       ActivityLog[]
+    28→  createdLeads        Lead[]              @relation("LeadCreator")
+    29→  assignedLeads       Lead[]              @relation("LeadAssignee")
+    30→  complaints          Complaint[]         @relation("ComplaintCreator")
+    31→  assignedComplaints  Complaint[]         @relation("ComplaintAssignee")
+    32→  expenses            Expense[]           @relation("ExpenseCreator")
+    33→  notices             Notice[]            @relation("NoticeCreator")
+    34→  sentMessages        Communication[]     @relation("MessageSender")
+    35→  visitors            Visitor[]           @relation("VisitorHost")
+    36→  attendance          Attendance[]
+    37→  prRequested         PurchaseRequisition[] @relation("PRRequestor")
+    38→  prApproved          PurchaseRequisition[] @relation("PRApprover")
+    39→  poCreated           PurchaseOrder[] @relation("POCreator")
+    40→  poApproved          PurchaseOrder[] @relation("POApprover")
+    41→  grnReceived         GoodsReceivedNote[] @relation("GRNReceiver")
+    42→  stockTransactions   StockTransaction[] @relation("StockTransactionUser")
+    43→  kitchenIssued       KitchenIssue[] @relation("KitchenIssuer")
+    44→  attendanceMarked    MessAttendance[] @relation("AttendanceMarker")
+    45→  wasteRecorded       WasteRecord[] @relation("WasteRecorder")
+    46→}
+    47→
+    48→// ─── Property Management ───────────────────────────────────
+    49→model Property {
+    50→  id          String   @id @default(cuid())
+    51→  name        String
+    52→  type        String   @default("pg") // pg, hostel, co_living, apartment
+    53→  address     String
+    54→  city        String
+    55→  state       String?
+    56→  pincode     String?
+    57→  landmark    String?
+    58→  description String?
+    59→  totalRooms  Int      @default(0)
+    60→  totalBeds   Int      @default(0)
+    61→  occupancy   Int      @default(0)
+    62→  amenities   String?
+    63→  images      String?
+    64→  isActive    Boolean  @default(true)
+    65→  ownerId     String
+    66→  owner       User     @relation("PropertyOwner", fields: [ownerId], references: [id])
+    67→  createdAt   DateTime @default(now())
+    68→  updatedAt   DateTime @updatedAt
+    69→
+    70→  buildings         Building[]
+    71→  floors            Floor[]
+    72→  rooms             Room[]
+    73→  leads             Lead[]
+    74→  tenants           Tenant[]
+    75→  expenses          Expense[]
+    76→  staff             Staff[]
+    77→  notices           Notice[]
+    78→  visitors          Visitor[]
+    79→  inventoryCategories InventoryCategory[]
+    80→  inventoryItems    InventoryItem[]
+    81→  vendors           Vendor[]
+    82→  vendorQuotations  VendorQuotation[]
+    83→  purchaseRequisitions PurchaseRequisition[]
+    84→  purchaseOrders    PurchaseOrder[]
+    85→  goodsReceivedNotes GoodsReceivedNote[]
+    86→  stockTransactions StockTransaction[]
+    87→  menuPlans         MenuPlan[]
+    88→  recipes           Recipe[]
+    89→  kitchenIssues     KitchenIssue[]
+    90→  messAttendance    MessAttendance[]
+    91→  consumptionLogs   ConsumptionLog[]
+    92→  wasteRecords      WasteRecord[]
+    93→  assets            Asset[]
+    94→  laundryItems      LaundryItem[]
+    95→  housekeepingItems HousekeepingItem[]
+    96→}
+    97→
+    98→model Building {
+    99→  id          String   @id @default(cuid())
+   100→  name        String
+   101→  propertyId  String
+   102→  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   103→  wings       String?
+   104→  totalFloors Int      @default(0)
+   105→  createdAt   DateTime @default(now())
+   106→  updatedAt   DateTime @updatedAt
+   107→
+   108→  floors Floor[]
+   109→  rooms  Room[]
+   110→}
+   111→
+   112→model Floor {
+   113→  id         String   @id @default(cuid())
+   114→  name       String
+   115→  number     Int
+   116→  buildingId String
+   117→  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+   118→  propertyId String
+   119→  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   120→  wing       String?
+   121→  createdAt  DateTime @default(now())
+   122→  updatedAt  DateTime @updatedAt
+   123→
+   124→  rooms Room[]
+   125→}
+   126→
+   127→model Room {
+   128→  id           String   @id @default(cuid())
+   129→  name         String
+   130→  number       String
+   131→  floorId      String
+   132→  floor        Floor    @relation(fields: [floorId], references: [id], onDelete: Cascade)
+   133→  buildingId   String
+   134→  building     Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+   135→  propertyId   String
+   136→  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+   137→  sharingType  String   @default("single") // single, double, triple, four_sharing
+   138→  roomType     String   @default("non_ac") // ac, non_ac, deluxe, premium
+   139→  totalBeds    Int      @default(1)
+   140→  occupiedBeds Int      @default(0)
+   141→  rent         Float    @default(0)
+   142→  deposit      Float    @default(0)
+   143→  amenities    String?
+   144→  status       String   @default("available") // available, occupied, maintenance, blocked
+   145→  images       String?
+   146→  createdAt    DateTime @default(now())
+   147→  updatedAt    DateTime @updatedAt
+   148→
+   149→  beds      Bed[]
+   150→  tenants   Tenant[]
+   151→  bookings  Booking[]
+   152→  assets    Asset[]
+   153→  laundryItems LaundryItem[]
+   154→}
+   155→
+   156→model Bed {
+   157→  id         String   @id @default(cuid())
+   158→  name       String
+   159→  number     Int
+   160→  roomId     String
+   161→  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+   162→  status     String   @default("available") // available, occupied, blocked, maintenance
+   163→  tenantId   String?  @unique
+   164→  tenant     Tenant?  @relation("BedTenant")
+   165→  createdAt  DateTime @default(now())
+   166→  updatedAt  DateTime @updatedAt
+   167→}
+   168→
+   169→// ─── Lead CRM ──────────────────────────────────────────────
+   170→model Lead {
+   171→  id             String   @id @default(cuid())
+   172→  name           String
+   173→  email          String?
+   174→  phone          String
+   175→  source         String   @default("website") // website, whatsapp, referral, walk_in, google, social_media
+   176→  status         String   @default("lead") // lead, inquiry, site_visit, negotiation, token, booking, move_in, lost
+   177→  stage          Int      @default(1)
+   178→  propertyId     String
+   179→  property       Property @relation(fields: [propertyId], references: [id])
+   180→  roomPreference String?
+   181→  budget         Float?
+   182→  visitDate      DateTime?
+   183→  visitNotes     String?
+   184→  followUpDate   DateTime?
+   185→  followUpNotes  String?
+   186→  tokenAmount    Float?
+   187→  notes          String?
+   188→  lostReason     String?
+   189→  assignedToId   String?
+   190→  assignedTo     User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+   191→  createdById    String
+   192→  createdBy      User     @relation("LeadCreator", fields: [createdById], references: [id])
+   193→  createdAt      DateTime @default(now())
+   194→  updatedAt      DateTime @updatedAt
+   195→
+   196→  bookings Booking[]
+   197→}
+   198→
+   199→// ─── Tenant Management ─────────────────────────────────────
+   200→model Tenant {
+   201→  id               String   @id @default(cuid())
+   202→  userId           String?  @unique
+   203→  user             User?    @relation(fields: [userId], references: [id])
+   204→  name             String
+   205→  email            String?
+   206→  phone            String
+   207→  emergencyContact String?
+   208→  emergencyPhone   String?
+   209→  fatherName       String?
+   210→  motherName       String?
+   211→  aadhaarNumber    String?
+   212→  panNumber        String?
+   213→  passportNumber   String?
+   214→  dateOfBirth      DateTime?
+   215→  gender           String?
+   216→  occupation       String?
+   217→  company          String?
+   218→  permanentAddress String?
+   219→  kycStatus        String   @default("pending") // pending, verified, rejected
+   220→  policeVerified   Boolean  @default(false)
+   221→  agreementStatus  String   @default("pending") // pending, signed, expired
+   222→  agreementStart   DateTime?
+   223→  agreementEnd     DateTime?
+   224→  propertyId       String
+   225→  property         Property @relation(fields: [propertyId], references: [id])
+   226→  roomId           String?
+   227→  room             Room?    @relation(fields: [roomId], references: [id])
+   228→  bedId            String?  @unique
+   229→  bed              Bed?     @relation("BedTenant", fields: [bedId], references: [id])
+   230→  checkInDate      DateTime?
+   231→  checkOutDate     DateTime?
+   232→  status           String   @default("active") // active, inactive, notice_period, moved_out
+   233→  rentAmount       Float    @default(0)
+   234→  depositAmount    Float    @default(0)
+   235→  depositStatus    String   @default("pending") // pending, paid, refunded, partially_refunded
+   236→  createdAt        DateTime @default(now())
+   237→  updatedAt        DateTime @updatedAt
+   238→
+   239→  payments     Payment[]
+   240→  complaints   Complaint[]
+   241→  visitors     Visitor[]
+   242→  documents    Document[]
+   243→  bookings     Booking[]
+   244→  messAttendance MessAttendance[]
+   245→}
+   246→
+   247→// ─── Booking & Check-in ────────────────────────────────────
+   248→model Booking {
+   249→  id           String   @id @default(cuid())
+   250→  leadId       String?
+   251→  lead         Lead?    @relation(fields: [leadId], references: [id])
+   252→  tenantId     String?
+   253→  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+   254→  roomId       String
+   255→  room         Room     @relation(fields: [roomId], references: [id])
+   256→  propertyId   String
+   257→  checkInDate  DateTime
+   258→  checkOutDate DateTime?
+   259→  status       String   @default("confirmed") // confirmed, checked_in, checked_out, cancelled
+   260→  bookingType  String   @default("new") // new, renewal, transfer
+   261→  tokenAmount  Float    @default(0)
+   262→  createdAt    DateTime @default(now())
+   263→  updatedAt    DateTime @updatedAt
+   264→}
+   265→
+   266→// ─── Rent & Payment ────────────────────────────────────────
+   267→model Payment {
+   268→  id             String   @id @default(cuid())
+   269→  tenantId       String
+   270→  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+   271→  propertyId     String
+   272→  amount         Float
+   273→  rentAmount     Float    @default(0)
+   274→  electricity    Float    @default(0)
+   275→  water          Float    @default(0)
+   276→  wifi           Float    @default(0)
+   277→  food           Float    @default(0)
+   278→  laundry        Float    @default(0)
+   279→  parking        Float    @default(0)
+   280→  otherCharges   Float    @default(0)
+   281→  lateFine       Float    @default(0)
+   282→  discount       Float    @default(0)
+   283→  advanceAdjust  Float    @default(0)
+   284→  paymentMethod  String   @default("upi") // upi, bank_transfer, card, wallet, cash, qr
+   285→  paymentType    String   @default("rent") // rent, deposit, token, other
+   286→  status         String   @default("pending") // pending, paid, failed, overdue
+   287→  dueDate        DateTime
+   288→  paidDate       DateTime?
+   289→  receiptNumber  String?
+   290→  utrNumber      String?
+   291→  notes          String?
+   292→  month          Int
+   293→  year           Int
+   294→  createdAt      DateTime @default(now())
+   295→  updatedAt      DateTime @updatedAt
+   296→}
+   297→
+   298→// ─── Complaint Management ──────────────────────────────────
+   299→model Complaint {
+   300→  id           String   @id @default(cuid())
+   301→  title        String
+   302→  description  String
+   303→  category     String   @default("maintenance") // maintenance, cleanliness, noise, food, staff, other
+   304→  priority     String   @default("medium") // low, medium, high, urgent
+   305→  status       String   @default("open") // open, assigned, in_progress, resolved, closed
+   306→  rating       Int?
+   307→  resolution   String?
+   308→  propertyId   String
+   309→  tenantId     String
+   310→  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+   311→  assignedToId String?
+   312→  assignedTo   User?    @relation("ComplaintAssignee", fields: [assignedToId], references: [id])
+   313→  createdById  String
+   314→  createdBy    User     @relation("ComplaintCreator", fields: [createdById], references: [id])
+   315→  createdAt    DateTime @default(now())
+   316→  updatedAt    DateTime @updatedAt
+   317→
+   318→  activities ActivityLog[]
+   319→}
+   320→
+   321→// ─── Staff Management ──────────────────────────────────────
+   322→model Staff {
+   323→  id            String   @id @default(cuid())
+   324→  userId        String?  @unique
+   325→  user          User?    @relation(fields: [userId], references: [id])
+   326→  name          String
+   327→  phone         String
+   328→  role          String   @default("caretaker") // caretaker, housekeeping, maintenance, security, cook, manager
+   329→  propertyId    String
+   330→  property      Property @relation(fields: [propertyId], references: [id])
+   331→  salary        Float    @default(0)
+   332→  joinDate      DateTime?
+   333→  status        String   @default("active") // active, inactive, on_leave
+   334→  aadhaarNumber String?
+   335→  address       String?
+   336→  createdAt     DateTime @default(now())
+   337→  updatedAt     DateTime @updatedAt
+   338→
+   339→  attendance     Attendance[]
+   340→  salaryPayments SalaryPayment[]
+   341→}
+   342→
+   343→model Attendance {
+   344→  id        String   @id @default(cuid())
+   345→  staffId   String
+   346→  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+   347→  userId    String?
+   348→  user      User?    @relation(fields: [userId], references: [id])
+   349→  date      DateTime
+   350→  checkIn   DateTime?
+   351→  checkOut  DateTime?
+   352→  status    String   @default("present") // present, absent, half_day, leave
+   353→  notes     String?
+   354→  createdAt DateTime @default(now())
+   355→  updatedAt DateTime @updatedAt
+   356→}
+   357→
+   358→model SalaryPayment {
+   359→  id        String   @id @default(cuid())
+   360→  staffId   String
+   361→  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+   362→  amount    Float
+   363→  month     Int
+   364→  year      Int
+   365→  status    String   @default("paid") // paid, pending, processing
+   366→  paidDate  DateTime?
+   367→  notes     String?
+   368→  createdAt DateTime @default(now())
+   369→  updatedAt DateTime @updatedAt
+   370→}
+   371→
+   372→// ─── Accounting ────────────────────────────────────────────
+   373→model Expense {
+   374→  id          String   @id @default(cuid())
+   375→  category    String   @default("maintenance") // maintenance, utilities, salary, supplies, food, marketing, other
+   376→  description String
+   377→  amount      Float
+   378→  date        DateTime
+   379→  vendor      String?
+   380→  propertyId  String
+   381→  property    Property @relation(fields: [propertyId], references: [id])
+   382→  createdById String
+   383→  createdBy   User     @relation("ExpenseCreator", fields: [createdById], references: [id])
+   384→  receipt     String?
+   385→  status      String   @default("approved") // pending, approved, rejected
+   386→  createdAt   DateTime @default(now())
+   387→  updatedAt   DateTime @updatedAt
+   388→}
+   389→
+   390→// ─── Communication ─────────────────────────────────────────
+   391→model Notice {
+   392→  id          String   @id @default(cuid())
+   393→  title       String
+   394→  content     String
+   395→  type        String   @default("general") // general, urgent, maintenance, event, payment
+   396→  propertyId  String
+   397→  property    Property @relation(fields: [propertyId], references: [id])
+   398→  createdById String
+   399→  createdBy   User     @relation("NoticeCreator", fields: [createdById], references: [id])
+   400→  isActive    Boolean  @default(true)
+   401→  expiryDate  DateTime?
+   402→  createdAt   DateTime @default(now())
+   403→  updatedAt   DateTime @updatedAt
+   404→}
+   405→
+   406→model Communication {
+   407→  id            String   @id @default(cuid())
+   408→  type          String   @default("whatsapp") // whatsapp, sms, email, push, announcement
+   409→  message       String
+   410→  recipientType String   @default("all") // all, tenants, staff, specific
+   411→  recipientId   String?
+   412→  propertyId    String?
+   413→  senderId      String
+   414→  sender        User     @relation("MessageSender", fields: [senderId], references: [id])
+   415→  status        String   @default("sent") // sent, delivered, failed, read
+   416→  sentAt        DateTime @default(now())
+   417→  createdAt     DateTime @default(now())
+   418→  updatedAt     DateTime @updatedAt
+   419→}
+   420→
+   421→// ─── Visitor Management ────────────────────────────────────
+   422→model Visitor {
+   423→  id         String   @id @default(cuid())
+   424→  name       String
+   425→  phone      String?
+   426→  purpose    String
+   427→  tenantId   String?
+   428→  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+   429→  hostId     String?
+   430→  host       User?    @relation("VisitorHost", fields: [hostId], references: [id])
+   431→  propertyId String
+   432→  property   Property @relation(fields: [propertyId], references: [id])
+   433→  checkIn    DateTime
+   434→  checkOut   DateTime?
+   435→  status     String   @default("checked_in") // checked_in, checked_out
+   436→  createdAt  DateTime @default(now())
+   437→  updatedAt  DateTime @updatedAt
+   438→}
+   439→
+   440→// ─── Documents ─────────────────────────────────────────────
+   441→model Document {
+   442→  id         String   @id @default(cuid())
+   443→  name       String
+   444→  type       String   @default("identity") // identity, agreement, receipt, photo, other
+   445→  fileUrl    String
+   446→  tenantId   String?
+   447→  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+   448→  propertyId String?
+   449→  uploadedAt DateTime @default(now())
+   450→  createdAt  DateTime @default(now())
+   451→  updatedAt  DateTime @updatedAt
+   452→}
+   453→
+   454→// ─── Activity Log ──────────────────────────────────────────
+   455→model ActivityLog {
+   456→  id          String   @id @default(cuid())
+   457→  action      String
+   458→  details     String?
+   459→  entityType  String
+   460→  entityId    String?
+   461→  userId      String?
+   462→  user        User?    @relation(fields: [userId], references: [id])
+   463→  complaintId String?
+   464→  complaint   Complaint? @relation(fields: [complaintId], references: [id])
+   465→  createdAt   DateTime @default(now())
+   466→}
+   467→
+   468→// ─── Subscription ──────────────────────────────────────────
+   469→model Subscription {
+   470→  id        String   @id @default(cuid())
+   471→  userId    String
+   472→  plan      String   @default("basic") // basic, premium, gold, white_label
+   473→  status    String   @default("active") // active, expired, cancelled, trial
+   474→  startDate DateTime
+   475→  endDate   DateTime?
+   476→  amount    Float    @default(0)
+   477→  autoRenew Boolean  @default(true)
+   478→  createdAt DateTime @default(now())
+   479→  updatedAt DateTime @updatedAt
+   480→}
+   481→
+   482→// ─── Inventory Management ──────────────────────────────────
+   483→model InventoryCategory {
+   484→  id          String   @id @default(cuid())
+   485→  name        String
+   486→  slug        String   @unique
+   487→  description String?
+   488→  icon        String?
+   489→  propertyId  String
+   490→  property    Property @relation(fields: [propertyId], references: [id])
+   491→  createdAt   DateTime @default(now())
+   492→  updatedAt   DateTime @updatedAt
+   493→
+   494→  items InventoryItem[]
+   495→}
+   496→
+   497→model InventoryItem {
+   498→  id           String   @id @default(cuid())
+   499→  name         String
+   500→  sku          String?
+   501→  categoryId   String
+   502→  category     InventoryCategory @relation(fields: [categoryId], references: [id])
+   503→  propertyId   String
+   504→  property     Property @relation(fields: [propertyId], references: [id])
+   505→  unit         String   @default("kg") // kg, l, pcs, pack, box, bottle, can, cylinder
+   506→  unitPrice    Float    @default(0)
+   507→  currentStock Float    @default(0)
+   508→  openingStock Float    @default(0)
+   509→  minStock     Float    @default(0)   // low-stock alert threshold
+   510→  maxStock     Float?
+   511→  reorderLevel Float?
+   512→  batchNumber  String?
+   513→  expiryDate   DateTime?
+   514→  storeLocation String?
+   515→  gstRate      Float    @default(0)
+   516→  hsnCode      String?
+   517→  isActive     Boolean  @default(true)
+   518→  createdAt    DateTime @default(now())
+   519→  updatedAt    DateTime @updatedAt
+   520→
+   521→  stockTransactions  StockTransaction[]
+   522→  purchaseOrderItems PurchaseOrderItem[]
+   523→  kitchenIssues     KitchenIssue[]
+   524→  recipeItems       RecipeItem[]
+   525→  consumptionLogs   ConsumptionLog[]
+   526→  wasteRecords      WasteRecord[]
+   527→}
+   528→
+   529→model Vendor {
+   530→  id            String   @id @default(cuid())
+   531→  name          String
+   532→  contactPerson String?
+   533→  phone         String
+   534→  email         String?
+   535→  address       String?
+   536→  city          String?
+   537→  state         String?
+   538→  pincode       String?
+   539→  gstNumber     String?
+   540→  panNumber     String?
+   541→  bankName      String?
+   542→  bankAccount   String?
+   543→  ifscCode      String?
+   544→  paymentTerms  String?
+   545→  rating        Int      @default(0) // 1-5
+   546→  status        String   @default("active") // active, inactive, blacklisted
+   547→  propertyId    String
+   548→  property      Property @relation(fields: [propertyId], references: [id])
+   549→  createdAt     DateTime @default(now())
+   550→  updatedAt     DateTime @updatedAt
+   551→
+   552→  purchaseOrders PurchaseOrder[]
+   553→  quotations     VendorQuotation[]
+   554→}
+   555→
+   556→model VendorQuotation {
+   557→  id          String   @id @default(cuid())
+   558→  vendorId    String
+   559→  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+   560→  itemId      String?
+   561→  itemName    String
+   562→  quantity    Float
+   563→  unitPrice   Float
+   564→  validTill   DateTime?
+   565→  status      String   @default("pending") // pending, accepted, rejected, expired
+   566→  notes       String?
+   567→  propertyId  String
+   568→  property    Property @relation(fields: [propertyId], references: [id])
+   569→  createdAt   DateTime @default(now())
+   570→  updatedAt   DateTime @updatedAt
+   571→}
+   572→
+   573→model PurchaseRequisition {
+   574→  id          String   @id @default(cuid())
+   575→  prNumber    String   @unique
+   576→  title       String
+   577→  description String?
+   578→  propertyId  String
+   579→  property    Property @relation(fields: [propertyId], references: [id])
+   580→  requestedById String
+   581→  requestedBy User     @relation("PRRequestor", fields: [requestedById], references: [id])
+   582→  approvedById String?
+   583→  approvedBy  User?    @relation("PRApprover", fields: [approvedById], references: [id])
+   584→  status      String   @default("draft") // draft, submitted, approved, rejected, cancelled, converted
+   585→  priority    String   @default("normal") // low, normal, high, urgent
+   586→  requiredBy  DateTime?
+   587→  approvedAt  DateTime?
+   588→  notes       String?
+   589→  createdAt   DateTime @default(now())
+   590→  updatedAt   DateTime @updatedAt
+   591→
+   592→  items PurchaseRequisitionItem[]
+   593→}
+   594→
+   595→model PurchaseRequisitionItem {
+   596→  id             String   @id @default(cuid())
+   597→  requisitionId  String
+   598→  requisition    PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+   599→  itemName       String
+   600→  description    String?
+   601→  quantity       Float
+   602→  unit           String
+   603→  estimatedPrice Float?
+   604→  notes          String?
+   605→}
+   606→
+   607→model PurchaseOrder {
+   608→  id              String   @id @default(cuid())
+   609→  poNumber        String   @unique
+   610→  vendorId        String
+   611→  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+   612→  propertyId      String
+   613→  property        Property @relation(fields: [propertyId], references: [id])
+   614→  createdById     String
+   615→  createdBy       User     @relation("POCreator", fields: [createdById], references: [id])
+   616→  approvedById    String?
+   617→  approvedBy      User?    @relation("POApprover", fields: [approvedById], references: [id])
+   618→  status          String   @default("draft") // draft, submitted, approved, partially_received, received, cancelled
+   619→  orderDate       DateTime @default(now())
+   620→  expectedDelivery DateTime?
+   621→  totalAmount     Float    @default(0)
+   622→  gstAmount       Float    @default(0)
+   623→  discount        Float    @default(0)
+   624→  netAmount       Float    @default(0)
+   625→  paymentStatus   String   @default("unpaid") // unpaid, partial, paid
+   626→  paymentMode     String?
+   627→  notes           String?
+   628→  createdAt       DateTime @default(now())
+   629→  updatedAt       DateTime @updatedAt
+   630→
+   631→  items              PurchaseOrderItem[]
+   632→  goodsReceivedNotes GoodsReceivedNote[]
+   633→}
+   634→
+   635→model PurchaseOrderItem {
+   636→  id          String   @id @default(cuid())
+   637→  purchaseOrderId String
+   638→  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+   639→  itemId      String?
+   640→  item        InventoryItem? @relation(fields: [itemId], references: [id])
+   641→  itemName    String
+   642→  description String?
+   643→  quantity    Float
+   644→  unit        String
+   645→  unitPrice   Float
+   646→  gstRate     Float    @default(0)
+   647→  totalPrice  Float
+   648→  receivedQty Float    @default(0)
+   649→  status      String   @default("pending") // pending, partially_received, received, returned
+   650→}
+   651→
+   652→model GoodsReceivedNote {
+   653→  id              String   @id @default(cuid())
+   654→  grnNumber       String   @unique
+   655→  purchaseOrderId String
+   656→  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+   657→  propertyId      String
+   658→  property        Property @relation(fields: [propertyId], references: [id])
+   659→  receivedById    String
+   660→  receivedBy      User     @relation("GRNReceiver", fields: [receivedById], references: [id])
+   661→  receivedDate    DateTime @default(now())
+   662→  invoiceNumber   String?
+   663→  invoiceDate     DateTime?
+   664→  invoiceAmount   Float?
+   665→  status          String   @default("pending_inspection") // pending_inspection, accepted, partially_accepted, rejected
+   666→  notes           String?
+   667→  createdAt       DateTime @default(now())
+   668→  updatedAt       DateTime @updatedAt
+   669→
+   670→  items GoodsReceivedNoteItem[]
+   671→}
+   672→
+   673→model GoodsReceivedNoteItem {
+   674→  id           String   @id @default(cuid())
+   675→  grnId        String
+   676→  grn          GoodsReceivedNote @relation(fields: [grnId], references: [id], onDelete: Cascade)
+   677→  poItemId     String?
+   678→  itemName     String
+   679→  orderedQty   Float
+   680→  receivedQty  Float
+   681→  acceptedQty  Float
+   682→  rejectedQty  Float    @default(0)
+   683→  unitPrice    Float
+   684→  batchNumber  String?
+   685→  expiryDate   DateTime?
+   686→  notes        String?
+   687→}
+   688→
+   689→model StockTransaction {
+   690→  id            String   @id @default(cuid())
+   691→  itemId        String
+   692→  item          InventoryItem @relation(fields: [itemId], references: [id])
+   693→  propertyId    String
+   694→  property      Property @relation(fields: [propertyId], references: [id])
+   695→  type          String   // purchase, issue, adjustment, transfer_in, transfer_out, return, opening, closing, damage, expiry
+   696→  quantity      Float    // positive for in, negative for out
+   697→  previousStock Float
+   698→  newStock      Float
+   699→  unitPrice     Float?
+   700→  reference     String?  // PO number, GRN number, issue slip number
+   701→  referenceId   String?  // ID of related PO/GRN/Issue
+   702→  batchNumber   String?
+   703→  expiryDate    DateTime?
+   704→  notes         String?
+   705→  performedById String?
+   706→  performedBy   User?    @relation("StockTransactionUser", fields: [performedById], references: [id])
+   707→  createdAt     DateTime @default(now())
+   708→}
+   709→
+   710→model MenuPlan {
+   711→  id          String   @id @default(cuid())
+   712→  date        DateTime
+   713→  mealType    String   // breakfast, lunch, snacks, dinner
+   714→  propertyId  String
+   715→  property    Property @relation(fields: [propertyId], references: [id])
+   716→  headCount   Int      @default(0)
+   717→  status      String   @default("planned") // planned, preparing, served, completed
+   718→  notes       String?
+   719→  createdAt   DateTime @default(now())
+   720→  updatedAt   DateTime @updatedAt
+   721→
+   722→  items MenuPlanItem[]
+   723→}
+   724→
+   725→model MenuPlanItem {
+   726→  id         String   @id @default(cuid())
+   727→  menuPlanId String
+   728→  menuPlan   MenuPlan @relation(fields: [menuPlanId], references: [id], onDelete: Cascade)
+   729→  recipeId   String?
+   730→  recipe     Recipe?  @relation(fields: [recipeId], references: [id])
+   731→  dishName   String
+   732→  servings   Int      @default(1)
+   733→  notes      String?
+   734→}
+   735→
+   736→model Recipe {
+   737→  id          String   @id @default(cuid())
+   738→  name        String
+   739→  category    String   @default("veg") // veg, non_veg, vegan
+   740→  mealType    String   @default("lunch") // breakfast, lunch, snacks, dinner
+   741→  baseServings Int     @default(100)
+   742→  instructions String?
+   743→  propertyId  String
+   744→  property    Property @relation(fields: [propertyId], references: [id])
+   745→  isActive    Boolean  @default(true)
+   746→  createdAt   DateTime @default(now())
+   747→  updatedAt   DateTime @updatedAt
+   748→
+   749→  ingredients RecipeItem[]
+   750→  menuItems   MenuPlanItem[]
+   751→}
+   752→
+   753→model RecipeItem {
+   754→  id         String   @id @default(cuid())
+   755→  recipeId   String
+   756→  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+   757→  itemId     String
+   758→  item       InventoryItem @relation(fields: [itemId], references: [id])
+   759→  quantity   Float    // quantity for baseServings
+   760→  unit       String
+   761→  notes      String?
+   762→}
+   763→
+   764→model KitchenIssue {
+   765→  id          String   @id @default(cuid())
+   766→  issueNumber String   @unique
+   767→  itemId      String
+   768→  item        InventoryItem @relation(fields: [itemId], references: [id])
+   769→  propertyId  String
+   770→  property    Property @relation(fields: [propertyId], references: [id])
+   771→  quantity    Float
+   772→  unit        String
+   773→  issuedTo    String   // kitchen, staff name
+   774→  purpose     String?  // breakfast, lunch, dinner, snacks, special
+   775→  menuPlanId  String?
+   776→  menuDate    DateTime?
+   777→  issuedById  String
+   778→  issuedBy    User     @relation("KitchenIssuer", fields: [issuedById], references: [id])
+   779→  notes       String?
+   780→  createdAt   DateTime @default(now())
+   781→  updatedAt   DateTime @updatedAt
+   782→}
+   783→
+   784→model MessAttendance {
+   785→  id          String   @id @default(cuid())
+   786→  date        DateTime
+   787→  mealType    String   // breakfast, lunch, snacks, dinner
+   788→  propertyId  String
+   789→  property    Property @relation(fields: [propertyId], references: [id])
+   790→  tenantId    String?
+   791→  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+   792→  present     Boolean  @default(false)
+   793→  guestCount  Int      @default(0)
+   794→  notes       String?
+   795→  markedById  String?
+   796→  markedBy    User?    @relation("AttendanceMarker", fields: [markedById], references: [id])
+   797→  createdAt   DateTime @default(now())
+   798→  updatedAt   DateTime @updatedAt
+   799→}
+   800→
+   801→model ConsumptionLog {
+   802→  id          String   @id @default(cuid())
+   803→  date        DateTime
+   804→  itemId      String
+   805→  item        InventoryItem @relation(fields: [itemId], references: [id])
+   806→  propertyId  String
+   807→  property    Property @relation(fields: [propertyId], references: [id])
+   808→  mealType    String?  // breakfast, lunch, snacks, dinner
+   809→  issuedQty   Float    @default(0)
+   810→  consumedQty Float    @default(0)
+   811→  returnedQty Float    @default(0)
+   812→  wastageQty  Float    @default(0)
+   813→  unit        String
+   814→  costPerUnit Float    @default(0)
+   815→  totalCost   Float    @default(0)
+   816→  notes       String?
+   817→  createdAt   DateTime @default(now())
+   818→  updatedAt   DateTime @updatedAt
+   819→}
+   820→
+   821→model WasteRecord {
+   822→  id          String   @id @default(cuid())
+   823→  date        DateTime
+   824→  category    String   // food_waste, expired, damaged, spoilage, other
+   825→  itemId      String?
+   826→  item        InventoryItem? @relation(fields: [itemId], references: [id])
+   827→  propertyId  String
+   828→  property    Property @relation(fields: [propertyId], references: [id])
+   829→  description String
+   830→  quantity    Float    @default(0)
+   831→  unit        String?
+   832→  estimatedCost Float  @default(0)
+   833→  disposalMethod String? // compost, trash, donation, recycling
+   834→  disposalDate DateTime?
+   835→  recordedById String?
+   836→  recordedBy  User?    @relation("WasteRecorder", fields: [recordedById], references: [id])
+   837→  notes       String?
+   838→  createdAt   DateTime @default(now())
+   839→  updatedAt   DateTime @updatedAt
+   840→}
+   841→
+   842→model Asset {
+   843→  id              String   @id @default(cuid())
+   844→  name            String
+   845→  assetTag        String?
+   846→  category        String   // furniture, electrical, electronics, appliance, kitchen_equipment, other
+   847→  subCategory     String?  // bed, mattress, chair, table, fan, ac, tv, water_cooler, washing_machine, refrigerator, gas_stove
+   848→  propertyId      String
+   849→  property        Property @relation(fields: [propertyId], references: [id])
+   850→  roomId          String?
+   851→  room            Room?    @relation(fields: [roomId], references: [id])
+   852→  purchaseDate    DateTime?
+   853→  purchasePrice   Float?
+   854→  currentValue    Float?
+   855→  depreciationRate Float?
+   856→  vendor          String?
+   857→  warrantyExpiry  DateTime?
+   858→  status          String   @default("active") // active, under_maintenance, disposed, lost
+   859→  condition       String   @default("good") // excellent, good, fair, poor, broken
+   860→  assignedTo      String?
+   861→  lastMaintenance DateTime?
+   862→  nextMaintenance DateTime?
+   863→  notes           String?
+   864→  createdAt       DateTime @default(now())
+   865→  updatedAt       DateTime @updatedAt
+   866→}
+   867→
+   868→model LaundryItem {
+   869→  id              String   @id @default(cuid())
+   870→  name            String   // bedsheets, blankets, pillows, towels, curtains
+   871→  category        String   // bedding, bathroom, curtain, other
+   872→  propertyId      String
+   873→  property        Property @relation(fields: [propertyId], references: [id])
+   874→  roomId          String?
+   875→  room            Room?    @relation(fields: [roomId], references: [id])
+   876→  totalQuantity   Int      @default(0)
+   877→  issuedQuantity   Int      @default(0)
+   878→  inLaundry       Int      @default(0)
+   879→  damagedQuantity  Int      @default(0)
+   880→  condition       String   @default("good") // good, fair, poor
+   881→  lastWashDate    DateTime?
+   882→  nextWashDate    DateTime?
+   883→  replacementDate DateTime?
+   884→  status          String   @default("in_use") // in_use, in_laundry, stored, damaged, disposed
+   885→  notes           String?
+   886→  createdAt       DateTime @default(now())
+   887→  updatedAt       DateTime @updatedAt
+   888→}
+   889→
+   890→model HousekeepingItem {
+   891→  id              String   @id @default(cuid())
+   892→  name            String   // phenyl, floor_cleaner, soap, detergent, mop, bucket, tissue_roll, garbage_bag
+   893→  category        String   // cleaning, hygiene, tool, other
+   894→  propertyId      String
+   895→  property        Property @relation(fields: [propertyId], references: [id])
+   896→  unit            String   // l, kg, pcs, pack, roll
+   897→  currentStock    Float    @default(0)
+   898→  minStock        Float    @default(0)
+   899→  unitPrice       Float    @default(0)
+   900→  lastRestocked   DateTime?
+   901→  nextRestock     DateTime?
+   902→  isActive        Boolean  @default(true)
+   903→  notes           String?
+   904→  createdAt       DateTime @default(now())
+   905→  updatedAt       DateTime @updatedAt
+   906→}
+   907→

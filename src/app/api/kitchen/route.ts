@@ -235,3 +235,145 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to process kitchen request' }, { status: 500 })
   }
 }
+
+// PATCH /api/kitchen - Update kitchen issues, menus, recipes
+export async function PATCH(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    if (data.type === 'issue') {
+      const existing = await db.kitchenIssue.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Kitchen issue not found' }, { status: 404 })
+
+      const updateData: Record<string, unknown> = {}
+      if (data.quantity !== undefined) updateData.quantity = data.quantity
+      if (data.issuedTo !== undefined) updateData.issuedTo = data.issuedTo
+      if (data.purpose !== undefined) updateData.purpose = data.purpose
+      if (data.notes !== undefined) updateData.notes = data.notes
+
+      const issue = await db.kitchenIssue.update({
+        where: { id: data.id },
+        data: updateData,
+        include: {
+          item: { select: { name: true, unit: true } },
+          property: { select: { name: true } },
+          issuedBy: { select: { name: true } },
+        },
+      })
+      return NextResponse.json(issue)
+    }
+
+    if (data.type === 'recipe') {
+      const existing = await db.recipe.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
+
+      const updateData: Record<string, unknown> = {}
+      if (data.name !== undefined) updateData.name = data.name
+      if (data.category !== undefined) updateData.category = data.category
+      if (data.mealType !== undefined) updateData.mealType = data.mealType
+      if (data.baseServings !== undefined) updateData.baseServings = data.baseServings
+      if (data.instructions !== undefined) updateData.instructions = data.instructions
+      if (data.isActive !== undefined) updateData.isActive = data.isActive
+
+      // If ingredients are provided, replace them
+      if (data.ingredients !== undefined) {
+        await db.recipeItem.deleteMany({ where: { recipeId: data.id } })
+        await db.recipeItem.createMany({
+          data: (data.ingredients as any[]).map((ing: any) => ({
+            recipeId: data.id,
+            itemId: ing.itemId,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            notes: ing.notes,
+          })),
+        })
+      }
+
+      const recipe = await db.recipe.update({
+        where: { id: data.id },
+        data: updateData,
+        include: { ingredients: { include: { item: true } } },
+      })
+      return NextResponse.json(recipe)
+    }
+
+    if (data.type === 'menu') {
+      const existing = await db.menuPlan.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Menu plan not found' }, { status: 404 })
+
+      const updateData: Record<string, unknown> = {}
+      if (data.date !== undefined) updateData.date = new Date(data.date)
+      if (data.mealType !== undefined) updateData.mealType = data.mealType
+      if (data.headCount !== undefined) updateData.headCount = data.headCount
+      if (data.status !== undefined) updateData.status = data.status
+      if (data.notes !== undefined) updateData.notes = data.notes
+
+      // If items are provided, replace them
+      if (data.items !== undefined) {
+        await db.menuPlanItem.deleteMany({ where: { menuPlanId: data.id } })
+        await db.menuPlanItem.createMany({
+          data: (data.items as any[]).map((item: any) => ({
+            menuPlanId: data.id,
+            recipeId: item.recipeId || null,
+            dishName: item.dishName,
+            servings: item.servings || 1,
+            notes: item.notes,
+          })),
+        })
+      }
+
+      const menu = await db.menuPlan.update({
+        where: { id: data.id },
+        data: updateData,
+        include: { items: { include: { recipe: true } } },
+      })
+      return NextResponse.json(menu)
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error) {
+    console.error('Kitchen PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update kitchen data' }, { status: 500 })
+  }
+}
+
+// DELETE /api/kitchen - Delete kitchen issues, menus, recipes
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    if (data.type === 'issue') {
+      const existing = await db.kitchenIssue.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Kitchen issue not found' }, { status: 404 })
+
+      await db.kitchenIssue.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Kitchen issue deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'recipe') {
+      const existing = await db.recipe.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
+
+      // Delete related menu plan items referencing this recipe, then ingredients, then recipe
+      await db.menuPlanItem.deleteMany({ where: { recipeId: data.id } })
+      await db.recipeItem.deleteMany({ where: { recipeId: data.id } })
+      await db.recipe.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Recipe deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'menu') {
+      const existing = await db.menuPlan.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Menu plan not found' }, { status: 404 })
+
+      // Delete menu items first (cascade), then the menu plan
+      await db.menuPlanItem.deleteMany({ where: { menuPlanId: data.id } })
+      await db.menuPlan.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Menu plan deleted successfully', id: data.id })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error) {
+    console.error('Kitchen DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete kitchen data' }, { status: 500 })
+  }
+}

@@ -1,0 +1,1270 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { ScrollArea } from '@/components/ui/scroll-area'
+    13→import {
+    14→  Dialog,
+    15→  DialogContent,
+    16→  DialogDescription,
+    17→  DialogFooter,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→} from '@/components/ui/dialog'
+    21→import {
+    22→  AlertDialog,
+    23→  AlertDialogAction,
+    24→  AlertDialogCancel,
+    25→  AlertDialogContent,
+    26→  AlertDialogDescription,
+    27→  AlertDialogFooter,
+    28→  AlertDialogHeader,
+    29→  AlertDialogTitle,
+    30→} from '@/components/ui/alert-dialog'
+    31→import {
+    32→  Select,
+    33→  SelectContent,
+    34→  SelectItem,
+    35→  SelectTrigger,
+    36→  SelectValue,
+    37→} from '@/components/ui/select'
+    38→import {
+    39→  Table,
+    40→  TableBody,
+    41→  TableCell,
+    42→  TableHead,
+    43→  TableHeader,
+    44→  TableRow,
+    45→} from '@/components/ui/table'
+    46→import {
+    47→  DropdownMenu,
+    48→  DropdownMenuContent,
+    49→  DropdownMenuItem,
+    50→  DropdownMenuTrigger,
+    51→} from '@/components/ui/dropdown-menu'
+    52→import {
+    53→  ChartContainer,
+    54→  ChartTooltip,
+    55→  ChartTooltipContent,
+    56→  ChartLegend,
+    57→  ChartLegendContent,
+    58→  type ChartConfig,
+    59→} from '@/components/ui/chart'
+    60→import {
+    61→  BarChart,
+    62→  Bar,
+    63→  PieChart,
+    64→  Pie,
+    65→  Cell,
+    66→  XAxis,
+    67→  YAxis,
+    68→  CartesianGrid,
+    69→} from 'recharts'
+    70→import {
+    71→  IndianRupee,
+    72→  Clock,
+    73→  AlertTriangle,
+    74→  TrendingUp,
+    75→  Plus,
+    76→  Search,
+    77→  Eye,
+    78→  MoreVertical,
+    79→  Loader2,
+    80→  CreditCard,
+    81→  Building2,
+    82→  Receipt,
+    83→  Send,
+    84→  CheckCircle2,
+    85→  Wallet,
+    86→  Smartphone,
+    87→  Landmark,
+    88→  Banknote,
+    89→  QrCode,
+    90→  Filter,
+    91→  ArrowUpDown,
+    92→  FileText,
+    93→  XCircle,
+    94→  CircleDot,
+    95→} from 'lucide-react'
+    96→
+    97→// ── Types ────────────────────────────────────────────────────────────────────
+    98→
+    99→type PaymentStatus = 'paid' | 'pending' | 'overdue' | 'failed'
+   100→type PaymentMethod = 'upi' | 'bank_transfer' | 'card' | 'wallet' | 'cash' | 'qr'
+   101→
+   102→interface TenantInfo {
+   103→  id: string
+   104→  name: string
+   105→  phone?: string
+   106→  room?: { id: string; name: string; number: string } | null
+   107→  bed?: { id: string; name: string } | null
+   108→}
+   109→
+   110→interface PaymentData {
+   111→  id: string
+   112→  tenantId: string
+   113→  tenant: TenantInfo
+   114→  propertyId: string
+   115→  property?: { id: string; name: string; address?: string }
+   116→  amount: number
+   117→  rentAmount: number
+   118→  electricity: number
+   119→  water: number
+   120→  wifi: number
+   121→  food: number
+   122→  laundry: number
+   123→  parking: number
+   124→  otherCharges: number
+   125→  lateFine: number
+   126→  discount: number
+   127→  advanceAdjust: number
+   128→  paymentMethod: PaymentMethod
+   129→  paymentType: string
+   130→  status: PaymentStatus
+   131→  dueDate: string
+   132→  paidDate?: string | null
+   133→  receiptNumber?: string | null
+   134→  utrNumber?: string | null
+   135→  notes?: string | null
+   136→  month: number
+   137→  year: number
+   138→  createdAt: string
+   139→  updatedAt: string
+   140→}
+   141→
+   142→interface PropertyInfo {
+   143→  id: string
+   144→  name: string
+   145→}
+   146→
+   147→interface RecordPaymentFormData {
+   148→  tenantId: string
+   149→  propertyId: string
+   150→  month: string
+   151→  year: string
+   152→  rentAmount: string
+   153→  electricity: string
+   154→  water: string
+   155→  wifi: string
+   156→  food: string
+   157→  laundry: string
+   158→  parking: string
+   159→  otherCharges: string
+   160→  lateFine: string
+   161→  discount: string
+   162→  advanceAdjust: string
+   163→  paymentMethod: PaymentMethod
+   164→  utrNumber: string
+   165→  notes: string
+   166→}
+   167→
+   168→// ── Constants ────────────────────────────────────────────────────────────────
+   169→
+   170→const STATUS_CONFIG: Record<PaymentStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   171→  paid: { label: 'Paid', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', dotClass: 'bg-emerald-500' },
+   172→  pending: { label: 'Pending', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500' },
+   173→  overdue: { label: 'Overdue', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', dotClass: 'bg-red-500' },
+   174→  failed: { label: 'Failed', bgClass: 'bg-gray-100 dark:bg-gray-950/50', textClass: 'text-gray-700 dark:text-gray-300', dotClass: 'bg-gray-500' },
+   175→}
+   176→
+   177→const METHOD_CONFIG: Record<PaymentMethod, { label: string; icon: typeof CreditCard }> = {
+   178→  upi: { label: 'UPI', icon: Smartphone },
+   179→  bank_transfer: { label: 'Bank Transfer', icon: Landmark },
+   180→  card: { label: 'Card', icon: CreditCard },
+   181→  wallet: { label: 'Wallet', icon: Wallet },
+   182→  cash: { label: 'Cash', icon: Banknote },
+   183→  qr: { label: 'QR', icon: QrCode },
+   184→}
+   185→
+   186→const MONTH_NAMES = [
+   187→  'January', 'February', 'March', 'April', 'May', 'June',
+   188→  'July', 'August', 'September', 'October', 'November', 'December',
+   189→]
+   190→
+   191→const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+   192→
+   193→const COLLECTION_CHART_CONFIG: ChartConfig = {
+   194→  collected: { label: 'Collected', color: '#10b981' },
+   195→  pending: { label: 'Pending', color: '#f59e0b' },
+   196→  overdue: { label: 'Overdue', color: '#ef4444' },
+   197→}
+   198→
+   199→const STATUS_PIE_CONFIG: ChartConfig = {
+   200→  paid: { label: 'Paid', color: '#10b981' },
+   201→  pending: { label: 'Pending', color: '#f59e0b' },
+   202→  overdue: { label: 'Overdue', color: '#ef4444' },
+   203→  failed: { label: 'Failed', color: '#9ca3af' },
+   204→}
+   205→
+   206→const STATUS_PIE_COLORS: Record<PaymentStatus, string> = {
+   207→  paid: '#10b981',
+   208→  pending: '#f59e0b',
+   209→  overdue: '#ef4444',
+   210→  failed: '#9ca3af',
+   211→}
+   212→
+   213→const EMPTY_FORM: RecordPaymentFormData = {
+   214→  tenantId: '',
+   215→  propertyId: '',
+   216→  month: String(new Date().getMonth() + 1),
+   217→  year: String(new Date().getFullYear()),
+   218→  rentAmount: '',
+   219→  electricity: '',
+   220→  water: '',
+   221→  wifi: '',
+   222→  food: '',
+   223→  laundry: '',
+   224→  parking: '',
+   225→  otherCharges: '',
+   226→  lateFine: '',
+   227→  discount: '',
+   228→  advanceAdjust: '',
+   229→  paymentMethod: 'upi',
+   230→  utrNumber: '',
+   231→  notes: '',
+   232→}
+   233→
+   234→// ── Helpers ──────────────────────────────────────────────────────────────────
+   235→
+   236→function formatCurrency(amount: number): string {
+   237→  return new Intl.NumberFormat('en-IN', {
+   238→    style: 'currency',
+   239→    currency: 'INR',
+   240→    minimumFractionDigits: 0,
+   241→    maximumFractionDigits: 0,
+   242→  }).format(amount)
+   243→}
+   244→
+   245→function formatDate(dateStr?: string | null): string {
+   246→  if (!dateStr) return '—'
+   247→  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   248→}
+   249→
+   250→function parseNum(val: string): number {
+   251→  const n = parseFloat(val)
+   252→  return isNaN(n) ? 0 : n
+   253→}
+   254→
+   255→// ── Skeleton Loaders ─────────────────────────────────────────────────────────
+   256→
+   257→function StatsCardSkeleton() {
+   258→  return (
+   259→    <Card>
+   260→      <CardContent className="p-6">
+   261→        <div className="flex items-center justify-between">
+   262→          <div className="space-y-2">
+   263→            <Skeleton className="h-4 w-24" />
+   264→            <Skeleton className="h-8 w-16" />
+   265→          </div>
+   266→          <Skeleton className="h-10 w-10 rounded-lg" />
+   267→        </div>
+   268→      </CardContent>
+   269→    </Card>
+   270→  )
+   271→}
+   272→
+   273→function ChartSkeleton() {
+   274→  return (
+   275→    <Card>
+   276→      <CardContent className="p-6">
+   277→        <Skeleton className="h-4 w-32 mb-4" />
+   278→        <Skeleton className="h-64 w-full" />
+   279→      </CardContent>
+   280→    </Card>
+   281→  )
+   282→}
+   283→
+   284→function TableSkeleton() {
+   285→  return (
+   286→    <div className="space-y-3">
+   287→      <Skeleton className="h-10 w-full rounded" />
+   288→      {Array.from({ length: 5 }).map((_, i) => (
+   289→        <Skeleton key={i} className="h-12 w-full rounded" />
+   290→      ))}
+   291→    </div>
+   292→  )
+   293→}
+   294→
+   295→// ── Stats Card ───────────────────────────────────────────────────────────────
+   296→
+   297→interface StatsCardProps {
+   298→  title: string
+   299→  value: string
+   300→  icon: React.ElementType
+   301→  iconBg?: string
+   302→  iconColor?: string
+   303→  subtitle?: string
+   304→}
+   305→
+   306→function StatsCard({ title, value, icon: Icon, iconBg = 'bg-emerald-50 dark:bg-emerald-950/50', iconColor = 'text-emerald-600 dark:text-emerald-400', subtitle }: StatsCardProps) {
+   307→  return (
+   308→    <Card className="hover:shadow-md transition-shadow">
+   309→      <CardContent className="p-6">
+   310→        <div className="flex items-center justify-between">
+   311→          <div className="space-y-1">
+   312→            <p className="text-sm text-muted-foreground font-medium">{title}</p>
+   313→            <p className="text-2xl font-bold tracking-tight">{value}</p>
+   314→            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+   315→          </div>
+   316→          <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${iconBg}`}>
+   317→            <Icon className={`w-5 h-5 ${iconColor}`} />
+   318→          </div>
+   319→        </div>
+   320→      </CardContent>
+   321→    </Card>
+   322→  )
+   323→}
+   324→
+   325→// ── Payment Receipt Dialog ───────────────────────────────────────────────────
+   326→
+   327→function PaymentReceiptDialog({
+   328→  payment,
+   329→  open,
+   330→  onClose,
+   331→}: {
+   332→  payment: PaymentData | null
+   333→  open: boolean
+   334→  onClose: () => void
+   335→}) {
+   336→  if (!payment) return null
+   337→
+   338→  const total = payment.rentAmount + payment.electricity + payment.water + payment.wifi +
+   339→    payment.food + payment.laundry + payment.parking + payment.otherCharges +
+   340→    payment.lateFine - payment.discount - payment.advanceAdjust
+   341→
+   342→  const statusCfg = STATUS_CONFIG[payment.status]
+   343→  const methodCfg = METHOD_CONFIG[payment.paymentMethod]
+   344→
+   345→  return (
+   346→    <Dialog open={open} onOpenChange={onClose}>
+   347→      <DialogContent className="max-w-lg">
+   348→        <DialogHeader>
+   349→          <DialogTitle className="flex items-center gap-2">
+   350→            <Receipt className="w-5 h-5 text-emerald-600" />
+   351→            Payment Receipt
+   352→          </DialogTitle>
+   353→          <DialogDescription>
+   354→            Receipt #{payment.receiptNumber || payment.id.slice(-8).toUpperCase()}
+   355→          </DialogDescription>
+   356→        </DialogHeader>
+   357→
+   358→        <div className="space-y-4">
+   359→          {/* Header */}
+   360→          <div className="flex items-center justify-between p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg">
+   361→            <div>
+   362→              <p className="font-semibold text-emerald-900 dark:text-emerald-100">{payment.tenant.name}</p>
+   363→              <p className="text-sm text-emerald-700 dark:text-emerald-300">
+   364→                {payment.tenant.room ? `Room ${payment.tenant.room.number}` : 'No room assigned'}
+   365→              </p>
+   366→            </div>
+   367→            <Badge variant="secondary" className={`${statusCfg.bgClass} ${statusCfg.textClass}`}>
+   368→              <div className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClass} mr-1`} />
+   369→              {statusCfg.label}
+   370→            </Badge>
+   371→          </div>
+   372→
+   373→          {/* Period */}
+   374→          <div className="grid grid-cols-2 gap-3 text-sm">
+   375→            <div className="flex justify-between">
+   376→              <span className="text-muted-foreground">Period</span>
+   377→              <span className="font-medium">{MONTH_NAMES[payment.month - 1]} {payment.year}</span>
+   378→            </div>
+   379→            <div className="flex justify-between">
+   380→              <span className="text-muted-foreground">Method</span>
+   381→              <span className="font-medium flex items-center gap-1">
+   382→                <methodCfg.icon className="w-3.5 h-3.5" />
+   383→                {methodCfg.label}
+   384→              </span>
+   385→            </div>
+   386→            <div className="flex justify-between">
+   387→              <span className="text-muted-foreground">Due Date</span>
+   388→              <span className="font-medium">{formatDate(payment.dueDate)}</span>
+   389→            </div>
+   390→            <div className="flex justify-between">
+   391→              <span className="text-muted-foreground">Paid Date</span>
+   392→              <span className="font-medium">{formatDate(payment.paidDate)}</span>
+   393→            </div>
+   394→          </div>
+   395→
+   396→          {/* Breakdown */}
+   397→          <div className="border rounded-lg p-3 space-y-1.5 text-sm">
+   398→            <p className="font-medium text-xs text-muted-foreground uppercase tracking-wider mb-2">Charges Breakdown</p>
+   399→            {[
+   400→              { label: 'Rent', value: payment.rentAmount },
+   401→              { label: 'Electricity', value: payment.electricity },
+   402→              { label: 'Water', value: payment.water },
+   403→              { label: 'WiFi', value: payment.wifi },
+   404→              { label: 'Food', value: payment.food },
+   405→              { label: 'Laundry', value: payment.laundry },
+   406→              { label: 'Parking', value: payment.parking },
+   407→              { label: 'Other Charges', value: payment.otherCharges },
+   408→              { label: 'Late Fine', value: payment.lateFine },
+   409→            ].filter(item => item.value > 0).map(item => (
+   410→              <div key={item.label} className="flex justify-between">
+   411→                <span className="text-muted-foreground">{item.label}</span>
+   412→                <span>{formatCurrency(item.value)}</span>
+   413→              </div>
+   414→            ))}
+   415→            {payment.discount > 0 && (
+   416→              <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+   417→                <span>Discount</span>
+   418→                <span>-{formatCurrency(payment.discount)}</span>
+   419→              </div>
+   420→            )}
+   421→            {payment.advanceAdjust > 0 && (
+   422→              <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+   423→                <span>Advance Adjustment</span>
+   424→                <span>-{formatCurrency(payment.advanceAdjust)}</span>
+   425→              </div>
+   426→            )}
+   427→            <div className="border-t pt-1.5 mt-1.5 flex justify-between font-bold">
+   428→              <span>Total</span>
+   429→              <span>{formatCurrency(total)}</span>
+   430→            </div>
+   431→          </div>
+   432→
+   433→          {payment.utrNumber && (
+   434→            <div className="flex justify-between text-sm">
+   435→              <span className="text-muted-foreground">UTR Number</span>
+   436→              <span className="font-mono text-xs">{payment.utrNumber}</span>
+   437→            </div>
+   438→          )}
+   439→
+   440→          {payment.notes && (
+   441→            <div className="text-sm">
+   442→              <span className="text-muted-foreground">Notes:</span>
+   443→              <p className="mt-0.5 text-muted-foreground">{payment.notes}</p>
+   444→            </div>
+   445→          )}
+   446→        </div>
+   447→
+   448→        <DialogFooter>
+   449→          <Button variant="outline" onClick={onClose}>Close</Button>
+   450→        </DialogFooter>
+   451→      </DialogContent>
+   452→    </Dialog>
+   453→  )
+   454→}
+   455→
+   456→// ── Mark as Paid Confirmation Dialog ─────────────────────────────────────────
+   457→
+   458→function MarkAsPaidDialog({
+   459→  open,
+   460→  onClose,
+   461→  onConfirm,
+   462→  payment,
+   463→  loading,
+   464→}: {
+   465→  open: boolean
+   466→  onClose: () => void
+   467→  onConfirm: () => void
+   468→  payment: PaymentData | null
+   469→  loading: boolean
+   470→}) {
+   471→  if (!payment) return null
+   472→
+   473→  return (
+   474→    <AlertDialog open={open} onOpenChange={onClose}>
+   475→      <AlertDialogContent>
+   476→        <AlertDialogHeader>
+   477→          <AlertDialogTitle className="flex items-center gap-2">
+   478→            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+   479→            Mark Payment as Paid
+   480→          </AlertDialogTitle>
+   481→          <AlertDialogDescription>
+   482→            Are you sure you want to mark this payment as paid?
+   483→          </AlertDialogDescription>
+   484→        </AlertDialogHeader>
+   485→        <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+   486→          <div className="flex justify-between">
+   487→            <span className="text-muted-foreground">Tenant</span>
+   488→            <span className="font-medium">{payment.tenant.name}</span>
+   489→          </div>
+   490→          <div className="flex justify-between">
+   491→            <span className="text-muted-foreground">Period</span>
+   492→            <span className="font-medium">{MONTH_NAMES[payment.month - 1]} {payment.year}</span>
+   493→          </div>
+   494→          <div className="flex justify-between">
+   495→            <span className="text-muted-foreground">Amount</span>
+   496→            <span className="font-bold">{formatCurrency(payment.amount)}</span>
+   497→          </div>
+   498→        </div>
+   499→        <AlertDialogFooter>
+   500→          <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+   501→          <AlertDialogAction
+   502→            onClick={onConfirm}
+   503→            disabled={loading}
+   504→            className="bg-emerald-600 hover:bg-emerald-700"
+   505→          >
+   506→            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+   507→            Mark as Paid
+   508→          </AlertDialogAction>
+   509→        </AlertDialogFooter>
+   510→      </AlertDialogContent>
+   511→    </AlertDialog>
+   512→  )
+   513→}
+   514→
+   515→// ── Record Payment Dialog ────────────────────────────────────────────────────
+   516→
+   517→function RecordPaymentDialog({
+   518→  open,
+   519→  onClose,
+   520→  tenants,
+   521→  properties,
+   522→  onSubmit,
+   523→  loading,
+   524→}: {
+   525→  open: boolean
+   526→  onClose: () => void
+   527→  tenants: { id: string; name: string }[]
+   528→  properties: PropertyInfo[]
+   529→  onSubmit: (data: RecordPaymentFormData) => void
+   530→  loading: boolean
+   531→}) {
+   532→  const [form, setForm] = useState<RecordPaymentFormData>({ ...EMPTY_FORM })
+   533→  const resetForm = () => setForm({ ...EMPTY_FORM })
+   534→
+   535→  const computedTotal = useMemo(() => {
+   536→    const rent = parseNum(form.rentAmount)
+   537→    const elec = parseNum(form.electricity)
+   538→    const wat = parseNum(form.water)
+   539→    const wifi = parseNum(form.wifi)
+   540→    const food = parseNum(form.food)
+   541→    const laun = parseNum(form.laundry)
+   542→    const park = parseNum(form.parking)
+   543→    const other = parseNum(form.otherCharges)
+   544→    const fine = parseNum(form.lateFine)
+   545→    const disc = parseNum(form.discount)
+   546→    const adv = parseNum(form.advanceAdjust)
+   547→    return rent + elec + wat + wifi + food + laun + park + other + fine - disc - adv
+   548→  }, [form])
+   549→
+   550→  const handleField = (field: keyof RecordPaymentFormData, value: string) => {
+   551→    setForm(prev => ({ ...prev, [field]: value }))
+   552→  }
+   553→
+   554→  const handleSubmit = () => {
+   555→    onSubmit({ ...form, amount: String(computedTotal) })
+   556→  }
+   557→
+   558→  const isValid = form.tenantId && form.propertyId && form.month && form.year && computedTotal > 0
+   559→
+   560→  return (
+   561→    <Dialog open={open} onOpenChange={onClose}>
+   562→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   563→        <DialogHeader>
+   564→          <DialogTitle className="flex items-center gap-2">
+   565→            <CreditCard className="w-5 h-5 text-emerald-600" />
+   566→            Record Payment
+   567→          </DialogTitle>
+   568→          <DialogDescription>
+   569→            Record a new rent payment with charges breakdown
+   570→          </DialogDescription>
+   571→        </DialogHeader>
+   572→
+   573→        <div className="space-y-6">
+   574→          {/* Tenant & Property */}
+   575→          <div className="grid grid-cols-2 gap-4">
+   576→            <div className="space-y-2">
+   577→              <Label>Tenant *</Label>
+   578→              <Select value={form.tenantId} onValueChange={v => handleField('tenantId', v)}>
+   579→                <SelectTrigger><SelectValue placeholder="Select tenant" /></SelectTrigger>
+   580→                <SelectContent>
+   581→                  {tenants.map(t => (
+   582→                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+   583→                  ))}
+   584→                </SelectContent>
+   585→              </Select>
+   586→            </div>
+   587→            <div className="space-y-2">
+   588→              <Label>Property *</Label>
+   589→              <Select value={form.propertyId} onValueChange={v => handleField('propertyId', v)}>
+   590→                <SelectTrigger><SelectValue placeholder="Select property" /></SelectTrigger>
+   591→                <SelectContent>
+   592→                  {properties.map(p => (
+   593→                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   594→                  ))}
+   595→                </SelectContent>
+   596→              </Select>
+   597→            </div>
+   598→          </div>
+   599→
+   600→          {/* Month & Year */}
+   601→          <div className="grid grid-cols-2 gap-4">
+   602→            <div className="space-y-2">
+   603→              <Label>Month *</Label>
+   604→              <Select value={form.month} onValueChange={v => handleField('month', v)}>
+   605→                <SelectTrigger><SelectValue placeholder="Select month" /></SelectTrigger>
+   606→                <SelectContent>
+   607→                  {MONTH_NAMES.map((m, i) => (
+   608→                    <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+   609→                  ))}
+   610→                </SelectContent>
+   611→              </Select>
+   612→            </div>
+   613→            <div className="space-y-2">
+   614→              <Label>Year *</Label>
+   615→              <Select value={form.year} onValueChange={v => handleField('year', v)}>
+   616→                <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+   617→                <SelectContent>
+   618→                  {[2024, 2025, 2026].map(y => (
+   619→                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+   620→                  ))}
+   621→                </SelectContent>
+   622→              </Select>
+   623→            </div>
+   624→          </div>
+   625→
+   626→          {/* Charges Breakdown */}
+   627→          <div className="space-y-3">
+   628→            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Charges Breakdown</p>
+   629→            <div className="grid grid-cols-2 gap-3">
+   630→              <div className="space-y-1.5">
+   631→                <Label className="text-xs">Rent Amount</Label>
+   632→                <Input type="number" placeholder="0" value={form.rentAmount} onChange={e => handleField('rentAmount', e.target.value)} />
+   633→              </div>
+   634→              <div className="space-y-1.5">
+   635→                <Label className="text-xs">Electricity</Label>
+   636→                <Input type="number" placeholder="0" value={form.electricity} onChange={e => handleField('electricity', e.target.value)} />
+   637→              </div>
+   638→              <div className="space-y-1.5">
+   639→                <Label className="text-xs">Water</Label>
+   640→                <Input type="number" placeholder="0" value={form.water} onChange={e => handleField('water', e.target.value)} />
+   641→              </div>
+   642→              <div className="space-y-1.5">
+   643→                <Label className="text-xs">WiFi</Label>
+   644→                <Input type="number" placeholder="0" value={form.wifi} onChange={e => handleField('wifi', e.target.value)} />
+   645→              </div>
+   646→              <div className="space-y-1.5">
+   647→                <Label className="text-xs">Food</Label>
+   648→                <Input type="number" placeholder="0" value={form.food} onChange={e => handleField('food', e.target.value)} />
+   649→              </div>
+   650→              <div className="space-y-1.5">
+   651→                <Label className="text-xs">Laundry</Label>
+   652→                <Input type="number" placeholder="0" value={form.laundry} onChange={e => handleField('laundry', e.target.value)} />
+   653→              </div>
+   654→              <div className="space-y-1.5">
+   655→                <Label className="text-xs">Parking</Label>
+   656→                <Input type="number" placeholder="0" value={form.parking} onChange={e => handleField('parking', e.target.value)} />
+   657→              </div>
+   658→              <div className="space-y-1.5">
+   659→                <Label className="text-xs">Other Charges</Label>
+   660→                <Input type="number" placeholder="0" value={form.otherCharges} onChange={e => handleField('otherCharges', e.target.value)} />
+   661→              </div>
+   662→            </div>
+   663→          </div>
+   664→
+   665→          {/* Adjustments */}
+   666→          <div className="space-y-3">
+   667→            <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Adjustments</p>
+   668→            <div className="grid grid-cols-3 gap-3">
+   669→              <div className="space-y-1.5">
+   670→                <Label className="text-xs">Late Fine</Label>
+   671→                <Input type="number" placeholder="0" value={form.lateFine} onChange={e => handleField('lateFine', e.target.value)} />
+   672→              </div>
+   673→              <div className="space-y-1.5">
+   674→                <Label className="text-xs">Discount</Label>
+   675→                <Input type="number" placeholder="0" value={form.discount} onChange={e => handleField('discount', e.target.value)} />
+   676→              </div>
+   677→              <div className="space-y-1.5">
+   678→                <Label className="text-xs">Advance Adjustment</Label>
+   679→                <Input type="number" placeholder="0" value={form.advanceAdjust} onChange={e => handleField('advanceAdjust', e.target.value)} />
+   680→              </div>
+   681→            </div>
+   682→          </div>
+   683→
+   684→          {/* Total */}
+   685→          <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-3 flex items-center justify-between">
+   686→            <span className="font-medium text-emerald-900 dark:text-emerald-100">Total Amount</span>
+   687→            <span className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(computedTotal)}</span>
+   688→          </div>
+   689→
+   690→          {/* Payment Method & UTR */}
+   691→          <div className="grid grid-cols-2 gap-4">
+   692→            <div className="space-y-2">
+   693→              <Label>Payment Method</Label>
+   694→              <Select value={form.paymentMethod} onValueChange={v => handleField('paymentMethod', v as PaymentMethod)}>
+   695→                <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
+   696→                <SelectContent>
+   697→                  {Object.entries(METHOD_CONFIG).map(([key, cfg]) => (
+   698→                    <SelectItem key={key} value={key}>
+   699→                      <span className="flex items-center gap-2">
+   700→                        <cfg.icon className="w-3.5 h-3.5" />
+   701→                        {cfg.label}
+   702→                      </span>
+   703→                    </SelectItem>
+   704→                  ))}
+   705→                </SelectContent>
+   706→              </Select>
+   707→            </div>
+   708→            {(form.paymentMethod === 'bank_transfer' || form.paymentMethod === 'upi') && (
+   709→              <div className="space-y-1.5">
+   710→                <Label className="text-xs">UTR Number</Label>
+   711→                <Input placeholder="Enter UTR number" value={form.utrNumber} onChange={e => handleField('utrNumber', e.target.value)} />
+   712→              </div>
+   713→            )}
+   714→          </div>
+   715→
+   716→          {/* Notes */}
+   717→          <div className="space-y-1.5">
+   718→            <Label>Notes</Label>
+   719→            <Textarea placeholder="Add any notes..." value={form.notes} onChange={e => handleField('notes', e.target.value)} rows={2} />
+   720→          </div>
+   721→        </div>
+   722→
+   723→        <DialogFooter>
+   724→          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+   725→          <Button onClick={handleSubmit} disabled={!isValid || loading} className="bg-emerald-600 hover:bg-emerald-700">
+   726→            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+   727→            Record Payment
+   728→          </Button>
+   729→        </DialogFooter>
+   730→      </DialogContent>
+   731→    </Dialog>
+   732→  )
+   733→}
+   734→
+   735→// ── Main Component ───────────────────────────────────────────────────────────
+   736→
+   737→export function PaymentsPage() {
+   738→  const { currentUser } = useAppStore()
+   739→
+   740→  // Data
+   741→  const [payments, setPayments] = useState<PaymentData[]>([])
+   742→  const [properties, setProperties] = useState<PropertyInfo[]>([])
+   743→  const [tenants, setTenants] = useState<{ id: string; name: string }[]>([])
+   744→  const [loading, setLoading] = useState(true)
+   745→  const [actionLoading, setActionLoading] = useState(false)
+   746→
+   747→  // Filters
+   748→  const [searchQuery, setSearchQuery] = useState('')
+   749→  const [statusFilter, setStatusFilter] = useState<string>('all')
+   750→  const [monthFilter, setMonthFilter] = useState<string>('all')
+   751→  const [yearFilter, setYearFilter] = useState<string>('all')
+   752→  const [propertyFilter, setPropertyFilter] = useState<string>('all')
+   753→  const [methodFilter, setMethodFilter] = useState<string>('all')
+   754→
+   755→  // Dialogs
+   756→  const [showRecordDialog, setShowRecordDialog] = useState(false)
+   757→  const [showReceiptDialog, setShowReceiptDialog] = useState(false)
+   758→  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false)
+   759→  const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null)
+   760→
+   761→  // ── Fetch Data ─────────────────────────────────────────────────────────────
+   762→
+   763→  const fetchPayments = useCallback(async () => {
+   764→    try {
+   765→      const params = new URLSearchParams()
+   766→      if (statusFilter !== 'all') params.set('status', statusFilter)
+   767→      if (monthFilter !== 'all') params.set('month', monthFilter)
+   768→      if (yearFilter !== 'all') params.set('year', yearFilter)
+   769→      if (propertyFilter !== 'all') params.set('propertyId', propertyFilter)
+   770→      const res = await fetch(`/api/payments?${params.toString()}`)
+   771→      if (res.ok) {
+   772→        const data = await res.json()
+   773→        setPayments(data)
+   774→      }
+   775→    } catch (err) {
+   776→      console.error('Failed to fetch payments:', err)
+   777→    }
+   778→  }, [statusFilter, monthFilter, yearFilter, propertyFilter])
+   779→
+   780→  useEffect(() => {
+   781→    fetchPayments().finally(() => setLoading(false))
+   782→  }, [fetchPayments])
+   783→
+   784→  useEffect(() => {
+   785→    async function fetchSupport() {
+   786→      try {
+   787→        const [propRes, tenantRes] = await Promise.all([
+   788→          fetch('/api/properties'),
+   789→          fetch('/api/tenants'),
+   790→        ])
+   791→        if (propRes.ok) setProperties(await propRes.json())
+   792→        if (tenantRes.ok) {
+   793→          const data = await tenantRes.json()
+   794→          setTenants(data.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name })))
+   795→        }
+   796→      } catch (err) {
+   797→        console.error('Failed to fetch support data:', err)
+   798→      }
+   799→    }
+   800→    fetchSupport()
+   801→  }, [])
+   802→
+   803→  // ── Computed Stats ─────────────────────────────────────────────────────────
+   804→
+   805→  const stats = useMemo(() => {
+   806→    const now = new Date()
+   807→    const currentMonth = now.getMonth() + 1
+   808→    const currentYear = now.getFullYear()
+   809→
+   810→    const thisMonthPayments = payments.filter(p => p.month === currentMonth && p.year === currentYear)
+   811→    const collected = thisMonthPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0)
+   812→    const pending = thisMonthPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0)
+   813→    const overdue = thisMonthPayments.filter(p => p.status === 'overdue').reduce((s, p) => s + p.amount, 0)
+   814→    const totalExpected = collected + pending + overdue
+   815→    const collectionRate = totalExpected > 0 ? Math.round((collected / totalExpected) * 100) : 0
+   816→
+   817→    return { collected, pending, overdue, collectionRate }
+   818→  }, [payments])
+   819→
+   820→  // ── Chart Data ─────────────────────────────────────────────────────────────
+   821→
+   822→  const monthlyCollectionData = useMemo(() => {
+   823→    const currentYear = new Date().getFullYear()
+   824→    const monthMap: Record<number, { collected: number; pending: number; overdue: number }> = {}
+   825→
+   826→    for (let i = 1; i <= 12; i++) {
+   827→      monthMap[i] = { collected: 0, pending: 0, overdue: 0 }
+   828→    }
+   829→
+   830→    payments
+   831→      .filter(p => p.year === currentYear)
+   832→      .forEach(p => {
+   833→        if (p.status === 'paid') monthMap[p.month].collected += p.amount
+   834→        else if (p.status === 'pending') monthMap[p.month].pending += p.amount
+   835→        else if (p.status === 'overdue') monthMap[p.month].overdue += p.amount
+   836→      })
+   837→
+   838→    return Object.entries(monthMap).map(([month, data]) => ({
+   839→      month: MONTH_SHORT[parseInt(month) - 1],
+   840→      ...data,
+   841→    }))
+   842→  }, [payments])
+   843→
+   844→  const statusBreakdownData = useMemo(() => {
+   845→    const counts: Record<PaymentStatus, number> = { paid: 0, pending: 0, overdue: 0, failed: 0 }
+   846→    payments.forEach(p => {
+   847→      if (counts[p.status] !== undefined) counts[p.status]++
+   848→    })
+   849→    return Object.entries(counts)
+   850→      .filter(([, count]) => count > 0)
+   851→      .map(([status, count]) => ({ status, count, fill: STATUS_PIE_COLORS[status as PaymentStatus] }))
+   852→  }, [payments])
+   853→
+   854→  // ── Filtered Payments ──────────────────────────────────────────────────────
+   855→
+   856→  const filteredPayments = useMemo(() => {
+   857→    let result = payments
+   858→
+   859→    if (searchQuery) {
+   860→      const q = searchQuery.toLowerCase()
+   861→      result = result.filter(p => p.tenant.name.toLowerCase().includes(q))
+   862→    }
+   863→    if (methodFilter !== 'all') {
+   864→      result = result.filter(p => p.paymentMethod === methodFilter)
+   865→    }
+   866→
+   867→    return result
+   868→  }, [payments, searchQuery, methodFilter])
+   869→
+   870→  // ── Actions ────────────────────────────────────────────────────────────────
+   871→
+   872→  const handleRecordPayment = async (formData: RecordPaymentFormData) => {
+   873→    setActionLoading(true)
+   874→    try {
+   875→      const total = parseNum(formData.rentAmount) + parseNum(formData.electricity) + parseNum(formData.water) +
+   876→        parseNum(formData.wifi) + parseNum(formData.food) + parseNum(formData.laundry) + parseNum(formData.parking) +
+   877→        parseNum(formData.otherCharges) + parseNum(formData.lateFine) - parseNum(formData.discount) - parseNum(formData.advanceAdjust)
+   878→
+   879→      const res = await fetch('/api/payments', {
+   880→        method: 'POST',
+   881→        headers: { 'Content-Type': 'application/json' },
+   882→        body: JSON.stringify({
+   883→          tenantId: formData.tenantId,
+   884→          propertyId: formData.propertyId,
+   885→          amount: total,
+   886→          rentAmount: parseNum(formData.rentAmount),
+   887→          electricity: parseNum(formData.electricity),
+   888→          water: parseNum(formData.water),
+   889→          wifi: parseNum(formData.wifi),
+   890→          food: parseNum(formData.food),
+   891→          laundry: parseNum(formData.laundry),
+   892→          parking: parseNum(formData.parking),
+   893→          otherCharges: parseNum(formData.otherCharges),
+   894→          lateFine: parseNum(formData.lateFine),
+   895→          discount: parseNum(formData.discount),
+   896→          advanceAdjust: parseNum(formData.advanceAdjust),
+   897→          paymentMethod: formData.paymentMethod,
+   898→          utrNumber: formData.utrNumber,
+   899→          notes: formData.notes,
+   900→          month: formData.month,
+   901→          year: formData.year,
+   902→          status: 'pending',
+   903→          dueDate: new Date(parseInt(formData.year), parseInt(formData.month), 5).toISOString(),
+   904→        }),
+   905→      })
+   906→
+   907→      if (res.ok) {
+   908→        setShowRecordDialog(false)
+   909→        await fetchPayments()
+   910→      }
+   911→    } catch (err) {
+   912→      console.error('Failed to record payment:', err)
+   913→    } finally {
+   914→      setActionLoading(false)
+   915→    }
+   916→  }
+   917→
+   918→  const handleMarkAsPaid = async () => {
+   919→    if (!selectedPayment) return
+   920→    setActionLoading(true)
+   921→    try {
+   922→      const res = await fetch('/api/payments', {
+   923→        method: 'PATCH',
+   924→        headers: { 'Content-Type': 'application/json' },
+   925→        body: JSON.stringify({
+   926→          id: selectedPayment.id,
+   927→          status: 'paid',
+   928→          paidDate: new Date().toISOString(),
+   929→        }),
+   930→      })
+   931→      if (res.ok) {
+   932→        setShowMarkPaidDialog(false)
+   933→        setSelectedPayment(null)
+   934→        await fetchPayments()
+   935→      }
+   936→    } catch (err) {
+   937→      console.error('Failed to mark as paid:', err)
+   938→    } finally {
+   939→      setActionLoading(false)
+   940→    }
+   941→  }
+   942→
+   943→  const handleSendReminder = async (payment: PaymentData) => {
+   944→    try {
+   945→      // In a real app, this would call an API to send a notification
+   946→      alert(`Payment reminder sent to ${payment.tenant.name} for ${MONTH_NAMES[payment.month - 1]} ${payment.year}`)
+   947→    } catch (err) {
+   948→      console.error('Failed to send reminder:', err)
+   949→    }
+   950→  }
+   951→
+   952→  // ── Render ─────────────────────────────────────────────────────────────────
+   953→
+   954→  if (loading) {
+   955→    return (
+   956→      <div className="p-6 space-y-6">
+   957→        <div className="flex items-center justify-between">
+   958→          <Skeleton className="h-8 w-48" />
+   959→          <Skeleton className="h-10 w-36" />
+   960→        </div>
+   961→        <div className="grid grid-cols-4 gap-4">
+   962→          {Array.from({ length: 4 }).map((_, i) => <StatsCardSkeleton key={i} />)}
+   963→        </div>
+   964→        <div className="grid grid-cols-2 gap-4">
+   965→          <ChartSkeleton />
+   966→          <ChartSkeleton />
+   967→        </div>
+   968→        <TableSkeleton />
+   969→      </div>
+   970→    )
+   971→  }
+   972→
+   973→  return (
+   974→    <div className="p-6 space-y-6">
+   975→      {/* Page Header */}
+   976→      <div className="flex items-center justify-between">
+   977→        <div>
+   978→          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+   979→            <IndianRupee className="w-6 h-6 text-emerald-600" />
+   980→            Payments &amp; Rent
+   981→          </h1>
+   982→          <p className="text-muted-foreground mt-1">Track rent collections, dues, and payment history</p>
+   983→        </div>
+   984→        <Button onClick={() => setShowRecordDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+   985→          <Plus className="w-4 h-4 mr-2" />
+   986→          Record Payment
+   987→        </Button>
+   988→      </div>
+   989→
+   990→      {/* Stats Cards */}
+   991→      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+   992→        <StatsCard
+   993→          title="Total Collected"
+   994→          value={formatCurrency(stats.collected)}
+   995→          icon={IndianRupee}
+   996→          iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+   997→          iconColor="text-emerald-600 dark:text-emerald-400"
+   998→          subtitle="This month"
+   999→        />
+  1000→        <StatsCard
+  1001→          title="Pending Payments"
+  1002→          value={formatCurrency(stats.pending)}
+  1003→          icon={Clock}
+  1004→          iconBg="bg-amber-50 dark:bg-amber-950/50"
+  1005→          iconColor="text-amber-600 dark:text-amber-400"
+  1006→        />
+  1007→        <StatsCard
+  1008→          title="Overdue"
+  1009→          value={formatCurrency(stats.overdue)}
+  1010→          icon={AlertTriangle}
+  1011→          iconBg="bg-red-50 dark:bg-red-950/50"
+  1012→          iconColor="text-red-600 dark:text-red-400"
+  1013→        />
+  1014→        <StatsCard
+  1015→          title="Collection Rate"
+  1016→          value={`${stats.collectionRate}%`}
+  1017→          icon={TrendingUp}
+  1018→          iconBg="bg-teal-50 dark:bg-teal-950/50"
+  1019→          iconColor="text-teal-600 dark:text-teal-400"
+  1020→        />
+  1021→      </div>
+  1022→
+  1023→      {/* Charts */}
+  1024→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1025→        {/* Monthly Collection Bar Chart */}
+  1026→        <Card>
+  1027→          <CardHeader className="pb-2">
+  1028→            <CardTitle className="text-base font-semibold">Monthly Collection</CardTitle>
+  1029→            <CardDescription>Revenue breakdown by month</CardDescription>
+  1030→          </CardHeader>
+  1031→          <CardContent>
+  1032→            <ChartContainer config={COLLECTION_CHART_CONFIG} className="h-64 w-full">
+  1033→              <BarChart data={monthlyCollectionData} barCategoryGap="20%">
+  1034→                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+  1035→                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+  1036→                <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+  1037→                <ChartTooltip content={<ChartTooltipContent />} />
+  1038→                <ChartLegend content={<ChartLegendContent />} />
+  1039→                <Bar dataKey="collected" fill="var(--color-collected)" radius={[4, 4, 0, 0]} />
+  1040→                <Bar dataKey="pending" fill="var(--color-pending)" radius={[4, 4, 0, 0]} />
+  1041→                <Bar dataKey="overdue" fill="var(--color-overdue)" radius={[4, 4, 0, 0]} />
+  1042→              </BarChart>
+  1043→            </ChartContainer>
+  1044→          </CardContent>
+  1045→        </Card>
+  1046→
+  1047→        {/* Payment Status Pie Chart */}
+  1048→        <Card>
+  1049→          <CardHeader className="pb-2">
+  1050→            <CardTitle className="text-base font-semibold">Payment Status</CardTitle>
+  1051→            <CardDescription>Status breakdown of all payments</CardDescription>
+  1052→          </CardHeader>
+  1053→          <CardContent>
+  1054→            <ChartContainer config={STATUS_PIE_CONFIG} className="h-64 w-full">
+  1055→              <PieChart>
+  1056→                <Pie
+  1057→                  data={statusBreakdownData}
+  1058→                  cx="50%"
+  1059→                  cy="50%"
+  1060→                  innerRadius={60}
+  1061→                  outerRadius={90}
+  1062→                  paddingAngle={4}
+  1063→                  dataKey="count"
+  1064→                  nameKey="status"
+  1065→                >
+  1066→                  {statusBreakdownData.map((entry, index) => (
+  1067→                    <Cell key={`cell-${index}`} fill={entry.fill} />
+  1068→                  ))}
+  1069→                </Pie>
+  1070→                <ChartTooltip content={<ChartTooltipContent />} />
+  1071→                <ChartLegend content={<ChartLegendContent />} />
+  1072→              </PieChart>
+  1073→            </ChartContainer>
+  1074→          </CardContent>
+  1075→        </Card>
+  1076→      </div>
+  1077→
+  1078→      {/* Filters */}
+  1079→      <Card>
+  1080→        <CardContent className="p-4">
+  1081→          <div className="flex flex-wrap items-center gap-3">
+  1082→            <div className="relative flex-1 min-w-[200px]">
+  1083→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+  1084→              <Input
+  1085→                placeholder="Search by tenant name..."
+  1086→                className="pl-9"
+  1087→                value={searchQuery}
+  1088→                onChange={e => setSearchQuery(e.target.value)}
+  1089→              />
+  1090→            </div>
+  1091→            <Select value={statusFilter} onValueChange={setStatusFilter}>
+  1092→              <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+  1093→              <SelectContent>
+  1094→                <SelectItem value="all">All Status</SelectItem>
+  1095→                <SelectItem value="paid">Paid</SelectItem>
+  1096→                <SelectItem value="pending">Pending</SelectItem>
+  1097→                <SelectItem value="overdue">Overdue</SelectItem>
+  1098→                <SelectItem value="failed">Failed</SelectItem>
+  1099→              </SelectContent>
+  1100→            </Select>
+  1101→            <Select value={monthFilter} onValueChange={setMonthFilter}>
+  1102→              <SelectTrigger className="w-36"><SelectValue placeholder="Month" /></SelectTrigger>
+  1103→              <SelectContent>
+  1104→                <SelectItem value="all">All Months</SelectItem>
+  1105→                {MONTH_NAMES.map((m, i) => (
+  1106→                  <SelectItem key={i} value={String(i + 1)}>{m}</SelectItem>
+  1107→                ))}
+  1108→              </SelectContent>
+  1109→            </Select>
+  1110→            <Select value={yearFilter} onValueChange={setYearFilter}>
+  1111→              <SelectTrigger className="w-28"><SelectValue placeholder="Year" /></SelectTrigger>
+  1112→              <SelectContent>
+  1113→                <SelectItem value="all">All Years</SelectItem>
+  1114→                {[2024, 2025, 2026].map(y => (
+  1115→                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+  1116→                ))}
+  1117→              </SelectContent>
+  1118→            </Select>
+  1119→            <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+  1120→              <SelectTrigger className="w-40"><SelectValue placeholder="Property" /></SelectTrigger>
+  1121→              <SelectContent>
+  1122→                <SelectItem value="all">All Properties</SelectItem>
+  1123→                {properties.map(p => (
+  1124→                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+  1125→                ))}
+  1126→              </SelectContent>
+  1127→            </Select>
+  1128→            <Select value={methodFilter} onValueChange={setMethodFilter}>
+  1129→              <SelectTrigger className="w-36"><SelectValue placeholder="Method" /></SelectTrigger>
+  1130→              <SelectContent>
+  1131→                <SelectItem value="all">All Methods</SelectItem>
+  1132→                {Object.entries(METHOD_CONFIG).map(([key, cfg]) => (
+  1133→                  <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+  1134→                ))}
+  1135→              </SelectContent>
+  1136→            </Select>
+  1137→          </div>
+  1138→        </CardContent>
+  1139→      </Card>
+  1140→
+  1141→      {/* Payment Table */}
+  1142→      <Card>
+  1143→        <CardContent className="p-0">
+  1144→          <ScrollArea className="w-full">
+  1145→            <Table>
+  1146→              <TableHeader>
+  1147→                <TableRow>
+  1148→                  <TableHead className="w-40">Tenant</TableHead>
+  1149→                  <TableHead>Property</TableHead>
+  1150→                  <TableHead>Month/Year</TableHead>
+  1151→                  <TableHead className="text-right">Rent</TableHead>
+  1152→                  <TableHead className="text-right">Electricity</TableHead>
+  1153→                  <TableHead className="text-right">Water</TableHead>
+  1154→                  <TableHead className="text-right">WiFi</TableHead>
+  1155→                  <TableHead className="text-right">Food</TableHead>
+  1156→                  <TableHead className="text-right">Late Fine</TableHead>
+  1157→                  <TableHead className="text-right font-semibold">Total</TableHead>
+  1158→                  <TableHead>Status</TableHead>
+  1159→                  <TableHead>Method</TableHead>
+  1160→                  <TableHead>Due Date</TableHead>
+  1161→                  <TableHead>Paid Date</TableHead>
+  1162→                  <TableHead className="w-12">Actions</TableHead>
+  1163→                </TableRow>
+  1164→              </TableHeader>
+  1165→              <TableBody>
+  1166→                {filteredPayments.length === 0 ? (
+  1167→                  <TableRow>
+  1168→                    <TableCell colSpan={15} className="text-center py-12 text-muted-foreground">
+  1169→                      <FileText className="w-10 h-10 mx-auto mb-2 opacity-40" />
+  1170→                      <p>No payments found</p>
+  1171→                      <p className="text-xs">Try adjusting your filters or record a new payment</p>
+  1172→                    </TableCell>
+  1173→                  </TableRow>
+  1174→                ) : (
+  1175→                  filteredPayments.map(payment => {
+  1176→                    const statusCfg = STATUS_CONFIG[payment.status]
+  1177→                    const methodCfg = METHOD_CONFIG[payment.paymentMethod]
+  1178→                    const total = payment.rentAmount + payment.electricity + payment.water +
+  1179→                      payment.wifi + payment.food + payment.laundry + payment.parking +
+  1180→                      payment.otherCharges + payment.lateFine - payment.discount - payment.advanceAdjust
+  1181→
+  1182→                    return (
+  1183→                      <TableRow key={payment.id} className="group hover:bg-muted/50">
+  1184→                        <TableCell className="font-medium">{payment.tenant.name}</TableCell>
+  1185→                        <TableCell className="text-muted-foreground">
+  1186→                          {payment.tenant.room ? `Room ${payment.tenant.room.number}` : '—'}
+  1187→                        </TableCell>
+  1188→                        <TableCell>{MONTH_SHORT[payment.month - 1]} {payment.year}</TableCell>
+  1189→                        <TableCell className="text-right">{formatCurrency(payment.rentAmount)}</TableCell>
+  1190→                        <TableCell className="text-right">{payment.electricity > 0 ? formatCurrency(payment.electricity) : '—'}</TableCell>
+  1191→                        <TableCell className="text-right">{payment.water > 0 ? formatCurrency(payment.water) : '—'}</TableCell>
+  1192→                        <TableCell className="text-right">{payment.wifi > 0 ? formatCurrency(payment.wifi) : '—'}</TableCell>
+  1193→                        <TableCell className="text-right">{payment.food > 0 ? formatCurrency(payment.food) : '—'}</TableCell>
+  1194→                        <TableCell className="text-right">{payment.lateFine > 0 ? formatCurrency(payment.lateFine) : '—'}</TableCell>
+  1195→                        <TableCell className="text-right font-semibold">{formatCurrency(total)}</TableCell>
+  1196→                        <TableCell>
+  1197→                          <Badge variant="secondary" className={`${statusCfg.bgClass} ${statusCfg.textClass} text-xs`}>
+  1198→                            <div className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClass} mr-1`} />
+  1199→                            {statusCfg.label}
+  1200→                          </Badge>
+  1201→                        </TableCell>
+  1202→                        <TableCell>
+  1203→                          <span className="flex items-center gap-1 text-xs">
+  1204→                            <methodCfg.icon className="w-3.5 h-3.5 text-muted-foreground" />
+  1205→                            {methodCfg.label}
+  1206→                          </span>
+  1207→                        </TableCell>
+  1208→                        <TableCell className="text-xs">{formatDate(payment.dueDate)}</TableCell>
+  1209→                        <TableCell className="text-xs">{formatDate(payment.paidDate)}</TableCell>
+  1210→                        <TableCell>
+  1211→                          <DropdownMenu>
+  1212→                            <DropdownMenuTrigger asChild>
+  1213→                              <Button variant="ghost" size="icon" className="h-8 w-8">
+  1214→                                <MoreVertical className="w-4 h-4" />
+  1215→                              </Button>
+  1216→                            </DropdownMenuTrigger>
+  1217→                            <DropdownMenuContent align="end">
+  1218→                              <DropdownMenuItem onClick={() => { setSelectedPayment(payment); setShowReceiptDialog(true) }}>
+  1219→                                <Eye className="w-4 h-4 mr-2" /> View Receipt
+  1220→                              </DropdownMenuItem>
+  1221→                              {payment.status !== 'paid' && (
+  1222→                                <DropdownMenuItem onClick={() => { setSelectedPayment(payment); setShowMarkPaidDialog(true) }}>
+  1223→                                  <CheckCircle2 className="w-4 h-4 mr-2" /> Mark as Paid
+  1224→                                </DropdownMenuItem>
+  1225→                              )}
+  1226→                              {(payment.status === 'pending' || payment.status === 'overdue') && (
+  1227→                                <DropdownMenuItem onClick={() => handleSendReminder(payment)}>
+  1228→                                  <Send className="w-4 h-4 mr-2" /> Send Reminder
+  1229→                                </DropdownMenuItem>
+  1230→                              )}
+  1231→                            </DropdownMenuContent>
+  1232→                          </DropdownMenu>
+  1233→                        </TableCell>
+  1234→                      </TableRow>
+  1235→                    )
+  1236→                  })
+  1237→                )}
+  1238→              </TableBody>
+  1239→            </Table>
+  1240→          </ScrollArea>
+  1241→        </CardContent>
+  1242→      </Card>
+  1243→
+  1244→      {/* Dialogs */}
+  1245→      <RecordPaymentDialog
+  1246→        open={showRecordDialog}
+  1247→        onClose={() => setShowRecordDialog(false)}
+  1248→        tenants={tenants}
+  1249→        properties={properties}
+  1250→        onSubmit={handleRecordPayment}
+  1251→        loading={actionLoading}
+  1252→      />
+  1253→
+  1254→      <PaymentReceiptDialog
+  1255→        payment={selectedPayment}
+  1256→        open={showReceiptDialog}
+  1257→        onClose={() => { setShowReceiptDialog(false); setSelectedPayment(null) }}
+  1258→      />
+  1259→
+  1260→      <MarkAsPaidDialog
+  1261→        open={showMarkPaidDialog}
+  1262→        onClose={() => { setShowMarkPaidDialog(false); setSelectedPayment(null) }}
+  1263→        onConfirm={handleMarkAsPaid}
+  1264→        payment={selectedPayment}
+  1265→        loading={actionLoading}
+  1266→      />
+  1267→    </div>
+  1268→  )
+  1269→}
+  1270→

@@ -1,0 +1,1242 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { ScrollArea } from '@/components/ui/scroll-area'
+    13→import {
+    14→  Dialog,
+    15→  DialogContent,
+    16→  DialogDescription,
+    17→  DialogFooter,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→} from '@/components/ui/dialog'
+    21→import {
+    22→  Select,
+    23→  SelectContent,
+    24→  SelectItem,
+    25→  SelectTrigger,
+    26→  SelectValue,
+    27→} from '@/components/ui/select'
+    28→import {
+    29→  Table,
+    30→  TableBody,
+    31→  TableCell,
+    32→  TableHead,
+    33→  TableHeader,
+    34→  TableRow,
+    35→} from '@/components/ui/table'
+    36→import {
+    37→  DropdownMenu,
+    38→  DropdownMenuContent,
+    39→  DropdownMenuItem,
+    40→  DropdownMenuTrigger,
+    41→} from '@/components/ui/dropdown-menu'
+    42→import {
+    43→  ChartContainer,
+    44→  ChartTooltip,
+    45→  ChartTooltipContent,
+    46→  ChartLegend,
+    47→  ChartLegendContent,
+    48→  type ChartConfig,
+    49→} from '@/components/ui/chart'
+    50→import {
+    51→  BarChart,
+    52→  Bar,
+    53→  PieChart,
+    54→  Pie,
+    55→  Cell,
+    56→  XAxis,
+    57→  YAxis,
+    58→  CartesianGrid,
+    59→} from 'recharts'
+    60→import {
+    61→  MessageSquareWarning,
+    62→  AlertCircle,
+    63→  Clock,
+    64→  CheckCircle2,
+    65→  Plus,
+    66→  Search,
+    67→  Eye,
+    68→  MoreVertical,
+    69→  Loader2,
+    70→  UserCircle,
+    71→  Wrench,
+    72→  Sparkles,
+    73→  Volume2,
+    74→  Utensils,
+    75→  Users,
+    76→  HelpCircle,
+    77→  Star,
+    78→  ArrowUpDown,
+    79→  FileText,
+    80→  Filter,
+    81→  UserCheck,
+    82→  CalendarDays,
+    83→  XCircle,
+    84→  CircleDot,
+    85→  Timer,
+    86→} from 'lucide-react'
+    87→
+    88→// ── Types ────────────────────────────────────────────────────────────────────
+    89→
+    90→type ComplaintStatus = 'open' | 'assigned' | 'in_progress' | 'resolved' | 'closed'
+    91→type ComplaintPriority = 'low' | 'medium' | 'high' | 'urgent'
+    92→type ComplaintCategory = 'maintenance' | 'cleanliness' | 'noise' | 'food' | 'staff' | 'other'
+    93→
+    94→interface TenantInfo {
+    95→  id: string
+    96→  name: string
+    97→  phone?: string
+    98→  room?: { id: string; name: string; number: string } | null
+    99→}
+   100→
+   101→interface StaffInfo {
+   102→  id: string
+   103→  name: string
+   104→  email?: string
+   105→  phone?: string
+   106→}
+   107→
+   108→interface CreatorInfo {
+   109→  id: string
+   110→  name: string
+   111→  email?: string
+   112→}
+   113→
+   114→interface ComplaintData {
+   115→  id: string
+   116→  title: string
+   117→  description: string
+   118→  category: ComplaintCategory
+   119→  priority: ComplaintPriority
+   120→  status: ComplaintStatus
+   121→  rating?: number | null
+   122→  resolution?: string | null
+   123→  propertyId: string
+   124→  tenantId: string
+   125→  tenant: TenantInfo
+   126→  assignedToId?: string | null
+   127→  assignedTo?: StaffInfo | null
+   128→  createdById: string
+   129→  createdBy?: CreatorInfo | null
+   130→  createdAt: string
+   131→  updatedAt: string
+   132→}
+   133→
+   134→interface PropertyInfo {
+   135→  id: string
+   136→  name: string
+   137→}
+   138→
+   139→interface RaiseComplaintFormData {
+   140→  title: string
+   141→  description: string
+   142→  category: ComplaintCategory
+   143→  priority: ComplaintPriority
+   144→  tenantId: string
+   145→  propertyId: string
+   146→}
+   147→
+   148→// ── Constants ────────────────────────────────────────────────────────────────
+   149→
+   150→const STATUS_CONFIG: Record<ComplaintStatus, { label: string; bgClass: string; textClass: string; dotClass: string; icon: typeof CircleDot }> = {
+   151→  open: { label: 'Open', bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300', dotClass: 'bg-blue-500', icon: CircleDot },
+   152→  assigned: { label: 'Assigned', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500', icon: UserCheck },
+   153→  in_progress: { label: 'In Progress', bgClass: 'bg-orange-100 dark:bg-orange-950/50', textClass: 'text-orange-700 dark:text-orange-300', dotClass: 'bg-orange-500', icon: Clock },
+   154→  resolved: { label: 'Resolved', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', dotClass: 'bg-emerald-500', icon: CheckCircle2 },
+   155→  closed: { label: 'Closed', bgClass: 'bg-gray-100 dark:bg-gray-950/50', textClass: 'text-gray-700 dark:text-gray-300', dotClass: 'bg-gray-500', icon: XCircle },
+   156→}
+   157→
+   158→const PRIORITY_CONFIG: Record<ComplaintPriority, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   159→  low: { label: 'Low', bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300', dotClass: 'bg-blue-500' },
+   160→  medium: { label: 'Medium', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500' },
+   161→  high: { label: 'High', bgClass: 'bg-orange-100 dark:bg-orange-950/50', textClass: 'text-orange-700 dark:text-orange-300', dotClass: 'bg-orange-500' },
+   162→  urgent: { label: 'Urgent', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', dotClass: 'bg-red-500' },
+   163→}
+   164→
+   165→const CATEGORY_CONFIG: Record<ComplaintCategory, { label: string; bgClass: string; textClass: string; icon: typeof Wrench }> = {
+   166→  maintenance: { label: 'Maintenance', bgClass: 'bg-orange-100 dark:bg-orange-950/50', textClass: 'text-orange-700 dark:text-orange-300', icon: Wrench },
+   167→  cleanliness: { label: 'Cleanliness', bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300', icon: Sparkles },
+   168→  noise: { label: 'Noise', bgClass: 'bg-yellow-100 dark:bg-yellow-950/50', textClass: 'text-yellow-700 dark:text-yellow-300', icon: Volume2 },
+   169→  food: { label: 'Food', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', icon: Utensils },
+   170→  staff: { label: 'Staff', bgClass: 'bg-purple-100 dark:bg-purple-950/50', textClass: 'text-purple-700 dark:text-purple-300', icon: Users },
+   171→  other: { label: 'Other', bgClass: 'bg-gray-100 dark:bg-gray-950/50', textClass: 'text-gray-700 dark:text-gray-300', icon: HelpCircle },
+   172→}
+   173→
+   174→const STATUS_PIE_CONFIG: ChartConfig = {
+   175→  open: { label: 'Open', color: '#3b82f6' },
+   176→  assigned: { label: 'Assigned', color: '#f59e0b' },
+   177→  in_progress: { label: 'In Progress', color: '#f97316' },
+   178→  resolved: { label: 'Resolved', color: '#10b981' },
+   179→  closed: { label: 'Closed', color: '#9ca3af' },
+   180→}
+   181→
+   182→const STATUS_PIE_COLORS: Record<ComplaintStatus, string> = {
+   183→  open: '#3b82f6',
+   184→  assigned: '#f59e0b',
+   185→  in_progress: '#f97316',
+   186→  resolved: '#10b981',
+   187→  closed: '#9ca3af',
+   188→}
+   189→
+   190→const PRIORITY_BAR_CONFIG: ChartConfig = {
+   191→  low: { label: 'Low', color: '#3b82f6' },
+   192→  medium: { label: 'Medium', color: '#f59e0b' },
+   193→  high: { label: 'High', color: '#f97316' },
+   194→  urgent: { label: 'Urgent', color: '#ef4444' },
+   195→}
+   196→
+   197→const PRIORITY_BAR_COLORS: Record<ComplaintPriority, string> = {
+   198→  low: '#3b82f6',
+   199→  medium: '#f59e0b',
+   200→  high: '#f97316',
+   201→  urgent: '#ef4444',
+   202→}
+   203→
+   204→const EMPTY_FORM: RaiseComplaintFormData = {
+   205→  title: '',
+   206→  description: '',
+   207→  category: 'maintenance',
+   208→  priority: 'medium',
+   209→  tenantId: '',
+   210→  propertyId: '',
+   211→}
+   212→
+   213→// ── Helpers ──────────────────────────────────────────────────────────────────
+   214→
+   215→function formatDate(dateStr?: string | null): string {
+   216→  if (!dateStr) return '—'
+   217→  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   218→}
+   219→
+   220→function formatRelativeTime(dateStr: string): string {
+   221→  const date = new Date(dateStr)
+   222→  const now = new Date()
+   223→  const diffMs = now.getTime() - date.getTime()
+   224→  const diffMins = Math.floor(diffMs / 60000)
+   225→  const diffHours = Math.floor(diffMs / 3600000)
+   226→  const diffDays = Math.floor(diffMs / 86400000)
+   227→
+   228→  if (diffMins < 1) return 'Just now'
+   229→  if (diffMins < 60) return `${diffMins}m ago`
+   230→  if (diffHours < 24) return `${diffHours}h ago`
+   231→  if (diffDays < 7) return `${diffDays}d ago`
+   232→  return date.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })
+   233→}
+   234→
+   235→// ── Skeleton Loaders ─────────────────────────────────────────────────────────
+   236→
+   237→function StatsCardSkeleton() {
+   238→  return (
+   239→    <Card>
+   240→      <CardContent className="p-6">
+   241→        <div className="flex items-center justify-between">
+   242→          <div className="space-y-2">
+   243→            <Skeleton className="h-4 w-24" />
+   244→            <Skeleton className="h-8 w-16" />
+   245→          </div>
+   246→          <Skeleton className="h-10 w-10 rounded-lg" />
+   247→        </div>
+   248→      </CardContent>
+   249→    </Card>
+   250→  )
+   251→}
+   252→
+   253→function ChartSkeleton() {
+   254→  return (
+   255→    <Card>
+   256→      <CardContent className="p-6">
+   257→        <Skeleton className="h-4 w-32 mb-4" />
+   258→        <Skeleton className="h-64 w-full" />
+   259→      </CardContent>
+   260→    </Card>
+   261→  )
+   262→}
+   263→
+   264→function TableSkeleton() {
+   265→  return (
+   266→    <div className="space-y-3">
+   267→      <Skeleton className="h-10 w-full rounded" />
+   268→      {Array.from({ length: 5 }).map((_, i) => (
+   269→        <Skeleton key={i} className="h-12 w-full rounded" />
+   270→      ))}
+   271→    </div>
+   272→  )
+   273→}
+   274→
+   275→// ── Stats Card ───────────────────────────────────────────────────────────────
+   276→
+   277→interface StatsCardProps {
+   278→  title: string
+   279→  value: string | number
+   280→  icon: React.ElementType
+   281→  iconBg?: string
+   282→  iconColor?: string
+   283→  subtitle?: string
+   284→}
+   285→
+   286→function StatsCard({ title, value, icon: Icon, iconBg = 'bg-emerald-50 dark:bg-emerald-950/50', iconColor = 'text-emerald-600 dark:text-emerald-400', subtitle }: StatsCardProps) {
+   287→  return (
+   288→    <Card className="hover:shadow-md transition-shadow">
+   289→      <CardContent className="p-6">
+   290→        <div className="flex items-center justify-between">
+   291→          <div className="space-y-1">
+   292→            <p className="text-sm text-muted-foreground font-medium">{title}</p>
+   293→            <p className="text-2xl font-bold tracking-tight">{value}</p>
+   294→            {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
+   295→          </div>
+   296→          <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${iconBg}`}>
+   297→            <Icon className={`w-5 h-5 ${iconColor}`} />
+   298→          </div>
+   299→        </div>
+   300→      </CardContent>
+   301→    </Card>
+   302→  )
+   303→}
+   304→
+   305→// ── Star Rating Component ────────────────────────────────────────────────────
+   306→
+   307→function StarRating({ rating, onChange, readonly = false }: { rating: number; onChange?: (r: number) => void; readonly?: boolean }) {
+   308→  return (
+   309→    <div className="flex items-center gap-0.5">
+   310→      {Array.from({ length: 5 }).map((_, i) => (
+   311→        <button
+   312→          key={i}
+   313→          type="button"
+   314→          disabled={readonly}
+   315→          onClick={() => onChange?.(i + 1)}
+   316→          className={`${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
+   317→        >
+   318→          <Star
+   319→            className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+   320→          />
+   321→        </button>
+   322→      ))}
+   323→    </div>
+   324→  )
+   325→}
+   326→
+   327→// ── Complaint Detail Dialog ──────────────────────────────────────────────────
+   328→
+   329→function ComplaintDetailDialog({
+   330→  complaint,
+   331→  open,
+   332→  onClose,
+   333→  staff,
+   334→  onUpdateStatus,
+   335→  onAssignStaff,
+   336→  onAddResolution,
+   337→  loading,
+   338→}: {
+   339→  complaint: ComplaintData | null
+   340→  open: boolean
+   341→  onClose: () => void
+   342→  staff: StaffInfo[]
+   343→  onUpdateStatus: (id: string, status: ComplaintStatus, resolution?: string, rating?: number) => void
+   344→  onAssignStaff: (id: string, staffId: string) => void
+   345→  onAddResolution: (id: string, resolution: string, rating: number) => void
+   346→  loading: boolean
+   347→}) {
+   348→  // Derive initial values from complaint
+   349→  const initialAssignTo = complaint?.assignedToId || ''
+   350→  const initialRating = complaint?.rating || 0
+   351→
+   352→  const [assignTo, setAssignTo] = useState(initialAssignTo)
+   353→  const [newStatus, setNewStatus] = useState<ComplaintStatus | ''>('')
+   354→  const [resolutionNotes, setResolutionNotes] = useState('')
+   355→  const [resolutionRating, setResolutionRating] = useState(initialRating)
+   356→
+   357→  if (!complaint) return null
+   358→
+   359→  const statusCfg = STATUS_CONFIG[complaint.status]
+   360→  const priorityCfg = PRIORITY_CONFIG[complaint.priority]
+   361→  const categoryCfg = CATEGORY_CONFIG[complaint.category]
+   362→
+   363→  // Build timeline from status changes
+   364→  const timeline: { status: ComplaintStatus; date: string; label: string }[] = [
+   365→    { status: 'open', date: complaint.createdAt, label: `Complaint created by ${complaint.createdBy?.name || 'System'}` },
+   366→  ]
+   367→  if (complaint.assignedTo) {
+   368→    timeline.push({ status: 'assigned', date: complaint.updatedAt, label: `Assigned to ${complaint.assignedTo.name}` })
+   369→  }
+   370→  if (['in_progress', 'resolved', 'closed'].includes(complaint.status)) {
+   371→    timeline.push({ status: 'in_progress', date: complaint.updatedAt, label: 'Work started' })
+   372→  }
+   373→  if (['resolved', 'closed'].includes(complaint.status)) {
+   374→    timeline.push({ status: 'resolved', date: complaint.updatedAt, label: 'Complaint resolved' })
+   375→  }
+   376→  if (complaint.status === 'closed') {
+   377→    timeline.push({ status: 'closed', date: complaint.updatedAt, label: 'Complaint closed' })
+   378→  }
+   379→
+   380→  return (
+   381→    <Dialog open={open} onOpenChange={onClose}>
+   382→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   383→        <DialogHeader>
+   384→          <DialogTitle className="flex items-center gap-2">
+   385→            <MessageSquareWarning className="w-5 h-5 text-emerald-600" />
+   386→            {complaint.title}
+   387→          </DialogTitle>
+   388→          <DialogDescription>
+   389→            Complaint #{complaint.id.slice(-8).toUpperCase()}
+   390→          </DialogDescription>
+   391→        </DialogHeader>
+   392→
+   393→        <div className="space-y-5">
+   394→          {/* Status Badges Row */}
+   395→          <div className="flex flex-wrap items-center gap-2">
+   396→            <Badge variant="secondary" className={`${statusCfg.bgClass} ${statusCfg.textClass}`}>
+   397→              <div className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClass} mr-1`} />
+   398→              {statusCfg.label}
+   399→            </Badge>
+   400→            <Badge variant="secondary" className={`${priorityCfg.bgClass} ${priorityCfg.textClass}`}>
+   401→              <div className={`h-1.5 w-1.5 rounded-full ${priorityCfg.dotClass} mr-1`} />
+   402→              {priorityCfg.label}
+   403→            </Badge>
+   404→            <Badge variant="secondary" className={`${categoryCfg.bgClass} ${categoryCfg.textClass}`}>
+   405→              <categoryCfg.icon className="w-3 h-3 mr-1" />
+   406→              {categoryCfg.label}
+   407→            </Badge>
+   408→          </div>
+   409→
+   410→          {/* Description */}
+   411→          <div className="bg-muted/50 rounded-lg p-4">
+   412→            <p className="text-sm font-medium text-muted-foreground mb-1">Description</p>
+   413→            <p className="text-sm whitespace-pre-wrap">{complaint.description}</p>
+   414→          </div>
+   415→
+   416→          {/* Info Grid */}
+   417→          <div className="grid grid-cols-2 gap-3 text-sm">
+   418→            <div className="flex justify-between p-2 bg-muted/30 rounded">
+   419→              <span className="text-muted-foreground">Tenant</span>
+   420→              <span className="font-medium">{complaint.tenant.name}</span>
+   421→            </div>
+   422→            <div className="flex justify-between p-2 bg-muted/30 rounded">
+   423→              <span className="text-muted-foreground">Room</span>
+   424→              <span className="font-medium">{complaint.tenant.room?.number || '—'}</span>
+   425→            </div>
+   426→            <div className="flex justify-between p-2 bg-muted/30 rounded">
+   427→              <span className="text-muted-foreground">Assigned To</span>
+   428→              <span className="font-medium">{complaint.assignedTo?.name || 'Unassigned'}</span>
+   429→            </div>
+   430→            <div className="flex justify-between p-2 bg-muted/30 rounded">
+   431→              <span className="text-muted-foreground">Created</span>
+   432→              <span className="font-medium">{formatDate(complaint.createdAt)}</span>
+   433→            </div>
+   434→          </div>
+   435→
+   436→          {/* Rating */}
+   437→          {complaint.rating && (
+   438→            <div className="flex items-center gap-2 text-sm">
+   439→              <span className="text-muted-foreground">Rating:</span>
+   440→              <StarRating rating={complaint.rating} readonly />
+   441→            </div>
+   442→          )}
+   443→
+   444→          {/* Resolution */}
+   445→          {complaint.resolution && (
+   446→            <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-4">
+   447→              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300 mb-1">Resolution</p>
+   448→              <p className="text-sm whitespace-pre-wrap">{complaint.resolution}</p>
+   449→            </div>
+   450→          )}
+   451→
+   452→          {/* Timeline */}
+   453→          <div className="space-y-2">
+   454→            <p className="text-sm font-medium text-muted-foreground">Timeline</p>
+   455→            <div className="space-y-0">
+   456→              {timeline.map((item, idx) => {
+   457→                const cfg = STATUS_CONFIG[item.status]
+   458→                const TimelineIcon = cfg.icon
+   459→                return (
+   460→                  <div key={idx} className="flex items-start gap-3 pb-3">
+   461→                    <div className="flex flex-col items-center">
+   462→                      <div className={`flex items-center justify-center w-7 h-7 rounded-full ${cfg.bgClass}`}>
+   463→                        <TimelineIcon className={`w-3.5 h-3.5 ${cfg.textClass}`} />
+   464→                      </div>
+   465→                      {idx < timeline.length - 1 && <div className="w-px h-6 bg-border mt-1" />}
+   466→                    </div>
+   467→                    <div className="pt-0.5">
+   468→                      <p className="text-sm font-medium">{item.label}</p>
+   469→                      <p className="text-xs text-muted-foreground">{formatRelativeTime(item.date)}</p>
+   470→                    </div>
+   471→                  </div>
+   472→                )
+   473→              })}
+   474→            </div>
+   475→          </div>
+   476→
+   477→          {/* Actions */}
+   478→          <div className="border-t pt-4 space-y-4">
+   479→            {/* Assign to Staff */}
+   480→            {complaint.status !== 'resolved' && complaint.status !== 'closed' && (
+   481→              <div className="flex items-end gap-3">
+   482→                <div className="flex-1 space-y-1.5">
+   483→                  <Label className="text-xs">Assign to Staff</Label>
+   484→                  <Select value={assignTo} onValueChange={setAssignTo}>
+   485→                    <SelectTrigger><SelectValue placeholder="Select staff member" /></SelectTrigger>
+   486→                    <SelectContent>
+   487→                      {staff.map(s => (
+   488→                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+   489→                      ))}
+   490→                    </SelectContent>
+   491→                  </Select>
+   492→                </div>
+   493→                <Button
+   494→                  size="sm"
+   495→                  onClick={() => assignTo && onAssignStaff(complaint.id, assignTo)}
+   496→                  disabled={!assignTo || loading}
+   497→                  className="bg-emerald-600 hover:bg-emerald-700"
+   498→                >
+   499→                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+   500→                </Button>
+   501→              </div>
+   502→            )}
+   503→
+   504→            {/* Update Status */}
+   505→            {complaint.status !== 'resolved' && complaint.status !== 'closed' && (
+   506→              <div className="flex items-end gap-3">
+   507→                <div className="flex-1 space-y-1.5">
+   508→                  <Label className="text-xs">Update Status</Label>
+   509→                  <Select value={newStatus} onValueChange={v => setNewStatus(v as ComplaintStatus)}>
+   510→                    <SelectTrigger><SelectValue placeholder="Select new status" /></SelectTrigger>
+   511→                    <SelectContent>
+   512→                      {Object.entries(STATUS_CONFIG)
+   513→                        .filter(([key]) => key !== complaint.status)
+   514→                        .map(([key, cfg]) => (
+   515→                          <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   516→                        ))}
+   517→                    </SelectContent>
+   518→                  </Select>
+   519→                </div>
+   520→                <Button
+   521→                  size="sm"
+   522→                  onClick={() => newStatus && onUpdateStatus(complaint.id, newStatus as ComplaintStatus)}
+   523→                  disabled={!newStatus || loading}
+   524→                  className="bg-emerald-600 hover:bg-emerald-700"
+   525→                >
+   526→                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update'}
+   527→                </Button>
+   528→              </div>
+   529→            )}
+   530→
+   531→            {/* Add Resolution Notes */}
+   532→            {complaint.status === 'in_progress' && (
+   533→              <div className="space-y-3">
+   534→                <p className="text-sm font-medium text-muted-foreground">Resolution</p>
+   535→                <Textarea
+   536→                  placeholder="Add resolution notes..."
+   537→                  value={resolutionNotes}
+   538→                  onChange={e => setResolutionNotes(e.target.value)}
+   539→                  rows={3}
+   540→                />
+   541→                <div className="flex items-center gap-3">
+   542→                  <Label className="text-xs">Rating:</Label>
+   543→                  <StarRating rating={resolutionRating} onChange={setResolutionRating} />
+   544→                </div>
+   545→                <Button
+   546→                  onClick={() => onAddResolution(complaint.id, resolutionNotes, resolutionRating)}
+   547→                  disabled={!resolutionNotes || loading}
+   548→                  className="bg-emerald-600 hover:bg-emerald-700"
+   549→                >
+   550→                  {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+   551→                  Resolve Complaint
+   552→                </Button>
+   553→              </div>
+   554→            )}
+   555→          </div>
+   556→        </div>
+   557→
+   558→        <DialogFooter>
+   559→          <Button variant="outline" onClick={onClose}>Close</Button>
+   560→        </DialogFooter>
+   561→      </DialogContent>
+   562→    </Dialog>
+   563→  )
+   564→}
+   565→
+   566→// ── Raise Complaint Dialog ───────────────────────────────────────────────────
+   567→
+   568→function RaiseComplaintDialog({
+   569→  open,
+   570→  onClose,
+   571→  tenants,
+   572→  properties,
+   573→  onSubmit,
+   574→  loading,
+   575→}: {
+   576→  open: boolean
+   577→  onClose: () => void
+   578→  tenants: { id: string; name: string }[]
+   579→  properties: PropertyInfo[]
+   580→  onSubmit: (data: RaiseComplaintFormData) => void
+   581→  loading: boolean
+   582→}) {
+   583→  // Reset form when dialog opens - use key prop on parent Dialog instead
+   584→  const [form, setForm] = useState<RaiseComplaintFormData>({ ...EMPTY_FORM })
+   585→  const resetForm = () => setForm({ ...EMPTY_FORM })
+   586→
+   587→  const handleField = (field: keyof RaiseComplaintFormData, value: string) => {
+   588→    setForm(prev => ({ ...prev, [field]: value }))
+   589→  }
+   590→
+   591→  const isValid = form.title && form.description && form.tenantId && form.propertyId
+   592→
+   593→  return (
+   594→    <Dialog open={open} onOpenChange={onClose}>
+   595→      <DialogContent className="max-w-lg">
+   596→        <DialogHeader>
+   597→          <DialogTitle className="flex items-center gap-2">
+   598→            <MessageSquareWarning className="w-5 h-5 text-emerald-600" />
+   599→            Raise Complaint
+   600→          </DialogTitle>
+   601→          <DialogDescription>
+   602→            Submit a new complaint for resolution
+   603→          </DialogDescription>
+   604→        </DialogHeader>
+   605→
+   606→        <div className="space-y-4">
+   607→          <div className="space-y-1.5">
+   608→            <Label>Title *</Label>
+   609→            <Input
+   610→              placeholder="Brief description of the complaint"
+   611→              value={form.title}
+   612→              onChange={e => handleField('title', e.target.value)}
+   613→            />
+   614→          </div>
+   615→
+   616→          <div className="space-y-1.5">
+   617→            <Label>Description *</Label>
+   618→            <Textarea
+   619→              placeholder="Provide detailed description of the issue..."
+   620→              value={form.description}
+   621→              onChange={e => handleField('description', e.target.value)}
+   622→              rows={4}
+   623→            />
+   624→          </div>
+   625→
+   626→          <div className="grid grid-cols-2 gap-4">
+   627→            <div className="space-y-1.5">
+   628→              <Label>Category</Label>
+   629→              <Select value={form.category} onValueChange={v => handleField('category', v)}>
+   630→                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+   631→                <SelectContent>
+   632→                  {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+   633→                    <SelectItem key={key} value={key}>
+   634→                      <span className="flex items-center gap-2">
+   635→                        <cfg.icon className="w-3.5 h-3.5" />
+   636→                        {cfg.label}
+   637→                      </span>
+   638→                    </SelectItem>
+   639→                  ))}
+   640→                </SelectContent>
+   641→              </Select>
+   642→            </div>
+   643→            <div className="space-y-1.5">
+   644→              <Label>Priority</Label>
+   645→              <Select value={form.priority} onValueChange={v => handleField('priority', v)}>
+   646→                <SelectTrigger><SelectValue placeholder="Select priority" /></SelectTrigger>
+   647→                <SelectContent>
+   648→                  {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+   649→                    <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   650→                  ))}
+   651→                </SelectContent>
+   652→              </Select>
+   653→            </div>
+   654→          </div>
+   655→
+   656→          <div className="grid grid-cols-2 gap-4">
+   657→            <div className="space-y-1.5">
+   658→              <Label>Tenant *</Label>
+   659→              <Select value={form.tenantId} onValueChange={v => handleField('tenantId', v)}>
+   660→                <SelectTrigger><SelectValue placeholder="Select tenant" /></SelectTrigger>
+   661→                <SelectContent>
+   662→                  {tenants.map(t => (
+   663→                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+   664→                  ))}
+   665→                </SelectContent>
+   666→              </Select>
+   667→            </div>
+   668→            <div className="space-y-1.5">
+   669→              <Label>Property *</Label>
+   670→              <Select value={form.propertyId} onValueChange={v => handleField('propertyId', v)}>
+   671→                <SelectTrigger><SelectValue placeholder="Select property" /></SelectTrigger>
+   672→                <SelectContent>
+   673→                  {properties.map(p => (
+   674→                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   675→                  ))}
+   676→                </SelectContent>
+   677→              </Select>
+   678→            </div>
+   679→          </div>
+   680→        </div>
+   681→
+   682→        <DialogFooter>
+   683→          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+   684→          <Button onClick={() => onSubmit(form)} disabled={!isValid || loading} className="bg-emerald-600 hover:bg-emerald-700">
+   685→            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+   686→            Submit Complaint
+   687→          </Button>
+   688→        </DialogFooter>
+   689→      </DialogContent>
+   690→    </Dialog>
+   691→  )
+   692→}
+   693→
+   694→// ── Main Component ───────────────────────────────────────────────────────────
+   695→
+   696→export function ComplaintsPage() {
+   697→  const { currentUser } = useAppStore()
+   698→
+   699→  // Data
+   700→  const [complaints, setComplaints] = useState<ComplaintData[]>([])
+   701→  const [properties, setProperties] = useState<PropertyInfo[]>([])
+   702→  const [tenants, setTenants] = useState<{ id: string; name: string }[]>([])
+   703→  const [staff, setStaff] = useState<StaffInfo[]>([])
+   704→  const [loading, setLoading] = useState(true)
+   705→  const [actionLoading, setActionLoading] = useState(false)
+   706→
+   707→  // Filters
+   708→  const [searchQuery, setSearchQuery] = useState('')
+   709→  const [statusFilter, setStatusFilter] = useState<string>('all')
+   710→  const [priorityFilter, setPriorityFilter] = useState<string>('all')
+   711→  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+   712→
+   713→  // Dialogs
+   714→  const [showRaiseDialog, setShowRaiseDialog] = useState(false)
+   715→  const [showDetailDialog, setShowDetailDialog] = useState(false)
+   716→  const [selectedComplaint, setSelectedComplaint] = useState<ComplaintData | null>(null)
+   717→
+   718→  // ── Fetch Data ─────────────────────────────────────────────────────────────
+   719→
+   720→  const fetchComplaints = useCallback(async () => {
+   721→    try {
+   722→      const params = new URLSearchParams()
+   723→      if (statusFilter !== 'all') params.set('status', statusFilter)
+   724→      if (categoryFilter !== 'all') params.set('category', categoryFilter)
+   725→      const res = await fetch(`/api/complaints?${params.toString()}`)
+   726→      if (res.ok) {
+   727→        const data = await res.json()
+   728→        setComplaints(data)
+   729→      }
+   730→    } catch (err) {
+   731→      console.error('Failed to fetch complaints:', err)
+   732→    }
+   733→  }, [statusFilter, categoryFilter])
+   734→
+   735→  useEffect(() => {
+   736→    fetchComplaints().finally(() => setLoading(false))
+   737→  }, [fetchComplaints])
+   738→
+   739→  useEffect(() => {
+   740→    async function fetchSupport() {
+   741→      try {
+   742→        const [propRes, tenantRes, staffRes] = await Promise.all([
+   743→          fetch('/api/properties'),
+   744→          fetch('/api/tenants'),
+   745→          fetch('/api/staff'),
+   746→        ])
+   747→        if (propRes.ok) setProperties(await propRes.json())
+   748→        if (tenantRes.ok) {
+   749→          const data = await tenantRes.json()
+   750→          setTenants(data.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name })))
+   751→        }
+   752→        if (staffRes.ok) {
+   753→          const data = await staffRes.json()
+   754→          setStaff(data.map((s: { id: string; name: string; email?: string; phone?: string }) => ({
+   755→            id: s.id,
+   756→            name: s.name,
+   757→            email: s.email,
+   758→            phone: s.phone,
+   759→          })))
+   760→        }
+   761→      } catch (err) {
+   762→        console.error('Failed to fetch support data:', err)
+   763→      }
+   764→    }
+   765→    fetchSupport()
+   766→  }, [])
+   767→
+   768→  // ── Computed Stats ─────────────────────────────────────────────────────────
+   769→
+   770→  const stats = useMemo(() => {
+   771→    const total = complaints.length
+   772→    const open = complaints.filter(c => c.status === 'open').length
+   773→    const inProgress = complaints.filter(c => c.status === 'assigned' || c.status === 'in_progress').length
+   774→    const resolved = complaints.filter(c => c.status === 'resolved' || c.status === 'closed').length
+   775→
+   776→    // Average resolution time (days) for resolved complaints
+   777→    const resolvedComplaints = complaints.filter(c => c.status === 'resolved' || c.status === 'closed')
+   778→    let avgResolutionDays = 0
+   779→    if (resolvedComplaints.length > 0) {
+   780→      const totalDays = resolvedComplaints.reduce((sum, c) => {
+   781→        const created = new Date(c.createdAt)
+   782→        const updated = new Date(c.updatedAt)
+   783→        const diffDays = Math.max(1, Math.ceil((updated.getTime() - created.getTime()) / 86400000))
+   784→        return sum + diffDays
+   785→      }, 0)
+   786→      avgResolutionDays = Math.round(totalDays / resolvedComplaints.length)
+   787→    }
+   788→
+   789→    return { total, open, inProgress, resolved, avgResolutionDays }
+   790→  }, [complaints])
+   791→
+   792→  // ── Chart Data ─────────────────────────────────────────────────────────────
+   793→
+   794→  const statusBreakdownData = useMemo(() => {
+   795→    const counts: Record<ComplaintStatus, number> = { open: 0, assigned: 0, in_progress: 0, resolved: 0, closed: 0 }
+   796→    complaints.forEach(c => {
+   797→      if (counts[c.status] !== undefined) counts[c.status]++
+   798→    })
+   799→    return Object.entries(counts)
+   800→      .filter(([, count]) => count > 0)
+   801→      .map(([status, count]) => ({ status, count, fill: STATUS_PIE_COLORS[status as ComplaintStatus] }))
+   802→  }, [complaints])
+   803→
+   804→  const priorityBreakdownData = useMemo(() => {
+   805→    const counts: Record<ComplaintPriority, number> = { low: 0, medium: 0, high: 0, urgent: 0 }
+   806→    complaints.forEach(c => {
+   807→      if (counts[c.priority] !== undefined) counts[c.priority]++
+   808→    })
+   809→    return Object.entries(counts).map(([priority, count]) => ({
+   810→      priority: PRIORITY_CONFIG[priority as ComplaintPriority].label,
+   811→      count,
+   812→      fill: PRIORITY_BAR_COLORS[priority as ComplaintPriority],
+   813→    }))
+   814→  }, [complaints])
+   815→
+   816→  // ── Filtered Complaints ────────────────────────────────────────────────────
+   817→
+   818→  const filteredComplaints = useMemo(() => {
+   819→    let result = complaints
+   820→
+   821→    if (searchQuery) {
+   822→      const q = searchQuery.toLowerCase()
+   823→      result = result.filter(c =>
+   824→        c.title.toLowerCase().includes(q) ||
+   825→        c.tenant.name.toLowerCase().includes(q) ||
+   826→        c.description.toLowerCase().includes(q)
+   827→      )
+   828→    }
+   829→    if (priorityFilter !== 'all') {
+   830→      result = result.filter(c => c.priority === priorityFilter)
+   831→    }
+   832→
+   833→    return result
+   834→  }, [complaints, searchQuery, priorityFilter])
+   835→
+   836→  // ── Actions ────────────────────────────────────────────────────────────────
+   837→
+   838→  const handleRaiseComplaint = async (formData: RaiseComplaintFormData) => {
+   839→    setActionLoading(true)
+   840→    try {
+   841→      const res = await fetch('/api/complaints', {
+   842→        method: 'POST',
+   843→        headers: { 'Content-Type': 'application/json' },
+   844→        body: JSON.stringify({
+   845→          title: formData.title,
+   846→          description: formData.description,
+   847→          category: formData.category,
+   848→          priority: formData.priority,
+   849→          tenantId: formData.tenantId,
+   850→          propertyId: formData.propertyId,
+   851→          createdById: currentUser?.id || 'system',
+   852→        }),
+   853→      })
+   854→      if (res.ok) {
+   855→        setShowRaiseDialog(false)
+   856→        await fetchComplaints()
+   857→      }
+   858→    } catch (err) {
+   859→      console.error('Failed to raise complaint:', err)
+   860→    } finally {
+   861→      setActionLoading(false)
+   862→    }
+   863→  }
+   864→
+   865→  const handleUpdateStatus = async (id: string, status: ComplaintStatus, resolution?: string, rating?: number) => {
+   866→    setActionLoading(true)
+   867→    try {
+   868→      const body: Record<string, unknown> = { id, status }
+   869→      if (resolution) body.resolution = resolution
+   870→      if (rating) body.rating = rating
+   871→
+   872→      const res = await fetch('/api/complaints', {
+   873→        method: 'PATCH',
+   874→        headers: { 'Content-Type': 'application/json' },
+   875→        body: JSON.stringify(body),
+   876→      })
+   877→      if (res.ok) {
+   878→        setSelectedCom(null)
+   879→        setShowDetailDialog(false)
+   880→        await fetchComplaints()
+   881→      }
+   882→    } catch (err) {
+   883→      console.error('Failed to update complaint:', err)
+   884→    } finally {
+   885→      setActionLoading(false)
+   886→    }
+   887→  }
+   888→
+   889→  const handleAssignStaff = async (id: string, staffId: string) => {
+   890→    setActionLoading(true)
+   891→    try {
+   892→      const res = await fetch('/api/complaints', {
+   893→        method: 'PATCH',
+   894→        headers: { 'Content-Type': 'application/json' },
+   895→        body: JSON.stringify({ id, assignedToId: staffId, status: 'assigned' }),
+   896→      })
+   897→      if (res.ok) {
+   898→        await fetchComplaints()
+   899→        // Update the selected complaint
+   900→        const updated = await res.json()
+   901→        setSelectedComplaint(updated)
+   902→      }
+   903→    } catch (err) {
+   904→      console.error('Failed to assign staff:', err)
+   905→    } finally {
+   906→      setActionLoading(false)
+   907→    }
+   908→  }
+   909→
+   910→  const handleAddResolution = async (id: string, resolution: string, rating: number) => {
+   911→    setActionLoading(true)
+   912→    try {
+   913→      const res = await fetch('/api/complaints', {
+   914→        method: 'PATCH',
+   915→        headers: { 'Content-Type': 'application/json' },
+   916→        body: JSON.stringify({ id, status: 'resolved', resolution, rating }),
+   917→      })
+   918→      if (res.ok) {
+   919→        setSelectedComplaint(null)
+   920→        setShowDetailDialog(false)
+   921→        await fetchComplaints()
+   922→      }
+   923→    } catch (err) {
+   924→      console.error('Failed to resolve complaint:', err)
+   925→    } finally {
+   926→      setActionLoading(false)
+   927→    }
+   928→  }
+   929→
+   930→  // ── Render ─────────────────────────────────────────────────────────────────
+   931→
+   932→  if (loading) {
+   933→    return (
+   934→      <div className="p-6 space-y-6">
+   935→        <div className="flex items-center justify-between">
+   936→          <Skeleton className="h-8 w-48" />
+   937→          <Skeleton className="h-10 w-36" />
+   938→        </div>
+   939→        <div className="grid grid-cols-5 gap-4">
+   940→          {Array.from({ length: 5 }).map((_, i) => <StatsCardSkeleton key={i} />)}
+   941→        </div>
+   942→        <div className="grid grid-cols-2 gap-4">
+   943→          <ChartSkeleton />
+   944→          <ChartSkeleton />
+   945→        </div>
+   946→        <TableSkeleton />
+   947→      </div>
+   948→    )
+   949→  }
+   950→
+   951→  return (
+   952→    <div className="p-6 space-y-6">
+   953→      {/* Page Header */}
+   954→      <div className="flex items-center justify-between">
+   955→        <div>
+   956→          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+   957→            <MessageSquareWarning className="w-6 h-6 text-emerald-600" />
+   958→            Complaints
+   959→          </h1>
+   960→          <p className="text-muted-foreground mt-1">Track and manage tenant complaints and resolutions</p>
+   961→        </div>
+   962→        <Button onClick={() => setShowRaiseDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+   963→          <Plus className="w-4 h-4 mr-2" />
+   964→          Raise Complaint
+   965→        </Button>
+   966→      </div>
+   967→
+   968→      {/* Stats Cards */}
+   969→      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+   970→        <StatsCard
+   971→          title="Total Complaints"
+   972→          value={stats.total}
+   973→          icon={MessageSquareWarning}
+   974→          iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+   975→          iconColor="text-emerald-600 dark:text-emerald-400"
+   976→        />
+   977→        <StatsCard
+   978→          title="Open"
+   979→          value={stats.open}
+   980→          icon={AlertCircle}
+   981→          iconBg="bg-blue-50 dark:bg-blue-950/50"
+   982→          iconColor="text-blue-600 dark:text-blue-400"
+   983→        />
+   984→        <StatsCard
+   985→          title="In Progress"
+   986→          value={stats.inProgress}
+   987→          icon={Clock}
+   988→          iconBg="bg-orange-50 dark:bg-orange-950/50"
+   989→          iconColor="text-orange-600 dark:text-orange-400"
+   990→        />
+   991→        <StatsCard
+   992→          title="Resolved"
+   993→          value={stats.resolved}
+   994→          icon={CheckCircle2}
+   995→          iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+   996→          iconColor="text-emerald-600 dark:text-emerald-400"
+   997→        />
+   998→        <StatsCard
+   999→          title="Avg Resolution"
+  1000→          value={stats.avgResolutionDays > 0 ? `${stats.avgResolutionDays}d` : '—'}
+  1001→          icon={Timer}
+  1002→          iconBg="bg-teal-50 dark:bg-teal-950/50"
+  1003→          iconColor="text-teal-600 dark:text-teal-400"
+  1004→          subtitle="Average time"
+  1005→        />
+  1006→      </div>
+  1007→
+  1008→      {/* Charts */}
+  1009→      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  1010→        {/* Status Pie Chart */}
+  1011→        <Card>
+  1012→          <CardHeader className="pb-2">
+  1013→            <CardTitle className="text-base font-semibold">Status Breakdown</CardTitle>
+  1014→            <CardDescription>Complaint distribution by status</CardDescription>
+  1015→          </CardHeader>
+  1016→          <CardContent>
+  1017→            <ChartContainer config={STATUS_PIE_CONFIG} className="h-64 w-full">
+  1018→              <PieChart>
+  1019→                <Pie
+  1020→                  data={statusBreakdownData}
+  1021→                  cx="50%"
+  1022→                  cy="50%"
+  1023→                  innerRadius={60}
+  1024→                  outerRadius={90}
+  1025→                  paddingAngle={4}
+  1026→                  dataKey="count"
+  1027→                  nameKey="status"
+  1028→                >
+  1029→                  {statusBreakdownData.map((entry, index) => (
+  1030→                    <Cell key={`cell-${index}`} fill={entry.fill} />
+  1031→                  ))}
+  1032→                </Pie>
+  1033→                <ChartTooltip content={<ChartTooltipContent />} />
+  1034→                <ChartLegend content={<ChartLegendContent />} />
+  1035→              </PieChart>
+  1036→            </ChartContainer>
+  1037→          </CardContent>
+  1038→        </Card>
+  1039→
+  1040→        {/* Priority Bar Chart */}
+  1041→        <Card>
+  1042→          <CardHeader className="pb-2">
+  1043→            <CardTitle className="text-base font-semibold">Priority Breakdown</CardTitle>
+  1044→            <CardDescription>Complaint distribution by priority level</CardDescription>
+  1045→          </CardHeader>
+  1046→          <CardContent>
+  1047→            <ChartContainer config={PRIORITY_BAR_CONFIG} className="h-64 w-full">
+  1048→              <BarChart data={priorityBreakdownData} barCategoryGap="30%">
+  1049→                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+  1050→                <XAxis dataKey="priority" tickLine={false} axisLine={false} fontSize={12} />
+  1051→                <YAxis tickLine={false} axisLine={false} fontSize={12} allowDecimals={false} />
+  1052→                <ChartTooltip content={<ChartTooltipContent />} />
+  1053→                <ChartLegend content={<ChartLegendContent />} />
+  1054→                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+  1055→                  {priorityBreakdownData.map((entry, index) => (
+  1056→                    <Cell key={`cell-${index}`} fill={entry.fill} />
+  1057→                  ))}
+  1058→                </Bar>
+  1059→              </BarChart>
+  1060→            </ChartContainer>
+  1061→          </CardContent>
+  1062→        </Card>
+  1063→      </div>
+  1064→
+  1065→      {/* Filters */}
+  1066→      <Card>
+  1067→        <CardContent className="p-4">
+  1068→          <div className="flex flex-wrap items-center gap-3">
+  1069→            <div className="relative flex-1 min-w-[200px]">
+  1070→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+  1071→              <Input
+  1072→                placeholder="Search complaints..."
+  1073→                className="pl-9"
+  1074→                value={searchQuery}
+  1075→                onChange={e => setSearchQuery(e.target.value)}
+  1076→              />
+  1077→            </div>
+  1078→            <Select value={statusFilter} onValueChange={setStatusFilter}>
+  1079→              <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+  1080→              <SelectContent>
+  1081→                <SelectItem value="all">All Status</SelectItem>
+  1082→                <SelectItem value="open">Open</SelectItem>
+  1083→                <SelectItem value="assigned">Assigned</SelectItem>
+  1084→                <SelectItem value="in_progress">In Progress</SelectItem>
+  1085→                <SelectItem value="resolved">Resolved</SelectItem>
+  1086→                <SelectItem value="closed">Closed</SelectItem>
+  1087→              </SelectContent>
+  1088→            </Select>
+  1089→            <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+  1090→              <SelectTrigger className="w-36"><SelectValue placeholder="Priority" /></SelectTrigger>
+  1091→              <SelectContent>
+  1092→                <SelectItem value="all">All Priority</SelectItem>
+  1093→                <SelectItem value="low">Low</SelectItem>
+  1094→                <SelectItem value="medium">Medium</SelectItem>
+  1095→                <SelectItem value="high">High</SelectItem>
+  1096→                <SelectItem value="urgent">Urgent</SelectItem>
+  1097→              </SelectContent>
+  1098→            </Select>
+  1099→            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+  1100→              <SelectTrigger className="w-36"><SelectValue placeholder="Category" /></SelectTrigger>
+  1101→              <SelectContent>
+  1102→                <SelectItem value="all">All Categories</SelectItem>
+  1103→                {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+  1104→                  <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+  1105→                ))}
+  1106→              </SelectContent>
+  1107→            </Select>
+  1108→          </div>
+  1109→        </CardContent>
+  1110→      </Card>
+  1111→
+  1112→      {/* Complaint Table */}
+  1113→      <Card>
+  1114→        <CardContent className="p-0">
+  1115→          <ScrollArea className="w-full">
+  1116→            <Table>
+  1117→              <TableHeader>
+  1118→                <TableRow>
+  1119→                  <TableHead className="w-48">Title</TableHead>
+  1120→                  <TableHead>Category</TableHead>
+  1121→                  <TableHead>Priority</TableHead>
+  1122→                  <TableHead>Status</TableHead>
+  1123→                  <TableHead>Tenant</TableHead>
+  1124→                  <TableHead>Assigned To</TableHead>
+  1125→                  <TableHead>Created</TableHead>
+  1126→                  <TableHead>Rating</TableHead>
+  1127→                  <TableHead className="w-12">Actions</TableHead>
+  1128→                </TableRow>
+  1129→              </TableHeader>
+  1130→              <TableBody>
+  1131→                {filteredComplaints.length === 0 ? (
+  1132→                  <TableRow>
+  1133→                    <TableCell colSpan={9} className="text-center py-12 text-muted-foreground">
+  1134→                      <MessageSquareWarning className="w-10 h-10 mx-auto mb-2 opacity-40" />
+  1135→                      <p>No complaints found</p>
+  1136→                      <p className="text-xs">Try adjusting your filters or raise a new complaint</p>
+  1137→                    </TableCell>
+  1138→                  </TableRow>
+  1139→                ) : (
+  1140→                  filteredComplaints.map(complaint => {
+  1141→                    const statusCfg = STATUS_CONFIG[complaint.status]
+  1142→                    const priorityCfg = PRIORITY_CONFIG[complaint.priority]
+  1143→                    const categoryCfg = CATEGORY_CONFIG[complaint.category]
+  1144→
+  1145→                    return (
+  1146→                      <TableRow key={complaint.id} className="group hover:bg-muted/50">
+  1147→                        <TableCell>
+  1148→                          <div>
+  1149→                            <p className="font-medium text-sm line-clamp-1">{complaint.title}</p>
+  1150→                            <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{complaint.description}</p>
+  1151→                          </div>
+  1152→                        </TableCell>
+  1153→                        <TableCell>
+  1154→                          <Badge variant="secondary" className={`${categoryCfg.bgClass} ${categoryCfg.textClass} text-xs`}>
+  1155→                            <categoryCfg.icon className="w-3 h-3 mr-1" />
+  1156→                            {categoryCfg.label}
+  1157→                          </Badge>
+  1158→                        </TableCell>
+  1159→                        <TableCell>
+  1160→                          <Badge variant="secondary" className={`${priorityCfg.bgClass} ${priorityCfg.textClass} text-xs`}>
+  1161→                            <div className={`h-1.5 w-1.5 rounded-full ${priorityCfg.dotClass} mr-1`} />
+  1162→                            {priorityCfg.label}
+  1163→                          </Badge>
+  1164→                        </TableCell>
+  1165→                        <TableCell>
+  1166→                          <Badge variant="secondary" className={`${statusCfg.bgClass} ${statusCfg.textClass} text-xs`}>
+  1167→                            <div className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClass} mr-1`} />
+  1168→                            {statusCfg.label}
+  1169→                          </Badge>
+  1170→                        </TableCell>
+  1171→                        <TableCell className="text-sm">{complaint.tenant.name}</TableCell>
+  1172→                        <TableCell className="text-sm text-muted-foreground">
+  1173→                          {complaint.assignedTo?.name || '—'}
+  1174→                        </TableCell>
+  1175→                        <TableCell className="text-xs text-muted-foreground">
+  1176→                          {formatDate(complaint.createdAt)}
+  1177→                        </TableCell>
+  1178→                        <TableCell>
+  1179→                          {complaint.rating ? (
+  1180→                            <StarRating rating={complaint.rating} readonly />
+  1181→                          ) : (
+  1182→                            <span className="text-xs text-muted-foreground">—</span>
+  1183→                          )}
+  1184→                        </TableCell>
+  1185→                        <TableCell>
+  1186→                          <DropdownMenu>
+  1187→                            <DropdownMenuTrigger asChild>
+  1188→                              <Button variant="ghost" size="icon" className="h-8 w-8">
+  1189→                                <MoreVertical className="w-4 h-4" />
+  1190→                              </Button>
+  1191→                            </DropdownMenuTrigger>
+  1192→                            <DropdownMenuContent align="end">
+  1193→                              <DropdownMenuItem onClick={() => { setSelectedComplaint(complaint); setShowDetailDialog(true) }}>
+  1194→                                <Eye className="w-4 h-4 mr-2" /> View Details
+  1195→                              </DropdownMenuItem>
+  1196→                              {complaint.status === 'open' && (
+  1197→                                <DropdownMenuItem onClick={() => { setSelectedComplaint(complaint); setShowDetailDialog(true) }}>
+  1198→                                  <UserCheck className="w-4 h-4 mr-2" /> Assign
+  1199→                                </DropdownMenuItem>
+  1200→                              )}
+  1201→                              {['open', 'assigned', 'in_progress'].includes(complaint.status) && (
+  1202→                                <DropdownMenuItem onClick={() => { setSelectedComplaint(complaint); setShowDetailDialog(true) }}>
+  1203→                                  <ArrowUpDown className="w-4 h-4 mr-2" /> Update Status
+  1204→                                </DropdownMenuItem>
+  1205→                              )}
+  1206→                            </DropdownMenuContent>
+  1207→                          </DropdownMenu>
+  1208→                        </TableCell>
+  1209→                      </TableRow>
+  1210→                    )
+  1211→                  })
+  1212→                )}
+  1213→              </TableBody>
+  1214→            </Table>
+  1215→          </ScrollArea>
+  1216→        </CardContent>
+  1217→      </Card>
+  1218→
+  1219→      {/* Dialogs */}
+  1220→      <RaiseComplaintDialog
+  1221→        open={showRaiseDialog}
+  1222→        onClose={() => setShowRaiseDialog(false)}
+  1223→        tenants={tenants}
+  1224→        properties={properties}
+  1225→        onSubmit={handleRaiseComplaint}
+  1226→        loading={actionLoading}
+  1227→      />
+  1228→
+  1229→      <ComplaintDetailDialog
+  1230→        complaint={selectedComplaint}
+  1231→        open={showDetailDialog}
+  1232→        onClose={() => { setShowDetailDialog(false); setSelectedComplaint(null) }}
+  1233→        staff={staff}
+  1234→        onUpdateStatus={handleUpdateStatus}
+  1235→        onAssignStaff={handleAssignStaff}
+  1236→        onAddResolution={handleAddResolution}
+  1237→        loading={actionLoading}
+  1238→      />
+  1239→    </div>
+  1240→  )
+  1241→}
+  1242→

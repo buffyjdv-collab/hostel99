@@ -83,3 +83,65 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create expense' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json()
+    const { id, category, description, amount, date, vendor, receipt, status } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Expense id is required' }, { status: 400 })
+    }
+
+    const existingExpense = await db.expense.findUnique({ where: { id } })
+    if (!existingExpense) {
+      return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (category !== undefined) updateData.category = category
+    if (description !== undefined) updateData.description = description
+    if (amount !== undefined) updateData.amount = parseFloat(amount)
+    if (date !== undefined) updateData.date = new Date(date)
+    if (vendor !== undefined) updateData.vendor = vendor
+    if (receipt !== undefined) updateData.receipt = receipt
+    if (status !== undefined) updateData.status = status
+
+    const expense = await db.expense.update({
+      where: { id },
+      data: updateData,
+      include: {
+        property: { select: { id: true, name: true } },
+        createdBy: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    return NextResponse.json(expense)
+  } catch (error) {
+    console.error('Expenses PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update expense' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Expense id is required' }, { status: 400 })
+    }
+
+    const existingExpense = await db.expense.findUnique({ where: { id } })
+    if (!existingExpense) {
+      return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
+    }
+
+    await db.expense.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Expense deleted successfully', id })
+  } catch (error) {
+    console.error('Expenses DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete expense' }, { status: 500 })
+  }
+}

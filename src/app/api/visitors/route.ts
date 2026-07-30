@@ -90,3 +90,68 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to process visitor request' }, { status: 500 })
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const body = await request.json()
+    const { id, name, phone, purpose, tenantId, hostId, propertyId, checkIn, checkOut, status } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Visitor id is required' }, { status: 400 })
+    }
+
+    const existingVisitor = await db.visitor.findUnique({ where: { id } })
+    if (!existingVisitor) {
+      return NextResponse.json({ error: 'Visitor not found' }, { status: 404 })
+    }
+
+    const updateData: Record<string, unknown> = {}
+    if (name !== undefined) updateData.name = name
+    if (phone !== undefined) updateData.phone = phone
+    if (purpose !== undefined) updateData.purpose = purpose
+    if (tenantId !== undefined) updateData.tenantId = tenantId
+    if (hostId !== undefined) updateData.hostId = hostId
+    if (propertyId !== undefined) updateData.propertyId = propertyId
+    if (checkIn !== undefined) updateData.checkIn = new Date(checkIn)
+    if (checkOut !== undefined) updateData.checkOut = new Date(checkOut)
+    if (status !== undefined) updateData.status = status
+
+    const visitor = await db.visitor.update({
+      where: { id },
+      data: updateData,
+      include: {
+        tenant: { select: { id: true, name: true, phone: true } },
+        host: { select: { id: true, name: true, email: true } },
+        property: { select: { id: true, name: true, address: true } },
+      },
+    })
+
+    return NextResponse.json(visitor)
+  } catch (error) {
+    console.error('Visitors PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update visitor' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json()
+    const { id } = body
+
+    if (!id) {
+      return NextResponse.json({ error: 'Visitor id is required' }, { status: 400 })
+    }
+
+    const existingVisitor = await db.visitor.findUnique({ where: { id } })
+    if (!existingVisitor) {
+      return NextResponse.json({ error: 'Visitor not found' }, { status: 404 })
+    }
+
+    await db.visitor.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Visitor deleted successfully', id })
+  } catch (error) {
+    console.error('Visitors DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete visitor' }, { status: 500 })
+  }
+}

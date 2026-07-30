@@ -1,0 +1,1189 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { ScrollArea } from '@/components/ui/scroll-area'
+    13→import {
+    14→  Dialog,
+    15→  DialogContent,
+    16→  DialogDescription,
+    17→  DialogFooter,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→} from '@/components/ui/dialog'
+    21→import {
+    22→  Select,
+    23→  SelectContent,
+    24→  SelectItem,
+    25→  SelectTrigger,
+    26→  SelectValue,
+    27→} from '@/components/ui/select'
+    28→import {
+    29→  Table,
+    30→  TableBody,
+    31→  TableCell,
+    32→  TableHead,
+    33→  TableHeader,
+    34→  TableRow,
+    35→} from '@/components/ui/table'
+    36→import {
+    37→  DropdownMenu,
+    38→  DropdownMenuContent,
+    39→  DropdownMenuItem,
+    40→  DropdownMenuTrigger,
+    41→} from '@/components/ui/dropdown-menu'
+    42→import {
+    43→  Tooltip,
+    44→  TooltipContent,
+    45→  TooltipProvider,
+    46→  TooltipTrigger,
+    47→} from '@/components/ui/tooltip'
+    48→import {
+    49→  UserPlus,
+    50→  Phone,
+    51→  Mail,
+    52→  Calendar,
+    53→  Building2,
+    54→  IndianRupee,
+    55→  LayoutGrid,
+    56→  List,
+    57→  Filter,
+    58→  Loader2,
+    59→  Search,
+    60→  Users,
+    61→  TrendingUp,
+    62→  UserCheck,
+    63→  UserX,
+    64→  Target,
+    65→  ArrowRight,
+    66→  ArrowLeft,
+    67→  Eye,
+    68→  MoreVertical,
+    69→  Globe,
+    70→  MessageCircle,
+    71→  UserRound,
+    72→  Footprints,
+    73→  Search as SearchIcon,
+    74→  Share2,
+    75→  ChevronDown,
+    76→  ChevronUp,
+    77→  ArrowUpDown,
+    78→  Clock,
+    79→  StickyNote,
+    80→  X,
+    81→} from 'lucide-react'
+    82→
+    83→// ── Types ────────────────────────────────────────────────────────────────────
+    84→
+    85→type LeadSource = 'website' | 'whatsapp' | 'referral' | 'walk_in' | 'google' | 'social_media'
+    86→type LeadStage = 'lead' | 'inquiry' | 'site_visit' | 'negotiation' | 'token' | 'booking' | 'move_in' | 'lost'
+    87→
+    88→interface LeadData {
+    89→  id: string
+    90→  name: string
+    91→  email?: string
+    92→  phone: string
+    93→  source: LeadSource
+    94→  status: LeadStage
+    95→  stage: number
+    96→  propertyId: string
+    97→  property: { id: string; name: string; address?: string }
+    98→  roomPreference?: string
+    99→  budget?: number
+   100→  visitDate?: string
+   101→  visitNotes?: string
+   102→  followUpDate?: string
+   103→  followUpNotes?: string
+   104→  tokenAmount?: number
+   105→  notes?: string
+   106→  lostReason?: string
+   107→  assignedToId?: string
+   108→  assignedTo?: { id: string; name: string; email: string } | null
+   109→  createdById: string
+   110→  createdBy: { id: string; name: string; email: string }
+   111→  createdAt: string
+   112→  updatedAt: string
+   113→}
+   114→
+   115→interface PropertyInfo {
+   116→  id: string
+   117→  name: string
+   118→}
+   119→
+   120→interface StaffInfo {
+   121→  id: string
+   122→  name: string
+   123→  email: string
+   124→}
+   125→
+   126→interface LeadFormData {
+   127→  name: string
+   128→  email: string
+   129→  phone: string
+   130→  source: LeadSource
+   131→  propertyId: string
+   132→  roomPreference: string
+   133→  budget: string
+   134→  notes: string
+   135→  followUpDate: string
+   136→  assignedToId: string
+   137→}
+   138→
+   139→// ── Constants ────────────────────────────────────────────────────────────────
+   140→
+   141→const PIPELINE_STAGES: { key: LeadStage; label: string; color: string; bgClass: string; borderClass: string }[] = [
+   142→  { key: 'lead', label: 'Lead', color: 'bg-slate-500', bgClass: 'bg-slate-50 dark:bg-slate-950/30', borderClass: 'border-slate-200 dark:border-slate-800' },
+   143→  { key: 'inquiry', label: 'Inquiry', color: 'bg-blue-500', bgClass: 'bg-blue-50 dark:bg-blue-950/30', borderClass: 'border-blue-200 dark:border-blue-800' },
+   144→  { key: 'site_visit', label: 'Site Visit', color: 'bg-amber-500', bgClass: 'bg-amber-50 dark:bg-amber-950/30', borderClass: 'border-amber-200 dark:border-amber-800' },
+   145→  { key: 'negotiation', label: 'Negotiation', color: 'bg-purple-500', bgClass: 'bg-purple-50 dark:bg-purple-950/30', borderClass: 'border-purple-200 dark:border-purple-800' },
+   146→  { key: 'token', label: 'Token', color: 'bg-orange-500', bgClass: 'bg-orange-50 dark:bg-orange-950/30', borderClass: 'border-orange-200 dark:border-orange-800' },
+   147→  { key: 'booking', label: 'Booking', color: 'bg-teal-500', bgClass: 'bg-teal-50 dark:bg-teal-950/30', borderClass: 'border-teal-200 dark:border-teal-800' },
+   148→  { key: 'move_in', label: 'Move In', color: 'bg-emerald-500', bgClass: 'bg-emerald-50 dark:bg-emerald-950/30', borderClass: 'border-emerald-200 dark:border-emerald-800' },
+   149→]
+   150→
+   151→const SOURCE_CONFIG: Record<LeadSource, { label: string; icon: typeof Globe; bgClass: string; textClass: string }> = {
+   152→  website: { label: 'Website', icon: Globe, bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300' },
+   153→  whatsapp: { label: 'WhatsApp', icon: MessageCircle, bgClass: 'bg-green-100 dark:bg-green-950/50', textClass: 'text-green-700 dark:text-green-300' },
+   154→  referral: { label: 'Referral', icon: UserRound, bgClass: 'bg-purple-100 dark:bg-purple-950/50', textClass: 'text-purple-700 dark:text-purple-300' },
+   155→  walk_in: { label: 'Walk-in', icon: Footprints, bgClass: 'bg-orange-100 dark:bg-orange-950/50', textClass: 'text-orange-700 dark:text-orange-300' },
+   156→  google: { label: 'Google', icon: SearchIcon, bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300' },
+   157→  social_media: { label: 'Social Media', icon: Share2, bgClass: 'bg-pink-100 dark:bg-pink-950/50', textClass: 'text-pink-700 dark:text-pink-300' },
+   158→}
+   159→
+   160→const STAGE_INDEX: Record<LeadStage, number> = {
+   161→  lead: 0,
+   162→  inquiry: 1,
+   163→  site_visit: 2,
+   164→  negotiation: 3,
+   165→  token: 4,
+   166→  booking: 5,
+   167→  move_in: 6,
+   168→  lost: -1,
+   169→}
+   170→
+   171→// ── Helpers ──────────────────────────────────────────────────────────────────
+   172→
+   173→function formatCurrency(amount: number): string {
+   174→  return new Intl.NumberFormat('en-IN', {
+   175→    style: 'currency',
+   176→    currency: 'INR',
+   177→    minimumFractionDigits: 0,
+   178→    maximumFractionDigits: 0,
+   179→  }).format(amount)
+   180→}
+   181→
+   182→function formatDate(dateStr?: string | null): string {
+   183→  if (!dateStr) return '—'
+   184→  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   185→}
+   186→
+   187→function isOverdue(dateStr?: string | null): boolean {
+   188→  if (!dateStr) return false
+   189→  return new Date(dateStr) < new Date()
+   190→}
+   191→
+   192→// ── Sub-components ───────────────────────────────────────────────────────────
+   193→
+   194→function StatsCardSkeleton() {
+   195→  return (
+   196→    <Card>
+   197→      <CardContent className="p-6">
+   198→        <div className="flex items-center justify-between">
+   199→          <div className="space-y-2">
+   200→            <Skeleton className="h-4 w-24" />
+   201→            <Skeleton className="h-8 w-16" />
+   202→          </div>
+   203→          <Skeleton className="h-10 w-10 rounded-lg" />
+   204→        </div>
+   205→      </CardContent>
+   206→    </Card>
+   207→  )
+   208→}
+   209→
+   210→function PipelineSkeleton() {
+   211→  return (
+   212→    <div className="grid grid-cols-7 gap-3">
+   213→      {Array.from({ length: 7 }).map((_, i) => (
+   214→        <div key={i} className="space-y-3">
+   215→          <Skeleton className="h-8 w-full rounded" />
+   216→          <Skeleton className="h-24 w-full rounded-lg" />
+   217→          <Skeleton className="h-24 w-full rounded-lg" />
+   218→        </div>
+   219→      ))}
+   220→    </div>
+   221→  )
+   222→}
+   223→
+   224→function TableSkeleton() {
+   225→  return (
+   226→    <div className="space-y-3">
+   227→      <Skeleton className="h-10 w-full rounded" />
+   228→      {Array.from({ length: 5 }).map((_, i) => (
+   229→        <Skeleton key={i} className="h-12 w-full rounded" />
+   230→      ))}
+   231→    </div>
+   232→  )
+   233→}
+   234→
+   235→function LeadCard({ lead, onClick }: { lead: LeadData; onClick: () => void }) {
+   236→  const sourceCfg = SOURCE_CONFIG[lead.source]
+   237→  const SourceIcon = sourceCfg.icon
+   238→  const overdue = isOverdue(lead.followUpDate)
+   239→
+   240→  return (
+   241→    <div
+   242→      onClick={onClick}
+   243→      className="group cursor-pointer rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 shadow-sm hover:shadow-md hover:border-emerald-300 dark:hover:border-emerald-700 transition-all duration-200"
+   244→    >
+   245→      <div className="flex items-start justify-between gap-2 mb-2">
+   246→        <h4 className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate">{lead.name}</h4>
+   247→        <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 shrink-0 ${sourceCfg.bgClass} ${sourceCfg.textClass}`}>
+   248→          <SourceIcon className="h-2.5 w-2.5 mr-0.5" />
+   249→          {sourceCfg.label}
+   250→        </Badge>
+   251→      </div>
+   252→      <div className="space-y-1.5 text-xs text-slate-500 dark:text-slate-400">
+   253→        <div className="flex items-center gap-1.5">
+   254→          <Phone className="h-3 w-3 shrink-0" />
+   255→          <span className="truncate">{lead.phone}</span>
+   256→        </div>
+   257→        <div className="flex items-center gap-1.5">
+   258→          <Building2 className="h-3 w-3 shrink-0" />
+   259→          <span className="truncate">{lead.property?.name || '—'}</span>
+   260→        </div>
+   261→        {lead.budget != null && (
+   262→          <div className="flex items-center gap-1.5">
+   263→            <IndianRupee className="h-3 w-3 shrink-0" />
+   264→            <span>{formatCurrency(lead.budget)}</span>
+   265→          </div>
+   266→        )}
+   267→        {lead.followUpDate && (
+   268→          <div className={`flex items-center gap-1.5 ${overdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}`}>
+   269→            <Calendar className="h-3 w-3 shrink-0" />
+   270→            <span>{formatDate(lead.followUpDate)}</span>
+   271→            {overdue && <span className="text-[10px]">(overdue)</span>}
+   272→          </div>
+   273→        )}
+   274→      </div>
+   275→    </div>
+   276→  )
+   277→}
+   278→
+   279→function LeadDetailDialog({
+   280→  lead,
+   281→  open,
+   282→  onClose,
+   283→  onStageChange,
+   284→}: {
+   285→  lead: LeadData | null
+   286→  open: boolean
+   287→  onClose: () => void
+   288→  onStageChange: (leadId: string, newStage: LeadStage) => void
+   289→}) {
+   290→  if (!lead) return null
+   291→
+   292→  const currentIdx = STAGE_INDEX[lead.status] ?? 0
+   293→  const canMoveForward = currentIdx < 6
+   294→  const canMoveBack = currentIdx > 0
+   295→
+   296→  const timeline = PIPELINE_STAGES.map((s, idx) => ({
+   297→    ...s,
+   298→    completed: idx < currentIdx,
+   299→    current: idx === currentIdx,
+   300→  }))
+   301→
+   302→  const sourceCfg = SOURCE_CONFIG[lead.source]
+   303→  const SourceIcon = sourceCfg.icon
+   304→
+   305→  return (
+   306→    <Dialog open={open} onOpenChange={onClose}>
+   307→      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   308→        <DialogHeader>
+   309→          <DialogTitle className="flex items-center gap-2">
+   310→            {lead.name}
+   311→            <Badge variant="secondary" className={`${sourceCfg.bgClass} ${sourceCfg.textClass}`}>
+   312→              <SourceIcon className="h-3 w-3 mr-1" />
+   313→              {sourceCfg.label}
+   314→            </Badge>
+   315→          </DialogTitle>
+   316→          <DialogDescription>
+   317→            Lead details and pipeline stage management
+   318→          </DialogDescription>
+   319→        </DialogHeader>
+   320→
+   321→        {/* Pipeline Timeline */}
+   322→        <div className="space-y-2">
+   323→          <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Pipeline Progress</h4>
+   324→          <div className="flex items-center gap-1">
+   325→            {timeline.map((step, idx) => (
+   326→              <TooltipProvider key={step.key}>
+   327→                <Tooltip>
+   328→                  <TooltipTrigger asChild>
+   329→                    <div className="flex items-center flex-1">
+   330→                      <div
+   331→                        className={`h-2.5 flex-1 rounded-full transition-colors ${
+   332→                          step.completed
+   333→                            ? 'bg-emerald-500'
+   334→                            : step.current
+   335→                            ? 'bg-emerald-400 animate-pulse'
+   336→                            : 'bg-slate-200 dark:bg-slate-700'
+   337→                        }`}
+   338→                      />
+   339→                      {idx < timeline.length - 1 && (
+   340→                        <div
+   341→                          className={`h-0.5 w-1 ${
+   342→                            step.completed ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'
+   343→                          }`}
+   344→                        />
+   345→                      )}
+   346→                    </div>
+   347→                  </TooltipTrigger>
+   348→                  <TooltipContent>{step.label}</TooltipContent>
+   349→                </Tooltip>
+   350→              </TooltipProvider>
+   351→            ))}
+   352→          </div>
+   353→          <div className="flex justify-between text-[10px] text-slate-400">
+   354→            {PIPELINE_STAGES.map((s) => (
+   355→              <span key={s.key} className="text-center flex-1">{s.label}</span>
+   356→            ))}
+   357→          </div>
+   358→        </div>
+   359→
+   360→        {/* Stage Actions */}
+   361→        <div className="flex items-center gap-2">
+   362→          {canMoveBack && (
+   363→            <Button
+   364→              variant="outline"
+   365→              size="sm"
+   366→              onClick={() => onStageChange(lead.id, PIPELINE_STAGES[currentIdx - 1].key)}
+   367→            >
+   368→              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
+   369→              Back to {PIPELINE_STAGES[currentIdx - 1].label}
+   370→            </Button>
+   371→          )}
+   372→          {canMoveForward && (
+   373→            <Button
+   374→              size="sm"
+   375→              className="bg-emerald-600 hover:bg-emerald-700"
+   376→              onClick={() => onStageChange(lead.id, PIPELINE_STAGES[currentIdx + 1].key)}
+   377→            >
+   378→              Move to {PIPELINE_STAGES[currentIdx + 1].label}
+   379→              <ArrowRight className="h-3.5 w-3.5 ml-1" />
+   380→            </Button>
+   381→          )}
+   382→          {lead.status !== 'lost' && currentIdx < 6 && (
+   383→            <Button
+   384→              variant="ghost"
+   385→              size="sm"
+   386→              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50"
+   387→              onClick={() => onStageChange(lead.id, 'lost')}
+   388→            >
+   389→              <UserX className="h-3.5 w-3.5 mr-1" />
+   390→              Mark Lost
+   391→            </Button>
+   392→          )}
+   393→        </div>
+   394→
+   395→        {/* Info Grid */}
+   396→        <div className="grid grid-cols-2 gap-4">
+   397→          <div className="space-y-3">
+   398→            <div>
+   399→              <p className="text-xs text-slate-500">Contact</p>
+   400→              <div className="flex items-center gap-1.5 text-sm mt-0.5">
+   401→                <Phone className="h-3.5 w-3.5 text-slate-400" />
+   402→                {lead.phone}
+   403→              </div>
+   404→              {lead.email && (
+   405→                <div className="flex items-center gap-1.5 text-sm mt-0.5">
+   406→                  <Mail className="h-3.5 w-3.5 text-slate-400" />
+   407→                  {lead.email}
+   408→                </div>
+   409→              )}
+   410→            </div>
+   411→            <div>
+   412→              <p className="text-xs text-slate-500">Property</p>
+   413→              <div className="flex items-center gap-1.5 text-sm mt-0.5">
+   414→                <Building2 className="h-3.5 w-3.5 text-slate-400" />
+   415→                {lead.property?.name || '—'}
+   416→              </div>
+   417→            </div>
+   418→            {lead.budget != null && (
+   419→              <div>
+   420→                <p className="text-xs text-slate-500">Budget</p>
+   421→                <div className="flex items-center gap-1.5 text-sm mt-0.5">
+   422→                  <IndianRupee className="h-3.5 w-3.5 text-slate-400" />
+   423→                  {formatCurrency(lead.budget)}
+   424→                </div>
+   425→              </div>
+   426→            )}
+   427→          </div>
+   428→          <div className="space-y-3">
+   429→            {lead.roomPreference && (
+   430→              <div>
+   431→                <p className="text-xs text-slate-500">Room Preference</p>
+   432→                <p className="text-sm mt-0.5">{lead.roomPreference}</p>
+   433→              </div>
+   434→            )}
+   435→            {lead.followUpDate && (
+   436→              <div>
+   437→                <p className="text-xs text-slate-500">Follow-up Date</p>
+   438→                <div className="flex items-center gap-1.5 text-sm mt-0.5">
+   439→                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+   440→                  {formatDate(lead.followUpDate)}
+   441→                </div>
+   442→              </div>
+   443→            )}
+   444→            {lead.assignedTo && (
+   445→              <div>
+   446→                <p className="text-xs text-slate-500">Assigned To</p>
+   447→                <p className="text-sm mt-0.5">{lead.assignedTo.name}</p>
+   448→              </div>
+   449→            )}
+   450→            {lead.tokenAmount != null && (
+   451→              <div>
+   452→                <p className="text-xs text-slate-500">Token Amount</p>
+   453→                <p className="text-sm mt-0.5">{formatCurrency(lead.tokenAmount)}</p>
+   454→              </div>
+   455→            )}
+   456→          </div>
+   457→        </div>
+   458→
+   459→        {/* Notes */}
+   460→        {lead.notes && (
+   461→          <div>
+   462→            <p className="text-xs text-slate-500 mb-1">Notes</p>
+   463→            <div className="text-sm bg-slate-50 dark:bg-slate-800 rounded-md p-3 whitespace-pre-wrap">
+   464→              {lead.notes}
+   465→            </div>
+   466→          </div>
+   467→        )}
+   468→        {lead.followUpNotes && (
+   469→          <div>
+   470→            <p className="text-xs text-slate-500 mb-1">Follow-up Notes</p>
+   471→            <div className="text-sm bg-slate-50 dark:bg-slate-800 rounded-md p-3 whitespace-pre-wrap">
+   472→              {lead.followUpNotes}
+   473→            </div>
+   474→          </div>
+   475→        )}
+   476→        {lead.lostReason && (
+   477→          <div>
+   478→            <p className="text-xs text-red-500 mb-1">Lost Reason</p>
+   479→            <div className="text-sm bg-red-50 dark:bg-red-950/30 rounded-md p-3 text-red-700 dark:text-red-300">
+   480→              {lead.lostReason}
+   481→            </div>
+   482→          </div>
+   483→        )}
+   484→
+   485→        {/* Created Info */}
+   486→        <div className="text-xs text-slate-400 pt-2 border-t">
+   487→          Created by {lead.createdBy?.name || 'System'} on {formatDate(lead.createdAt)}
+   488→          {lead.updatedAt && ` · Updated ${formatDate(lead.updatedAt)}`}
+   489→        </div>
+   490→      </DialogContent>
+   491→    </Dialog>
+   492→  )
+   493→}
+   494→
+   495→// ── Main Component ───────────────────────────────────────────────────────────
+   496→
+   497→export function LeadsPage() {
+   498→  const { currentUser } = useAppStore()
+   499→
+   500→  // Data state
+   501→  const [leads, setLeads] = useState<LeadData[]>([])
+   502→  const [properties, setProperties] = useState<PropertyInfo[]>([])
+   503→  const [staff, setStaff] = useState<StaffInfo[]>([])
+   504→  const [loading, setLoading] = useState(true)
+   505→  const [submitting, setSubmitting] = useState(false)
+   506→
+   507→  // UI state
+   508→  const [viewMode, setViewMode] = useState<'pipeline' | 'list'>('pipeline')
+   509→  const [showAddDialog, setShowAddDialog] = useState(false)
+   510→  const [selectedLead, setSelectedLead] = useState<LeadData | null>(null)
+   511→  const [showDetailDialog, setShowDetailDialog] = useState(false)
+   512→
+   513→  // Filter state
+   514→  const [searchQuery, setSearchQuery] = useState('')
+   515→  const [filterSource, setFilterSource] = useState<string>('all')
+   516→  const [filterStatus, setFilterStatus] = useState<string>('all')
+   517→  const [filterProperty, setFilterProperty] = useState<string>('all')
+   518→
+   519→  // Sort state
+   520→  const [sortField, setSortField] = useState<string>('createdAt')
+   521→  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+   522→
+   523→  // Form state
+   524→  const [form, setForm] = useState<LeadFormData>({
+   525→    name: '',
+   526→    email: '',
+   527→    phone: '',
+   528→    source: 'website',
+   529→    propertyId: '',
+   530→    roomPreference: '',
+   531→    budget: '',
+   532→    notes: '',
+   533→    followUpDate: '',
+   534→    assignedToId: '',
+   535→  })
+   536→
+   537→  // ── Data Fetching ──────────────────────────────────────────────────────────
+   538→
+   539→  useEffect(() => {
+   540→    async function fetchData() {
+   541→      setLoading(true)
+   542→      try {
+   543→        const [leadsRes, propsRes, staffRes] = await Promise.all([
+   544→          fetch('/api/leads'),
+   545→          fetch('/api/properties'),
+   546→          fetch('/api/staff'),
+   547→        ])
+   548→        if (leadsRes.ok) {
+   549→          const data = await leadsRes.json()
+   550→          setLeads(data.leads || data || [])
+   551→        }
+   552→        if (propsRes.ok) {
+   553→          const data = await propsRes.json()
+   554→          setProperties(Array.isArray(data) ? data : data.properties || [])
+   555→        }
+   556→        if (staffRes.ok) {
+   557→          const data = await staffRes.json()
+   558→          setStaff(Array.isArray(data) ? data : data.staff || [])
+   559→        }
+   560→      } catch (err) {
+   561→        console.error('Failed to fetch leads data:', err)
+   562→      } finally {
+   563→        setLoading(false)
+   564→      }
+   565→    }
+   566→    fetchData()
+   567→  }, [])
+   568→
+   569→  // ── Computed Values ────────────────────────────────────────────────────────
+   570→
+   571→  const activeLeads = useMemo(() => leads.filter((l) => l.status !== 'lost'), [leads])
+   572→
+   573→  const stats = useMemo(() => {
+   574→    const total = leads.length
+   575→    const converted = leads.filter((l) => l.status === 'move_in').length
+   576→    const inPipeline = activeLeads.length - converted
+   577→    const lost = leads.filter((l) => l.status === 'lost').length
+   578→    const conversionRate = total > 0 ? ((converted / total) * 100).toFixed(1) : '0.0'
+   579→    return { total, converted, inPipeline, lost, conversionRate }
+   580→  }, [leads, activeLeads])
+   581→
+   582→  const pipelineLeads = useMemo(() => {
+   583→    return PIPELINE_STAGES.map((stage) => ({
+   584→      ...stage,
+   585→      leads: activeLeads.filter((l) => l.status === stage.key),
+   586→    }))
+   587→  }, [activeLeads])
+   588→
+   589→  const filteredAndSortedLeads = useMemo(() => {
+   590→    let result = [...leads]
+   591→
+   592→    // Filter
+   593→    if (searchQuery) {
+   594→      const q = searchQuery.toLowerCase()
+   595→      result = result.filter(
+   596→        (l) =>
+   597→          l.name.toLowerCase().includes(q) ||
+   598→          l.phone.toLowerCase().includes(q) ||
+   599→          l.email?.toLowerCase().includes(q)
+   600→      )
+   601→    }
+   602→    if (filterSource !== 'all') {
+   603→      result = result.filter((l) => l.source === filterSource)
+   604→    }
+   605→    if (filterStatus !== 'all') {
+   606→      result = result.filter((l) => l.status === filterStatus)
+   607→    }
+   608→    if (filterProperty !== 'all') {
+   609→      result = result.filter((l) => l.propertyId === filterProperty)
+   610→    }
+   611→
+   612→    // Sort
+   613→    result.sort((a, b) => {
+   614→      const aVal = a[sortField as keyof LeadData]
+   615→      const bVal = b[sortField as keyof LeadData]
+   616→      if (aVal == null && bVal == null) return 0
+   617→      if (aVal == null) return 1
+   618→      if (bVal == null) return -1
+   619→      const cmp = String(aVal).localeCompare(String(bVal), undefined, { numeric: true })
+   620→      return sortDir === 'asc' ? cmp : -cmp
+   621→    })
+   622→
+   623→    return result
+   624→  }, [leads, searchQuery, filterSource, filterStatus, filterProperty, sortField, sortDir])
+   625→
+   626→  // ── Handlers ───────────────────────────────────────────────────────────────
+   627→
+   628→  function handleSort(field: string) {
+   629→    if (sortField === field) {
+   630→      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+   631→    } else {
+   632→      setSortField(field)
+   633→      setSortDir('asc')
+   634→    }
+   635→  }
+   636→
+   637→  function SortIcon({ field }: { field: string }) {
+   638→    if (sortField !== field) return <ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />
+   639→    return sortDir === 'asc' ? (
+   640→      <ChevronUp className="h-3.5 w-3.5 text-emerald-600" />
+   641→    ) : (
+   642→      <ChevronDown className="h-3.5 w-3.5 text-emerald-600" />
+   643→    )
+   644→  }
+   645→
+   646→  async function handleAddLead() {
+   647→    if (!form.name || !form.phone || !form.propertyId) return
+   648→    setSubmitting(true)
+   649→    try {
+   650→      const res = await fetch('/api/leads', {
+   651→        method: 'POST',
+   652→        headers: { 'Content-Type': 'application/json' },
+   653→        body: JSON.stringify({
+   654→          name: form.name,
+   655→          email: form.email || undefined,
+   656→          phone: form.phone,
+   657→          source: form.source,
+   658→          propertyId: form.propertyId,
+   659→          roomPreference: form.roomPreference || undefined,
+   660→          budget: form.budget ? parseFloat(form.budget) : undefined,
+   661→          notes: form.notes || undefined,
+   662→          followUpDate: form.followUpDate || undefined,
+   663→          assignedToId: form.assignedToId || undefined,
+   664→          createdById: currentUser?.id,
+   665→        }),
+   666→      })
+   667→      if (res.ok) {
+   668→        const newLead = await res.json()
+   669→        setLeads((prev) => [newLead, ...prev])
+   670→        setShowAddDialog(false)
+   671→        setForm({
+   672→          name: '',
+   673→          email: '',
+   674→          phone: '',
+   675→          source: 'website',
+   676→          propertyId: '',
+   677→          roomPreference: '',
+   678→          budget: '',
+   679→          notes: '',
+   680→          followUpDate: '',
+   681→          assignedToId: '',
+   682→        })
+   683→      }
+   684→    } catch (err) {
+   685→      console.error('Failed to add lead:', err)
+   686→    } finally {
+   687→      setSubmitting(false)
+   688→    }
+   689→  }
+   690→
+   691→  async function handleStageChange(leadId: string, newStage: LeadStage) {
+   692→    const stageIdx = STAGE_INDEX[newStage] ?? 0
+   693→    try {
+   694→      const res = await fetch('/api/leads', {
+   695→        method: 'PATCH',
+   696→        headers: { 'Content-Type': 'application/json' },
+   697→        body: JSON.stringify({ id: leadId, status: newStage, stage: stageIdx + 1 }),
+   698→      })
+   699→      if (res.ok) {
+   700→        const updated = await res.json()
+   701→        setLeads((prev) => prev.map((l) => (l.id === leadId ? { ...l, ...updated } : l)))
+   702→        setSelectedLead((prev) => (prev?.id === leadId ? { ...prev, ...updated } : prev))
+   703→      }
+   704→    } catch (err) {
+   705→      console.error('Failed to update lead stage:', err)
+   706→    }
+   707→  }
+   708→
+   709→  function openLeadDetail(lead: LeadData) {
+   710→    setSelectedLead(lead)
+   711→    setShowDetailDialog(true)
+   712→  }
+   713→
+   714→  // ── Render ─────────────────────────────────────────────────────────────────
+   715→
+   716→  return (
+   717→    <div className="space-y-6">
+   718→      {/* Header */}
+   719→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   720→        <div>
+   721→          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Lead CRM</h1>
+   722→          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+   723→            Track and manage leads through the sales pipeline
+   724→          </p>
+   725→        </div>
+   726→        <Button
+   727→          onClick={() => setShowAddDialog(true)}
+   728→          className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+   729→        >
+   730→          <UserPlus className="h-4 w-4 mr-2" />
+   731→          Add Lead
+   732→        </Button>
+   733→      </div>
+   734→
+   735→      {/* Stats */}
+   736→      {loading ? (
+   737→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+   738→          {Array.from({ length: 5 }).map((_, i) => (
+   739→            <StatsCardSkeleton key={i} />
+   740→          ))}
+   741→        </div>
+   742→      ) : (
+   743→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+   744→          <Card>
+   745→            <CardContent className="p-6">
+   746→              <div className="flex items-center justify-between">
+   747→                <div>
+   748→                  <p className="text-sm text-slate-500 dark:text-slate-400">Total Leads</p>
+   749→                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.total}</p>
+   750→                </div>
+   751→                <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+   752→                  <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   753→                </div>
+   754→              </div>
+   755→            </CardContent>
+   756→          </Card>
+   757→          <Card>
+   758→            <CardContent className="p-6">
+   759→              <div className="flex items-center justify-between">
+   760→                <div>
+   761→                  <p className="text-sm text-slate-500 dark:text-slate-400">Converted</p>
+   762→                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.converted}</p>
+   763→                </div>
+   764→                <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+   765→                  <UserCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   766→                </div>
+   767→              </div>
+   768→            </CardContent>
+   769→          </Card>
+   770→          <Card>
+   771→            <CardContent className="p-6">
+   772→              <div className="flex items-center justify-between">
+   773→                <div>
+   774→                  <p className="text-sm text-slate-500 dark:text-slate-400">In Pipeline</p>
+   775→                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{stats.inPipeline}</p>
+   776→                </div>
+   777→                <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
+   778→                  <TrendingUp className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+   779→                </div>
+   780→              </div>
+   781→            </CardContent>
+   782→          </Card>
+   783→          <Card>
+   784→            <CardContent className="p-6">
+   785→              <div className="flex items-center justify-between">
+   786→                <div>
+   787→                  <p className="text-sm text-slate-500 dark:text-slate-400">Lost</p>
+   788→                  <p className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.lost}</p>
+   789→                </div>
+   790→                <div className="h-10 w-10 rounded-lg bg-red-100 dark:bg-red-950/50 flex items-center justify-center">
+   791→                  <UserX className="h-5 w-5 text-red-600 dark:text-red-400" />
+   792→                </div>
+   793→              </div>
+   794→            </CardContent>
+   795→          </Card>
+   796→          <Card className="col-span-2 sm:col-span-1">
+   797→            <CardContent className="p-6">
+   798→              <div className="flex items-center justify-between">
+   799→                <div>
+   800→                  <p className="text-sm text-slate-500 dark:text-slate-400">Conversion Rate</p>
+   801→                  <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">{stats.conversionRate}%</p>
+   802→                </div>
+   803→                <div className="h-10 w-10 rounded-lg bg-teal-100 dark:bg-teal-950/50 flex items-center justify-center">
+   804→                  <Target className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+   805→                </div>
+   806→              </div>
+   807→            </CardContent>
+   808→          </Card>
+   809→        </div>
+   810→      )}
+   811→
+   812→      {/* View Toggle & Filters */}
+   813→      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+   814→        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+   815→          <Button
+   816→            variant={viewMode === 'pipeline' ? 'default' : 'ghost'}
+   817→            size="sm"
+   818→            onClick={() => setViewMode('pipeline')}
+   819→            className={viewMode === 'pipeline' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+   820→          >
+   821→            <LayoutGrid className="h-4 w-4 mr-1" />
+   822→            Pipeline
+   823→          </Button>
+   824→          <Button
+   825→            variant={viewMode === 'list' ? 'default' : 'ghost'}
+   826→            size="sm"
+   827→            onClick={() => setViewMode('list')}
+   828→            className={viewMode === 'list' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
+   829→          >
+   830→            <List className="h-4 w-4 mr-1" />
+   831→            List
+   832→          </Button>
+   833→        </div>
+   834→
+   835→        <div className="flex items-center gap-2 flex-wrap">
+   836→          <div className="relative">
+   837→            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+   838→            <Input
+   839→              placeholder="Search leads..."
+   840→              value={searchQuery}
+   841→              onChange={(e) => setSearchQuery(e.target.value)}
+   842→              className="pl-9 w-48 h-9"
+   843→            />
+   844→          </div>
+   845→          <Select value={filterSource} onValueChange={setFilterSource}>
+   846→            <SelectTrigger className="w-36 h-9">
+   847→              <Filter className="h-3.5 w-3.5 mr-1 text-slate-400" />
+   848→              <SelectValue placeholder="Source" />
+   849→            </SelectTrigger>
+   850→            <SelectContent>
+   851→              <SelectItem value="all">All Sources</SelectItem>
+   852→              {Object.entries(SOURCE_CONFIG).map(([key, cfg]) => (
+   853→                <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   854→              ))}
+   855→            </SelectContent>
+   856→          </Select>
+   857→          <Select value={filterStatus} onValueChange={setFilterStatus}>
+   858→            <SelectTrigger className="w-36 h-9">
+   859→              <SelectValue placeholder="Status" />
+   860→            </SelectTrigger>
+   861→            <SelectContent>
+   862→              <SelectItem value="all">All Statuses</SelectItem>
+   863→              {PIPELINE_STAGES.map((s) => (
+   864→                <SelectItem key={s.key} value={s.key}>{s.label}</SelectItem>
+   865→              ))}
+   866→              <SelectItem value="lost">Lost</SelectItem>
+   867→            </SelectContent>
+   868→          </Select>
+   869→          <Select value={filterProperty} onValueChange={setFilterProperty}>
+   870→            <SelectTrigger className="w-40 h-9">
+   871→              <SelectValue placeholder="Property" />
+   872→            </SelectTrigger>
+   873→            <SelectContent>
+   874→              <SelectItem value="all">All Properties</SelectItem>
+   875→              {properties.map((p) => (
+   876→                <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   877→              ))}
+   878→            </SelectContent>
+   879→          </Select>
+   880→        </div>
+   881→      </div>
+   882→
+   883→      {/* Pipeline View */}
+   884→      {viewMode === 'pipeline' && (
+   885→        loading ? (
+   886→          <PipelineSkeleton />
+   887→        ) : (
+   888→          <ScrollArea className="w-full">
+   889→            <div className="grid grid-cols-7 gap-3 min-w-[1200px]">
+   890→              {pipelineLeads.map((stage) => (
+   891→                <div key={stage.key} className={`rounded-xl border ${stage.borderClass} ${stage.bgClass} p-3`}>
+   892→                  <div className="flex items-center justify-between mb-3">
+   893→                    <div className="flex items-center gap-2">
+   894→                      <div className={`h-2.5 w-2.5 rounded-full ${stage.color}`} />
+   895→                      <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300">{stage.label}</h3>
+   896→                    </div>
+   897→                    <Badge variant="secondary" className="text-xs h-5 px-1.5 bg-white/80 dark:bg-slate-800/80">
+   898→                      {stage.leads.length}
+   899→                    </Badge>
+   900→                  </div>
+   901→                  <div className="space-y-2">
+   902→                    {stage.leads.length === 0 ? (
+   903→                      <div className="text-center py-6 text-xs text-slate-400 dark:text-slate-500">
+   904→                        No leads
+   905→                      </div>
+   906→                    ) : (
+   907→                      stage.leads.map((lead) => (
+   908→                        <LeadCard
+   909→                          key={lead.id}
+   910→                          lead={lead}
+   911→                          onClick={() => openLeadDetail(lead)}
+   912→                        />
+   913→                      ))
+   914→                    )}
+   915→                  </div>
+   916→                </div>
+   917→              ))}
+   918→            </div>
+   919→          </ScrollArea>
+   920→        )
+   921→      )}
+   922→
+   923→      {/* List View */}
+   924→      {viewMode === 'list' && (
+   925→        loading ? (
+   926→          <TableSkeleton />
+   927→        ) : (
+   928→          <Card>
+   929→            <CardContent className="p-0">
+   930→              <Table>
+   931→                <TableHeader>
+   932→                  <TableRow>
+   933→                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('name')}>
+   934→                      <div className="flex items-center gap-1">Name <SortIcon field="name" /></div>
+   935→                    </TableHead>
+   936→                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('phone')}>
+   937→                      <div className="flex items-center gap-1">Phone <SortIcon field="phone" /></div>
+   938→                    </TableHead>
+   939→                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('source')}>
+   940→                      <div className="flex items-center gap-1">Source <SortIcon field="source" /></div>
+   941→                    </TableHead>
+   942→                    <TableHead>Property</TableHead>
+   943→                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('budget')}>
+   944→                      <div className="flex items-center gap-1">Budget <SortIcon field="budget" /></div>
+   945→                    </TableHead>
+   946→                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('status')}>
+   947→                      <div className="flex items-center gap-1">Status <SortIcon field="status" /></div>
+   948→                    </TableHead>
+   949→                    <TableHead className="cursor-pointer select-none" onClick={() => handleSort('followUpDate')}>
+   950→                      <div className="flex items-center gap-1">Follow-up <SortIcon field="followUpDate" /></div>
+   951→                    </TableHead>
+   952→                    <TableHead className="w-10">Actions</TableHead>
+   953→                  </TableRow>
+   954→                </TableHeader>
+   955→                <TableBody>
+   956→                  {filteredAndSortedLeads.length === 0 ? (
+   957→                    <TableRow>
+   958→                      <TableCell colSpan={8} className="text-center py-8 text-slate-400">
+   959→                        No leads found
+   960→                      </TableCell>
+   961→                    </TableRow>
+   962→                  ) : (
+   963→                    filteredAndSortedLeads.map((lead) => {
+   964→                      const sourceCfg = SOURCE_CONFIG[lead.source]
+   965→                      const stageIdx = STAGE_INDEX[lead.status] ?? -1
+   966→                      const stageInfo = stageIdx >= 0 ? PIPELINE_STAGES[stageIdx] : null
+   967→                      const overdue = isOverdue(lead.followUpDate)
+   968→
+   969→                      return (
+   970→                        <TableRow key={lead.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" onClick={() => openLeadDetail(lead)}>
+   971→                          <TableCell className="font-medium">{lead.name}</TableCell>
+   972→                          <TableCell className="text-slate-600 dark:text-slate-400">{lead.phone}</TableCell>
+   973→                          <TableCell>
+   974→                            <Badge variant="secondary" className={`text-xs ${sourceCfg.bgClass} ${sourceCfg.textClass}`}>
+   975→                              {sourceCfg.label}
+   976→                            </Badge>
+   977→                          </TableCell>
+   978→                          <TableCell className="text-slate-600 dark:text-slate-400">{lead.property?.name || '—'}</TableCell>
+   979→                          <TableCell>
+   980→                            {lead.budget != null ? formatCurrency(lead.budget) : '—'}
+   981→                          </TableCell>
+   982→                          <TableCell>
+   983→                            {lead.status === 'lost' ? (
+   984→                              <Badge variant="secondary" className="bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300 text-xs">
+   985→                                Lost
+   986→                              </Badge>
+   987→                            ) : stageInfo ? (
+   988→                              <Badge variant="secondary" className={`${stageInfo.bgClass} text-xs`}>
+   989→                                <div className={`h-1.5 w-1.5 rounded-full ${stageInfo.color} mr-1`} />
+   990→                                {stageInfo.label}
+   991→                              </Badge>
+   992→                            ) : (
+   993→                              <Badge variant="secondary" className="text-xs">{lead.status}</Badge>
+   994→                            )}
+   995→                          </TableCell>
+   996→                          <TableCell className={overdue ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+   997→                            {formatDate(lead.followUpDate)}
+   998→                          </TableCell>
+   999→                          <TableCell>
+  1000→                            <DropdownMenu>
+  1001→                              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+  1002→                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+  1003→                                  <MoreVertical className="h-4 w-4" />
+  1004→                                </Button>
+  1005→                              </DropdownMenuTrigger>
+  1006→                              <DropdownMenuContent align="end">
+  1007→                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openLeadDetail(lead) }}>
+  1008→                                  <Eye className="h-4 w-4 mr-2" />
+  1009→                                  View Details
+  1010→                                </DropdownMenuItem>
+  1011→                                {lead.status !== 'lost' && STAGE_INDEX[lead.status] < 6 && (
+  1012→                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStageChange(lead.id, PIPELINE_STAGES[STAGE_INDEX[lead.status] + 1].key) }}>
+  1013→                                    <ArrowRight className="h-4 w-4 mr-2" />
+  1014→                                    Move to Next Stage
+  1015→                                  </DropdownMenuItem>
+  1016→                                )}
+  1017→                                {lead.status !== 'lost' && STAGE_INDEX[lead.status] > 0 && (
+  1018→                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStageChange(lead.id, PIPELINE_STAGES[STAGE_INDEX[lead.status] - 1].key) }}>
+  1019→                                    <ArrowLeft className="h-4 w-4 mr-2" />
+  1020→                                    Move Back
+  1021→                                  </DropdownMenuItem>
+  1022→                                )}
+  1023→                              </DropdownMenuContent>
+  1024→                            </DropdownMenu>
+  1025→                          </TableCell>
+  1026→                        </TableRow>
+  1027→                      )
+  1028→                    })
+  1029→                  )}
+  1030→                </TableBody>
+  1031→              </Table>
+  1032→            </CardContent>
+  1033→          </Card>
+  1034→        )
+  1035→      )}
+  1036→
+  1037→      {/* Add Lead Dialog */}
+  1038→      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+  1039→        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+  1040→          <DialogHeader>
+  1041→            <DialogTitle>Add New Lead</DialogTitle>
+  1042→            <DialogDescription>
+  1043→              Enter the lead details to add them to the pipeline
+  1044→            </DialogDescription>
+  1045→          </DialogHeader>
+  1046→
+  1047→          <div className="grid gap-4 py-4">
+  1048→            <div className="grid grid-cols-2 gap-4">
+  1049→              <div className="space-y-2">
+  1050→                <Label htmlFor="lead-name">Name *</Label>
+  1051→                <Input
+  1052→                  id="lead-name"
+  1053→                  placeholder="Full name"
+  1054→                  value={form.name}
+  1055→                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+  1056→                />
+  1057→              </div>
+  1058→              <div className="space-y-2">
+  1059→                <Label htmlFor="lead-phone">Phone *</Label>
+  1060→                <Input
+  1061→                  id="lead-phone"
+  1062→                  placeholder="Phone number"
+  1063→                  value={form.phone}
+  1064→                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
+  1065→                />
+  1066→              </div>
+  1067→            </div>
+  1068→            <div className="grid grid-cols-2 gap-4">
+  1069→              <div className="space-y-2">
+  1070→                <Label htmlFor="lead-email">Email</Label>
+  1071→                <Input
+  1072→                  id="lead-email"
+  1073→                  type="email"
+  1074→                  placeholder="Email address"
+  1075→                  value={form.email}
+  1076→                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+  1077→                />
+  1078→              </div>
+  1079→              <div className="space-y-2">
+  1080→                <Label htmlFor="lead-source">Source</Label>
+  1081→                <Select value={form.source} onValueChange={(v) => setForm((f) => ({ ...f, source: v as LeadSource }))}>
+  1082→                  <SelectTrigger id="lead-source">
+  1083→                    <SelectValue />
+  1084→                  </SelectTrigger>
+  1085→                  <SelectContent>
+  1086→                    {Object.entries(SOURCE_CONFIG).map(([key, cfg]) => (
+  1087→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+  1088→                    ))}
+  1089→                  </SelectContent>
+  1090→                </Select>
+  1091→              </div>
+  1092→            </div>
+  1093→            <div className="grid grid-cols-2 gap-4">
+  1094→              <div className="space-y-2">
+  1095→                <Label htmlFor="lead-property">Property *</Label>
+  1096→                <Select value={form.propertyId} onValueChange={(v) => setForm((f) => ({ ...f, propertyId: v }))}>
+  1097→                  <SelectTrigger id="lead-property">
+  1098→                    <SelectValue placeholder="Select property" />
+  1099→                  </SelectTrigger>
+  1100→                  <SelectContent>
+  1101→                    {properties.map((p) => (
+  1102→                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+  1103→                    ))}
+  1104→                  </SelectContent>
+  1105→                </Select>
+  1106→              </div>
+  1107→              <div className="space-y-2">
+  1108→                <Label htmlFor="lead-room">Room Preference</Label>
+  1109→                <Input
+  1110→                  id="lead-room"
+  1111→                  placeholder="e.g., AC Double Sharing"
+  1112→                  value={form.roomPreference}
+  1113→                  onChange={(e) => setForm((f) => ({ ...f, roomPreference: e.target.value }))}
+  1114→                />
+  1115→              </div>
+  1116→            </div>
+  1117→            <div className="grid grid-cols-2 gap-4">
+  1118→              <div className="space-y-2">
+  1119→                <Label htmlFor="lead-budget">Budget</Label>
+  1120→                <Input
+  1121→                  id="lead-budget"
+  1122→                  type="number"
+  1123→                  placeholder="Monthly budget"
+  1124→                  value={form.budget}
+  1125→                  onChange={(e) => setForm((f) => ({ ...f, budget: e.target.value }))}
+  1126→                />
+  1127→              </div>
+  1128→              <div className="space-y-2">
+  1129→                <Label htmlFor="lead-followup">Follow-up Date</Label>
+  1130→                <Input
+  1131→                  id="lead-followup"
+  1132→                  type="date"
+  1133→                  value={form.followUpDate}
+  1134→                  onChange={(e) => setForm((f) => ({ ...f, followUpDate: e.target.value }))}
+  1135→                />
+  1136→              </div>
+  1137→            </div>
+  1138→            <div className="space-y-2">
+  1139→              <Label htmlFor="lead-assign">Assign To</Label>
+  1140→              <Select value={form.assignedToId} onValueChange={(v) => setForm((f) => ({ ...f, assignedToId: v }))}>
+  1141→                <SelectTrigger id="lead-assign">
+  1142→                  <SelectValue placeholder="Select staff member" />
+  1143→                </SelectTrigger>
+  1144→                <SelectContent>
+  1145→                  {staff.map((s) => (
+  1146→                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+  1147→                  ))}
+  1148→                </SelectContent>
+  1149→              </Select>
+  1150→            </div>
+  1151→            <div className="space-y-2">
+  1152→              <Label htmlFor="lead-notes">Notes</Label>
+  1153→              <Textarea
+  1154→                id="lead-notes"
+  1155→                placeholder="Additional notes about this lead..."
+  1156→                value={form.notes}
+  1157→                onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+  1158→                rows={3}
+  1159→              />
+  1160→            </div>
+  1161→          </div>
+  1162→
+  1163→          <DialogFooter>
+  1164→            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+  1165→              Cancel
+  1166→            </Button>
+  1167→            <Button
+  1168→              onClick={handleAddLead}
+  1169→              disabled={submitting || !form.name || !form.phone || !form.propertyId}
+  1170→              className="bg-emerald-600 hover:bg-emerald-700"
+  1171→            >
+  1172→              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+  1173→              Add Lead
+  1174→            </Button>
+  1175→          </DialogFooter>
+  1176→        </DialogContent>
+  1177→      </Dialog>
+  1178→
+  1179→      {/* Lead Detail Dialog */}
+  1180→      <LeadDetailDialog
+  1181→        lead={selectedLead}
+  1182→        open={showDetailDialog}
+  1183→        onClose={() => setShowDetailDialog(false)}
+  1184→        onStageChange={handleStageChange}
+  1185→      />
+  1186→    </div>
+  1187→  )
+  1188→}
+  1189→

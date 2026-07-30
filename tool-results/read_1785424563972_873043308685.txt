@@ -1,0 +1,665 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { ScrollArea } from '@/components/ui/scroll-area'
+    13→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    14→import {
+    15→  Dialog,
+    16→  DialogContent,
+    17→  DialogDescription,
+    18→  DialogFooter,
+    19→  DialogHeader,
+    20→  DialogTitle,
+    21→} from '@/components/ui/dialog'
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→} from '@/components/ui/select'
+    29→import {
+    30→  Megaphone,
+    31→  Plus,
+    32→  Send,
+    33→  MessageSquare,
+    34→  Bell,
+    35→  AlertTriangle,
+    36→  Wrench,
+    37→  CalendarDays,
+    38→  IndianRupee,
+    39→  Clock,
+    40→  Building2,
+    41→  Filter,
+    42→  Loader2,
+    43→  CheckCircle2,
+    44→  XCircle,
+    45→  Smartphone,
+    46→  Mail,
+    47→  Speaker,
+    48→  Search,
+    49→} from 'lucide-react'
+    50→
+    51→// ── Types ────────────────────────────────────────────────────────────────────
+    52→
+    53→interface Notice {
+    54→  id: string
+    55→  title: string
+    56→  content: string
+    57→  type: string
+    58→  propertyId: string
+    59→  isActive: boolean
+    60→  expiryDate: string | null
+    61→  createdAt: string
+    62→  property?: { id: string; name: string }
+    63→  createdBy?: { id: string; name: string; email: string }
+    64→}
+    65→
+    66→interface Communication {
+    67→  id: string
+    68→  type: string
+    69→  message: string
+    70→  recipientType: string
+    71→  recipientId?: string | null
+    72→  propertyId?: string | null
+    73→  status: string
+    74→  sentAt: string
+    75→  sender?: { id: string; name: string }
+    76→}
+    77→
+    78→interface Property {
+    79→  id: string
+    80→  name: string
+    81→}
+    82→
+    83→// ── Constants ────────────────────────────────────────────────────────────────
+    84→
+    85→const NOTICE_TYPE_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+    86→  general: { label: 'General', color: 'text-blue-700', bg: 'bg-blue-100 border-blue-200', icon: <Bell className="h-3.5 w-3.5" /> },
+    87→  urgent: { label: 'Urgent', color: 'text-red-700', bg: 'bg-red-100 border-red-200', icon: <AlertTriangle className="h-3.5 w-3.5" /> },
+    88→  maintenance: { label: 'Maintenance', color: 'text-orange-700', bg: 'bg-orange-100 border-orange-200', icon: <Wrench className="h-3.5 w-3.5" /> },
+    89→  event: { label: 'Event', color: 'text-purple-700', bg: 'bg-purple-100 border-purple-200', icon: <CalendarDays className="h-3.5 w-3.5" /> },
+    90→  payment: { label: 'Payment', color: 'text-emerald-700', bg: 'bg-emerald-100 border-emerald-200', icon: <IndianRupee className="h-3.5 w-3.5" /> },
+    91→}
+    92→
+    93→const MESSAGE_TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+    94→  whatsapp: { label: 'WhatsApp', icon: <Smartphone className="h-4 w-4" />, color: 'text-green-600' },
+    95→  sms: { label: 'SMS', icon: <Smartphone className="h-4 w-4" />, color: 'text-blue-600' },
+    96→  email: { label: 'Email', icon: <Mail className="h-4 w-4" />, color: 'text-orange-600' },
+    97→  push: { label: 'Push', icon: <Bell className="h-4 w-4" />, color: 'text-purple-600' },
+    98→  announcement: { label: 'Announcement', icon: <Speaker className="h-4 w-4" />, color: 'text-teal-600' },
+    99→}
+   100→
+   101→const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+   102→  sent: { label: 'Sent', color: 'text-blue-600', icon: <Send className="h-3.5 w-3.5" /> },
+   103→  delivered: { label: 'Delivered', color: 'text-emerald-600', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+   104→  failed: { label: 'Failed', color: 'text-red-600', icon: <XCircle className="h-3.5 w-3.5" /> },
+   105→  read: { label: 'Read', color: 'text-teal-600', icon: <CheckCircle2 className="h-3.5 w-3.5" /> },
+   106→}
+   107→
+   108→// ── Helpers ──────────────────────────────────────────────────────────────────
+   109→
+   110→function formatDate(date: string | Date | null) {
+   111→  if (!date) return 'N/A'
+   112→  return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   113→}
+   114→
+   115→function formatDateTime(date: string | Date) {
+   116→  return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+   117→}
+   118→
+   119→function isExpired(expiryDate: string | null) {
+   120→  if (!expiryDate) return false
+   121→  return new Date(expiryDate) < new Date()
+   122→}
+   123→
+   124→// ── Component ────────────────────────────────────────────────────────────────
+   125→
+   126→export function NoticesPage() {
+   127→  const { currentUser } = useAppStore()
+   128→  const [loading, setLoading] = useState(true)
+   129→  const [notices, setNotices] = useState<Notice[]>([])
+   130→  const [properties, setProperties] = useState<Property[]>([])
+   131→
+   132→  // Filters
+   133→  const [noticeTypeFilter, setNoticeTypeFilter] = useState<string>('all')
+   134→  const [noticePropertyFilter, setNoticePropertyFilter] = useState<string>('all')
+   135→  const [messageTypeFilter, setMessageTypeFilter] = useState<string>('all')
+   136→
+   137→  // Dialogs
+   138→  const [createNoticeOpen, setCreateNoticeOpen] = useState(false)
+   139→  const [sendMessageOpen, setSendMessageOpen] = useState(false)
+   140→  const [submitting, setSubmitting] = useState(false)
+   141→
+   142→  // Create Notice form
+   143→  const [noticeForm, setNoticeForm] = useState({
+   144→    title: '',
+   145→    content: '',
+   146→    type: 'general',
+   147→    propertyId: '',
+   148→    expiryDate: '',
+   149→  })
+   150→
+   151→  // Send Message form
+   152→  const [messageForm, setMessageForm] = useState({
+   153→    message: '',
+   154→    type: 'whatsapp',
+   155→    recipientType: 'all',
+   156→    propertyId: '',
+   157→  })
+   158→
+   159→  // Mock communications (the API doesn't have a dedicated endpoint yet)
+   160→  const [communications] = useState<Communication[]>([])
+   161→
+   162→  // ── Data Fetching ──────────────────────────────────────────────────────
+   163→
+   164→  const fetchData = useCallback(async () => {
+   165→    setLoading(true)
+   166→    try {
+   167→      const [noticesRes, propsRes] = await Promise.all([
+   168→        fetch('/api/notices'),
+   169→        fetch('/api/properties'),
+   170→      ])
+   171→      if (noticesRes.ok) {
+   172→        const noticesData = await noticesRes.json()
+   173→        setNotices(Array.isArray(noticesData) ? noticesData : [])
+   174→      }
+   175→      if (propsRes.ok) {
+   176→        const propsData = await propsRes.json()
+   177→        setProperties(Array.isArray(propsData) ? propsData.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })) : [])
+   178→      }
+   179→    } catch { /* ignore */ }
+   180→    setLoading(false)
+   181→  }, [])
+   182→
+   183→  // Fetch on mount
+   184→  const [hasFetched, setHasFetched] = useState(false)
+   185→  if (!hasFetched) {
+   186→    setHasFetched(true)
+   187→    fetchData()
+   188→  }
+   189→
+   190→  // ── Filtered Data ──────────────────────────────────────────────────────
+   191→
+   192→  const filteredNotices = useMemo(() => {
+   193→    return notices.filter((n) => {
+   194→      if (noticeTypeFilter !== 'all' && n.type !== noticeTypeFilter) return false
+   195→      if (noticePropertyFilter !== 'all' && n.propertyId !== noticePropertyFilter) return false
+   196→      return true
+   197→    })
+   198→  }, [notices, noticeTypeFilter, noticePropertyFilter])
+   199→
+   200→  const filteredCommunications = useMemo(() => {
+   201→    return communications.filter((c) => {
+   202→      if (messageTypeFilter !== 'all' && c.type !== messageTypeFilter) return false
+   203→      return true
+   204→    })
+   205→  }, [communications, messageTypeFilter])
+   206→
+   207→  // ── Form Handlers ──────────────────────────────────────────────────────
+   208→
+   209→  const handleCreateNotice = async () => {
+   210→    if (!noticeForm.title || !noticeForm.content || !noticeForm.propertyId || !currentUser) return
+   211→    setSubmitting(true)
+   212→    try {
+   213→      const res = await fetch('/api/notices', {
+   214→        method: 'POST',
+   215→        headers: { 'Content-Type': 'application/json' },
+   216→        body: JSON.stringify({
+   217→          title: noticeForm.title,
+   218→          content: noticeForm.content,
+   219→          type: noticeForm.type,
+   220→          propertyId: noticeForm.propertyId,
+   221→          createdById: currentUser.id,
+   222→          expiryDate: noticeForm.expiryDate || undefined,
+   223→        }),
+   224→      })
+   225→      if (res.ok) {
+   226→        const newNotice = await res.json()
+   227→        setNotices((prev) => [newNotice, ...prev])
+   228→        setCreateNoticeOpen(false)
+   229→        setNoticeForm({ title: '', content: '', type: 'general', propertyId: '', expiryDate: '' })
+   230→      }
+   231→    } catch { /* ignore */ }
+   232→    setSubmitting(false)
+   233→  }
+   234→
+   235→  const handleSendMessage = async () => {
+   236→    if (!messageForm.message || !currentUser) return
+   237→    setSubmitting(true)
+   238→    try {
+   239→      const res = await fetch('/api/notices', {
+   240→        method: 'POST',
+   241→        headers: { 'Content-Type': 'application/json' },
+   242→        body: JSON.stringify({
+   243→          title: `Message: ${messageForm.type}`,
+   244→          content: messageForm.message,
+   245→          type: 'general',
+   246→          propertyId: messageForm.propertyId || properties[0]?.id,
+   247→          createdById: currentUser.id,
+   248→        }),
+   249→      })
+   250→      if (res.ok) {
+   251→        setSendMessageOpen(false)
+   252→        setMessageForm({ message: '', type: 'whatsapp', recipientType: 'all', propertyId: '' })
+   253→      }
+   254→    } catch { /* ignore */ }
+   255→    setSubmitting(false)
+   256→  }
+   257→
+   258→  const handleExpireNotice = async (noticeId: string) => {
+   259→    try {
+   260→      // Update locally since there's no PATCH endpoint
+   261→      setNotices((prev) =>
+   262→        prev.map((n) => n.id === noticeId ? { ...n, isActive: false } : n)
+   263→      )
+   264→    } catch { /* ignore */ }
+   265→  }
+   266→
+   267→  // ── Loading Skeleton ────────────────────────────────────────────────────
+   268→
+   269→  if (loading) {
+   270→    return (
+   271→      <div className="p-6 space-y-6">
+   272→        <div className="flex justify-between items-center">
+   273→          <Skeleton className="h-10 w-64" />
+   274→          <div className="flex gap-2">
+   275→            <Skeleton className="h-10 w-32" />
+   276→            <Skeleton className="h-10 w-32" />
+   277→          </div>
+   278→        </div>
+   279→        <Skeleton className="h-10 w-64" />
+   280→        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+   281→          {Array.from({ length: 6 }).map((_, i) => (
+   282→            <Skeleton key={i} className="h-48 rounded-lg" />
+   283→          ))}
+   284→        </div>
+   285→      </div>
+   286→    )
+   287→  }
+   288→
+   289→  // ── Render ──────────────────────────────────────────────────────────────
+   290→
+   291→  return (
+   292→    <div className="p-6 space-y-6">
+   293→      {/* Header */}
+   294→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   295→        <div>
+   296→          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+   297→            <Megaphone className="h-6 w-6 text-emerald-600" />
+   298→            Communication
+   299→          </h1>
+   300→          <p className="text-muted-foreground mt-1">Manage notices and communicate with tenants and staff</p>
+   301→        </div>
+   302→        <div className="flex gap-2">
+   303→          <Button onClick={() => setCreateNoticeOpen(true)} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+   304→            <Plus className="h-4 w-4" />
+   305→            Create Notice
+   306→          </Button>
+   307→          <Button onClick={() => setSendMessageOpen(true)} variant="outline" className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50">
+   308→            <Send className="h-4 w-4" />
+   309→            Send Message
+   310→          </Button>
+   311→        </div>
+   312→      </div>
+   313→
+   314→      {/* Tabs */}
+   315→      <Tabs defaultValue="notices" className="space-y-4">
+   316→        <TabsList className="bg-emerald-50">
+   317→          <TabsTrigger value="notices" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+   318→            <Bell className="h-4 w-4 mr-2" />
+   319→            Notice Board
+   320→          </TabsTrigger>
+   321→          <TabsTrigger value="messages" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+   322→            <MessageSquare className="h-4 w-4 mr-2" />
+   323→            Messages
+   324→          </TabsTrigger>
+   325→        </TabsList>
+   326→
+   327→        {/* Notice Board Tab */}
+   328→        <TabsContent value="notices" className="space-y-4">
+   329→          {/* Filters */}
+   330→          <div className="flex flex-wrap gap-3">
+   331→            <div className="flex items-center gap-2">
+   332→              <Filter className="h-4 w-4 text-emerald-600" />
+   333→              <span className="text-sm font-medium text-gray-600">Filters:</span>
+   334→            </div>
+   335→            <Select value={noticeTypeFilter} onValueChange={setNoticeTypeFilter}>
+   336→              <SelectTrigger className="w-[150px] h-9">
+   337→                <SelectValue placeholder="All Types" />
+   338→              </SelectTrigger>
+   339→              <SelectContent>
+   340→                <SelectItem value="all">All Types</SelectItem>
+   341→                {Object.entries(NOTICE_TYPE_CONFIG).map(([key, cfg]) => (
+   342→                  <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   343→                ))}
+   344→              </SelectContent>
+   345→            </Select>
+   346→            <Select value={noticePropertyFilter} onValueChange={setNoticePropertyFilter}>
+   347→              <SelectTrigger className="w-[180px] h-9">
+   348→                <SelectValue placeholder="All Properties" />
+   349→              </SelectTrigger>
+   350→              <SelectContent>
+   351→                <SelectItem value="all">All Properties</SelectItem>
+   352→                {properties.map((p) => (
+   353→                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   354→                ))}
+   355→              </SelectContent>
+   356→            </Select>
+   357→          </div>
+   358→
+   359→          {/* Notices List */}
+   360→          {filteredNotices.length === 0 ? (
+   361→            <Card className="border-dashed">
+   362→              <CardContent className="p-8 text-center">
+   363→                <Bell className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+   364→                <p className="text-muted-foreground font-medium">No notices found</p>
+   365→                <p className="text-sm text-muted-foreground mt-1">Create a notice to get started</p>
+   366→              </CardContent>
+   367→            </Card>
+   368→          ) : (
+   369→            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+   370→              {filteredNotices.map((notice) => {
+   371→                const typeConfig = NOTICE_TYPE_CONFIG[notice.type] || NOTICE_TYPE_CONFIG.general
+   372→                const expired = isExpired(notice.expiryDate) || !notice.isActive
+   373→
+   374→                return (
+   375→                  <Card key={notice.id} className={`transition-all hover:shadow-md ${expired ? 'opacity-60' : 'border-emerald-200'}`}>
+   376→                    <CardHeader className="pb-3">
+   377→                      <div className="flex items-start justify-between gap-2">
+   378→                        <CardTitle className="text-base leading-tight">{notice.title}</CardTitle>
+   379→                        <Badge className={`${typeConfig.bg} ${typeConfig.color} border shrink-0 gap-1`}>
+   380→                          {typeConfig.icon}
+   381→                          {typeConfig.label}
+   382→                        </Badge>
+   383→                      </div>
+   384→                      {notice.property && (
+   385→                        <CardDescription className="flex items-center gap-1 mt-1">
+   386→                          <Building2 className="h-3 w-3" />
+   387→                          {notice.property.name}
+   388→                        </CardDescription>
+   389→                      )}
+   390→                    </CardHeader>
+   391→                    <CardContent className="space-y-3">
+   392→                      <p className="text-sm text-gray-600 line-clamp-3">{notice.content}</p>
+   393→                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+   394→                        <span className="flex items-center gap-1">
+   395→                          <Clock className="h-3 w-3" />
+   396→                          Created: {formatDate(notice.createdAt)}
+   397→                        </span>
+   398→                        {notice.expiryDate && (
+   399→                          <span className="flex items-center gap-1">
+   400→                            <CalendarDays className="h-3 w-3" />
+   401→                            Expires: {formatDate(notice.expiryDate)}
+   402→                          </span>
+   403→                        )}
+   404→                      </div>
+   405→                      <div className="flex items-center justify-between pt-2 border-t">
+   406→                        {expired ? (
+   407→                          <Badge variant="secondary" className="text-xs">Expired</Badge>
+   408→                        ) : (
+   409→                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
+   410→                        )}
+   411→                        {notice.isActive && (
+   412→                          <Button
+   413→                            variant="ghost"
+   414→                            size="sm"
+   415→                            className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 h-7"
+   416→                            onClick={() => handleExpireNotice(notice.id)}
+   417→                          >
+   418→                            Expire
+   419→                          </Button>
+   420→                        )}
+   421→                      </div>
+   422→                    </CardContent>
+   423→                  </Card>
+   424→                )
+   425→              })}
+   426→            </div>
+   427→          )}
+   428→        </TabsContent>
+   429→
+   430→        {/* Messages Tab */}
+   431→        <TabsContent value="messages" className="space-y-4">
+   432→          {/* Filters */}
+   433→          <div className="flex flex-wrap gap-3">
+   434→            <div className="flex items-center gap-2">
+   435→              <Filter className="h-4 w-4 text-emerald-600" />
+   436→              <span className="text-sm font-medium text-gray-600">Type:</span>
+   437→            </div>
+   438→            <Select value={messageTypeFilter} onValueChange={setMessageTypeFilter}>
+   439→              <SelectTrigger className="w-[160px] h-9">
+   440→                <SelectValue placeholder="All Types" />
+   441→              </SelectTrigger>
+   442→              <SelectContent>
+   443→                <SelectItem value="all">All Types</SelectItem>
+   444→                {Object.entries(MESSAGE_TYPE_CONFIG).map(([key, cfg]) => (
+   445→                  <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   446→                ))}
+   447→              </SelectContent>
+   448→            </Select>
+   449→          </div>
+   450→
+   451→          {/* Messages List */}
+   452→          {filteredCommunications.length === 0 ? (
+   453→            <Card className="border-dashed">
+   454→              <CardContent className="p-8 text-center">
+   455→                <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+   456→                <p className="text-muted-foreground font-medium">No messages yet</p>
+   457→                <p className="text-sm text-muted-foreground mt-1">Send a message to tenants or staff</p>
+   458→              </CardContent>
+   459→            </Card>
+   460→          ) : (
+   461→            <div className="space-y-3">
+   462→              {filteredCommunications.map((msg) => {
+   463→                const typeConfig = MESSAGE_TYPE_CONFIG[msg.type] || MESSAGE_TYPE_CONFIG.whatsapp
+   464→                const statusConfig = STATUS_CONFIG[msg.status] || STATUS_CONFIG.sent
+   465→
+   466→                return (
+   467→                  <Card key={msg.id} className="hover:shadow-sm transition-shadow">
+   468→                    <CardContent className="p-4">
+   469→                      <div className="flex items-start gap-3">
+   470→                        <div className={`${statusConfig.color} mt-0.5`}>
+   471→                          {typeConfig.icon}
+   472→                        </div>
+   473→                        <div className="flex-1 min-w-0">
+   474→                          <p className="text-sm text-gray-800">{msg.message}</p>
+   475→                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+   476→                            <span className="flex items-center gap-1">
+   477→                              {typeConfig.icon}
+   478→                              {typeConfig.label}
+   479→                            </span>
+   480→                            <span className="capitalize">{msg.recipientType}</span>
+   481→                            <span className="flex items-center gap-1">
+   482→                              <Clock className="h-3 w-3" />
+   483→                              {formatDateTime(msg.sentAt)}
+   484→                            </span>
+   485→                            <span className={`flex items-center gap-1 ${statusConfig.color}`}>
+   486→                              {statusConfig.icon}
+   487→                              {statusConfig.label}
+   488→                            </span>
+   489→                          </div>
+   490→                        </div>
+   491→                      </div>
+   492→                    </CardContent>
+   493→                  </Card>
+   494→                )
+   495→              })}
+   496→            </div>
+   497→          )}
+   498→        </TabsContent>
+   499→      </Tabs>
+   500→
+   501→      {/* Create Notice Dialog */}
+   502→      <Dialog open={createNoticeOpen} onOpenChange={setCreateNoticeOpen}>
+   503→        <DialogContent className="sm:max-w-[500px]">
+   504→          <DialogHeader>
+   505→            <DialogTitle className="flex items-center gap-2">
+   506→              <Bell className="h-5 w-5 text-emerald-600" />
+   507→              Create Notice
+   508→            </DialogTitle>
+   509→            <DialogDescription>Post a new notice to the notice board for tenants and staff.</DialogDescription>
+   510→          </DialogHeader>
+   511→          <div className="space-y-4 py-4">
+   512→            <div className="space-y-2">
+   513→              <Label htmlFor="notice-title">Title</Label>
+   514→              <Input
+   515→                id="notice-title"
+   516→                placeholder="Notice title"
+   517→                value={noticeForm.title}
+   518→                onChange={(e) => setNoticeForm((prev) => ({ ...prev, title: e.target.value }))}
+   519→              />
+   520→            </div>
+   521→            <div className="space-y-2">
+   522→              <Label htmlFor="notice-content">Content</Label>
+   523→              <Textarea
+   524→                id="notice-content"
+   525→                placeholder="Notice content..."
+   526→                rows={4}
+   527→                value={noticeForm.content}
+   528→                onChange={(e) => setNoticeForm((prev) => ({ ...prev, content: e.target.value }))}
+   529→              />
+   530→            </div>
+   531→            <div className="grid grid-cols-2 gap-4">
+   532→              <div className="space-y-2">
+   533→                <Label>Type</Label>
+   534→                <Select value={noticeForm.type} onValueChange={(v) => setNoticeForm((prev) => ({ ...prev, type: v }))}>
+   535→                  <SelectTrigger>
+   536→                    <SelectValue />
+   537→                  </SelectTrigger>
+   538→                  <SelectContent>
+   539→                    {Object.entries(NOTICE_TYPE_CONFIG).map(([key, cfg]) => (
+   540→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   541→                    ))}
+   542→                  </SelectContent>
+   543→                </Select>
+   544→              </div>
+   545→              <div className="space-y-2">
+   546→                <Label>Property</Label>
+   547→                <Select value={noticeForm.propertyId} onValueChange={(v) => setNoticeForm((prev) => ({ ...prev, propertyId: v }))}>
+   548→                  <SelectTrigger>
+   549→                    <SelectValue placeholder="Select property" />
+   550→                  </SelectTrigger>
+   551→                  <SelectContent>
+   552→                    {properties.map((p) => (
+   553→                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   554→                    ))}
+   555→                  </SelectContent>
+   556→                </Select>
+   557→              </div>
+   558→            </div>
+   559→            <div className="space-y-2">
+   560→              <Label htmlFor="notice-expiry">Expiry Date</Label>
+   561→              <Input
+   562→                id="notice-expiry"
+   563→                type="date"
+   564→                value={noticeForm.expiryDate}
+   565→                onChange={(e) => setNoticeForm((prev) => ({ ...prev, expiryDate: e.target.value }))}
+   566→              />
+   567→            </div>
+   568→          </div>
+   569→          <DialogFooter>
+   570→            <Button variant="outline" onClick={() => setCreateNoticeOpen(false)}>Cancel</Button>
+   571→            <Button
+   572→              onClick={handleCreateNotice}
+   573→              disabled={submitting || !noticeForm.title || !noticeForm.content || !noticeForm.propertyId}
+   574→              className="bg-emerald-600 hover:bg-emerald-700"
+   575→            >
+   576→              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   577→              Create Notice
+   578→            </Button>
+   579→          </DialogFooter>
+   580→        </DialogContent>
+   581→      </Dialog>
+   582→
+   583→      {/* Send Message Dialog */}
+   584→      <Dialog open={sendMessageOpen} onOpenChange={setSendMessageOpen}>
+   585→        <DialogContent className="sm:max-w-[500px]">
+   586→          <DialogHeader>
+   587→            <DialogTitle className="flex items-center gap-2">
+   588→              <Send className="h-5 w-5 text-emerald-600" />
+   589→              Send Message
+   590→            </DialogTitle>
+   591→            <DialogDescription>Send a message to tenants, staff, or specific individuals.</DialogDescription>
+   592→          </DialogHeader>
+   593→          <div className="space-y-4 py-4">
+   594→            <div className="space-y-2">
+   595→              <Label htmlFor="msg-content">Message</Label>
+   596→              <Textarea
+   597→                id="msg-content"
+   598→                placeholder="Type your message..."
+   599→                rows={4}
+   600→                value={messageForm.message}
+   601→                onChange={(e) => setMessageForm((prev) => ({ ...prev, message: e.target.value }))}
+   602→              />
+   603→            </div>
+   604→            <div className="grid grid-cols-2 gap-4">
+   605→              <div className="space-y-2">
+   606→                <Label>Type</Label>
+   607→                <Select value={messageForm.type} onValueChange={(v) => setMessageForm((prev) => ({ ...prev, type: v }))}>
+   608→                  <SelectTrigger>
+   609→                    <SelectValue />
+   610→                  </SelectTrigger>
+   611→                  <SelectContent>
+   612→                    {Object.entries(MESSAGE_TYPE_CONFIG).map(([key, cfg]) => (
+   613→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   614→                    ))}
+   615→                  </SelectContent>
+   616→                </Select>
+   617→              </div>
+   618→              <div className="space-y-2">
+   619→                <Label>Recipient Type</Label>
+   620→                <Select value={messageForm.recipientType} onValueChange={(v) => setMessageForm((prev) => ({ ...prev, recipientType: v }))}>
+   621→                  <SelectTrigger>
+   622→                    <SelectValue />
+   623→                  </SelectTrigger>
+   624→                  <SelectContent>
+   625→                    <SelectItem value="all">All</SelectItem>
+   626→                    <SelectItem value="tenants">Tenants</SelectItem>
+   627→                    <SelectItem value="staff">Staff</SelectItem>
+   628→                    <SelectItem value="specific">Specific</SelectItem>
+   629→                  </SelectContent>
+   630→                </Select>
+   631→              </div>
+   632→            </div>
+   633→            <div className="space-y-2">
+   634→              <Label>Property (Optional)</Label>
+   635→              <Select value={messageForm.propertyId} onValueChange={(v) => setMessageForm((prev) => ({ ...prev, propertyId: v }))}>
+   636→                <SelectTrigger>
+   637→                  <SelectValue placeholder="All Properties" />
+   638→                </SelectTrigger>
+   639→                <SelectContent>
+   640→                  <SelectItem value="all">All Properties</SelectItem>
+   641→                  {properties.map((p) => (
+   642→                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   643→                  ))}
+   644→                </SelectContent>
+   645→              </Select>
+   646→            </div>
+   647→          </div>
+   648→          <DialogFooter>
+   649→            <Button variant="outline" onClick={() => setSendMessageOpen(false)}>Cancel</Button>
+   650→            <Button
+   651→              onClick={handleSendMessage}
+   652→              disabled={submitting || !messageForm.message}
+   653→              className="bg-emerald-600 hover:bg-emerald-700"
+   654→            >
+   655→              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   656→              <Send className="h-4 w-4 mr-2" />
+   657→              Send Message
+   658→            </Button>
+   659→          </DialogFooter>
+   660→        </DialogContent>
+   661→      </Dialog>
+   662→    </div>
+   663→  )
+   664→}
+   665→

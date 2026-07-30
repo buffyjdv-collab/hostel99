@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    13→import { Separator } from '@/components/ui/separator'
+    14→import {
+    15→  Dialog,
+    16→  DialogContent,
+    17→  DialogDescription,
+    18→  DialogFooter,
+    19→  DialogHeader,
+    20→  DialogTitle,
+    21→} from '@/components/ui/dialog'
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→} from '@/components/ui/select'
+    29→import {
+    30→  Table,
+    31→  TableBody,
+    32→  TableCell,
+    33→  TableHead,
+    34→  TableHeader,
+    35→  TableRow,
+    36→} from '@/components/ui/table'
+    37→import {
+    38→  DropdownMenu,
+    39→  DropdownMenuContent,
+    40→  DropdownMenuItem,
+    41→  DropdownMenuTrigger,
+    42→} from '@/components/ui/dropdown-menu'
+    43→import {
+    44→  AlertDialog,
+    45→  AlertDialogAction,
+    46→  AlertDialogCancel,
+    47→  AlertDialogContent,
+    48→  AlertDialogDescription,
+    49→  AlertDialogFooter,
+    50→  AlertDialogHeader,
+    51→  AlertDialogTitle,
+    52→} from '@/components/ui/alert-dialog'
+    53→import { useToast } from '@/hooks/use-toast'
+    54→import {
+    55→  Package,
+    56→  Wrench,
+    57→  IndianRupee,
+    58→  Plus,
+    59→  Search,
+    60→  MoreVertical,
+    61→  Loader2,
+    62→  Edit3,
+    63→  Trash2,
+    64→  Shirt,
+    65→  SprayCan,
+    66→  AlertTriangle,
+    67→  CheckCircle2,
+    68→  XCircle,
+    69→  Clock,
+    70→  ArrowRightLeft,
+    71→  ArrowDownToLine,
+    72→  ArrowUpFromLine,
+    73→  RefreshCw,
+    74→  Database,
+    75→  Activity,
+    76→  ShieldAlert,
+    77→  Tag,
+    78→  Bed,
+    79→  Zap,
+    80→  Monitor,
+    81→  Refrigerator,
+    82→  CookingPot,
+    83→  HelpCircle,
+    84→  Droplets,
+    85→  Bath,
+    86→  Curtain,
+    87→  Sparkles,
+    88→  Hammer,
+    89→  ShoppingCart,
+    90→  PackageCheck,
+    91→  TrendingDown,
+    92→} from 'lucide-react'
+    93→
+    94→// ── Types ────────────────────────────────────────────────────────────────────
+    95→
+    96→type AssetCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'broken'
+    97→type AssetStatus = 'active' | 'under_maintenance' | 'disposed' | 'lost'
+    98→type AssetCategory = 'furniture' | 'electrical' | 'electronics' | 'appliance' | 'kitchen_equipment' | 'other'
+    99→
+   100→type LaundryCategory = 'bedding' | 'bathroom' | 'curtain' | 'other'
+   101→type LaundryCondition = 'excellent' | 'good' | 'fair' | 'poor' | 'broken'
+   102→type LaundryStatus = 'in_use' | 'in_laundry' | 'stored' | 'damaged' | 'disposed'
+   103→
+   104→type HousekeepingCategory = 'cleaning' | 'hygiene' | 'tool' | 'other'
+   105→type HousekeepingStatus = 'in_stock' | 'low_stock' | 'out_of_stock'
+   106→
+   107→interface RoomInfo {
+   108→  id: string
+   109→  name: string
+   110→  number: string
+   111→}
+   112→
+   113→interface AssetItem {
+   114→  id: string
+   115→  name: string
+   116→  assetTag: string | null
+   117→  category: string
+   118→  subCategory: string | null
+   119→  room: RoomInfo | null
+   120→  purchaseDate: string | null
+   121→  purchasePrice: number | null
+   122→  currentValue: number | null
+   123→  depreciationRate: number | null
+   124→  vendor: string | null
+   125→  warrantyExpiry: string | null
+   126→  status: AssetStatus
+   127→  condition: AssetCondition
+   128→  assignedTo: string | null
+   129→  lastMaintenance: string | null
+   130→  nextMaintenance: string | null
+   131→  notes: string | null
+   132→}
+   133→
+   134→interface AssetStats {
+   135→  total: number
+   136→  active: number
+   137→  underMaintenance: number
+   138→  disposed: number
+   139→  totalValue: number
+   140→  byCategory: Record<string, number>
+   141→}
+   142→
+   143→interface LaundryItemData {
+   144→  id: string
+   145→  name: string
+   146→  category: LaundryCategory
+   147→  room: RoomInfo | null
+   148→  totalQuantity: number
+   149→  issuedQuantity: number
+   150→  inLaundry: number
+   151→  damagedQuantity: number
+   152→  condition: LaundryCondition
+   153→  lastWashDate: string | null
+   154→  nextWashDate: string | null
+   155→  status: LaundryStatus
+   156→  notes: string | null
+   157→}
+   158→
+   159→interface LaundryStats {
+   160→  totalItems: number
+   161→  inUse: number
+   162→  inLaundry: number
+   163→  damaged: number
+   164→}
+   165→
+   166→interface HousekeepingItemData {
+   167→  id: string
+   168→  name: string
+   169→  category: HousekeepingCategory
+   170→  unit: string
+   171→  currentStock: number
+   172→  minStock: number
+   173→  unitPrice: number
+   174→  lastRestocked: string | null
+   175→  nextRestock: string | null
+   176→  isActive: boolean
+   177→  notes: string | null
+   178→}
+   179→
+   180→interface HousekeepingStats {
+   181→  totalItems: number
+   182→  lowStock: number
+   183→  totalValue: number
+   184→}
+   185→
+   186→// ── Constants ────────────────────────────────────────────────────────────────
+   187→
+   188→const ASSET_CATEGORIES: { value: AssetCategory; label: string; icon: React.ReactNode }[] = [
+   189→  { value: 'furniture', label: 'Furniture', icon: <Bed className="h-3.5 w-3.5" /> },
+   190→  { value: 'electrical', label: 'Electrical', icon: <Zap className="h-3.5 w-3.5" /> },
+   191→  { value: 'electronics', label: 'Electronics', icon: <Monitor className="h-3.5 w-3.5" /> },
+   192→  { value: 'appliance', label: 'Appliance', icon: <Refrigerator className="h-3.5 w-3.5" /> },
+   193→  { value: 'kitchen_equipment', label: 'Kitchen Equipment', icon: <CookingPot className="h-3.5 w-3.5" /> },
+   194→  { value: 'other', label: 'Other', icon: <HelpCircle className="h-3.5 w-3.5" /> },
+   195→]
+   196→
+   197→const ASSET_SUB_CATEGORIES: Record<string, string[]> = {
+   198→  furniture: ['bed', 'mattress', 'chair', 'table', 'sofa', 'cupboard', 'shelf', 'desk', 'other'],
+   199→  electrical: ['fan', 'ac', 'geyser', 'water_cooler', 'heater', 'inverter', 'other'],
+   200→  electronics: ['tv', 'router', 'cctv', 'intercom', 'music_system', 'other'],
+   201→  appliance: ['washing_machine', 'refrigerator', 'microwave', 'iron', 'vacuum_cleaner', 'other'],
+   202→  kitchen_equipment: ['gas_stove', 'mixer', 'water_purifier', 'chimney', 'toaster', 'other'],
+   203→  other: ['other'],
+   204→}
+   205→
+   206→const LAUNDRY_CATEGORIES: { value: LaundryCategory; label: string }[] = [
+   207→  { value: 'bedding', label: 'Bedding' },
+   208→  { value: 'bathroom', label: 'Bathroom' },
+   209→  { value: 'curtain', label: 'Curtain' },
+   210→  { value: 'other', label: 'Other' },
+   211→]
+   212→
+   213→const HOUSEKEEPING_CATEGORIES: { value: HousekeepingCategory; label: string }[] = [
+   214→  { value: 'cleaning', label: 'Cleaning' },
+   215→  { value: 'hygiene', label: 'Hygiene' },
+   216→  { value: 'tool', label: 'Tool' },
+   217→  { value: 'other', label: 'Other' },
+   218→]
+   219→
+   220→const HOUSEKEEPING_UNITS = ['pcs', 'pack', 'l', 'kg', 'ml', 'g', 'roll', 'box', 'bottle', 'can']
+   221→
+   222→// ── Helpers ──────────────────────────────────────────────────────────────────
+   223→
+   224→function formatCurrency(value: number | null | undefined): string {
+   225→  if (value == null) return '—'
+   226→  return '₹' + value.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+   227→}
+   228→
+   229→function formatDate(dateStr: string | null | undefined): string {
+   230→  if (!dateStr) return '—'
+   231→  try {
+   232→    return new Date(dateStr).toLocaleDateString('en-IN', {
+   233→      day: '2-digit',
+   234→      month: 'short',
+   235→      year: 'numeric',
+   236→    })
+   237→  } catch {
+   238→    return '—'
+   239→  }
+   240→}
+   241→
+   242→function isWarrantyExpiringSoon(dateStr: string | null | undefined): boolean {
+   243→  if (!dateStr) return false
+   244→  const expiry = new Date(dateStr)
+   245→  const now = new Date()
+   246→  const diffDays = (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+   247→  return diffDays > 0 && diffDays <= 90
+   248→}
+   249→
+   250→function isWarrantyExpired(dateStr: string | null | undefined): boolean {
+   251→  if (!dateStr) return false
+   252→  return new Date(dateStr) < new Date()
+   253→}
+   254→
+   255→function getConditionBadge(condition: string) {
+   256→  const map: Record<string, { bg: string; text: string; label: string }> = {
+   257→    excellent: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-800 dark:text-emerald-300', label: 'Excellent' },
+   258→    good: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', label: 'Good' },
+   259→    fair: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-300', label: 'Fair' },
+   260→    poor: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-800 dark:text-orange-300', label: 'Poor' },
+   261→    broken: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: 'Broken' },
+   262→  }
+   263→  const c = map[condition] || map.good
+   264→  return (
+   265→    <Badge variant="secondary" className={`${c.bg} ${c.text} border-0 font-medium`}>
+   266→      {c.label}
+   267→    </Badge>
+   268→  )
+   269→}
+   270→
+   271→function getAssetStatusBadge(status: string) {
+   272→  const map: Record<string, { bg: string; text: string; label: string }> = {
+   273→    active: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-800 dark:text-emerald-300', label: 'Active' },
+   274→    under_maintenance: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-300', label: 'Maintenance' },
+   275→    disposed: { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-700 dark:text-slate-300', label: 'Disposed' },
+   276→    lost: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: 'Lost' },
+   277→  }
+   278→  const c = map[status] || map.active
+   279→  return (
+   280→    <Badge variant="secondary" className={`${c.bg} ${c.text} border-0 font-medium`}>
+   281→      {c.label}
+   282→    </Badge>
+   283→  )
+   284→}
+   285→
+   286→function getLaundryStatusBadge(status: string) {
+   287→  const map: Record<string, { bg: string; text: string; label: string }> = {
+   288→    in_use: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-800 dark:text-emerald-300', label: 'In Use' },
+   289→    in_laundry: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', label: 'In Laundry' },
+   290→    stored: { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-700 dark:text-slate-300', label: 'Stored' },
+   291→    damaged: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', label: 'Damaged' },
+   292→    disposed: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-800 dark:text-orange-300', label: 'Disposed' },
+   293→  }
+   294→  const c = map[status] || map.in_use
+   295→  return (
+   296→    <Badge variant="secondary" className={`${c.bg} ${c.text} border-0 font-medium`}>
+   297→      {c.label}
+   298→    </Badge>
+   299→  )
+   300→}
+   301→
+   302→function getHousekeepingStatusBadge(item: HousekeepingItemData) {
+   303→  if (item.currentStock <= 0) {
+   304→    return <Badge variant="secondary" className="bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-0 font-medium">Out of Stock</Badge>
+   305→  }
+   306→  if (item.currentStock <= item.minStock) {
+   307→    return <Badge variant="secondary" className="bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 border-0 font-medium">Low Stock</Badge>
+   308→  }
+   309→  return <Badge variant="secondary" className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300 border-0 font-medium">In Stock</Badge>
+   310→}
+   311→
+   312→function getCategoryLabel(category: string): string {
+   313→  const map: Record<string, string> = {
+   314→    furniture: 'Furniture',
+   315→    electrical: 'Electrical',
+   316→    electronics: 'Electronics',
+   317→    appliance: 'Appliance',
+   318→    kitchen_equipment: 'Kitchen Equipment',
+   319→    bedding: 'Bedding',
+   320→    bathroom: 'Bathroom',
+   321→    curtain: 'Curtain',
+   322→    cleaning: 'Cleaning',
+   323→    hygiene: 'Hygiene',
+   324→    tool: 'Tool',
+   325→    other: 'Other',
+   326→  }
+   327→  return map[category] || category
+   328→}
+   329→
+   330→function getSubCategoryLabel(sub: string): string {
+   331→  return sub.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
+   332→}
+   333→
+   334→// ── Main Component ───────────────────────────────────────────────────────────
+   335→
+   336→export function AssetsPage() {
+   337→  const { selectedPropertyId, currentUser } = useAppStore()
+   338→  const { toast } = useToast()
+   339→
+   340→  // Active tab
+   341→  const [activeTab, setActiveTab] = useState<string>('assets')
+   342→
+   343→  // Loading states
+   344→  const [assetsLoading, setAssetsLoading] = useState(true)
+   345→  const [laundryLoading, setLaundryLoading] = useState(true)
+   346→  const [housekeepingLoading, setHousekeepingLoading] = useState(true)
+   347→  const [roomsLoading, setRoomsLoading] = useState(true)
+   348→  const [actionLoading, setActionLoading] = useState(false)
+   349→
+   350→  // Data
+   351→  const [assets, setAssets] = useState<AssetItem[]>([])
+   352→  const [assetStats, setAssetStats] = useState<AssetStats>({ total: 0, active: 0, underMaintenance: 0, disposed: 0, totalValue: 0, byCategory: {} })
+   353→  const [laundry, setLaundry] = useState<LaundryItemData[]>([])
+   354→  const [laundryStats, setLaundryStats] = useState<LaundryStats>({ totalItems: 0, inUse: 0, inLaundry: 0, damaged: 0 })
+   355→  const [housekeeping, setHousekeeping] = useState<HousekeepingItemData[]>([])
+   356→  const [housekeepingStats, setHousekeepingStats] = useState<HousekeepingStats>({ totalItems: 0, lowStock: 0, totalValue: 0 })
+   357→  const [rooms, setRooms] = useState<RoomInfo[]>([])
+   358→
+   359→  // Filters
+   360→  const [assetSearch, setAssetSearch] = useState('')
+   361→  const [assetCategoryFilter, setAssetCategoryFilter] = useState<string>('all')
+   362→  const [laundrySearch, setLaundrySearch] = useState('')
+   363→  const [housekeepingSearch, setHousekeepingSearch] = useState('')
+   364→
+   365→  // Dialogs
+   366→  const [assetDialogOpen, setAssetDialogOpen] = useState(false)
+   367→  const [editAssetDialogOpen, setEditAssetDialogOpen] = useState(false)
+   368→  const [laundryDialogOpen, setLaundryDialogOpen] = useState(false)
+   369→  const [editLaundryDialogOpen, setEditLaundryDialogOpen] = useState(false)
+   370→  const [housekeepingDialogOpen, setHousekeepingDialogOpen] = useState(false)
+   371→  const [restockDialogOpen, setRestockDialogOpen] = useState(false)
+   372→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+   373→
+   374→  // Form data
+   375→  const [selectedAsset, setSelectedAsset] = useState<AssetItem | null>(null)
+   376→  const [selectedLaundry, setSelectedLaundry] = useState<LaundryItemData | null>(null)
+   377→  const [selectedHousekeeping, setSelectedHousekeeping] = useState<HousekeepingItemData | null>(null)
+   378→  const [deleteTarget, setDeleteTarget] = useState<{ type: 'asset' | 'laundry' | 'housekeeping'; id: string; name: string } | null>(null)
+   379→
+   380→  // Asset form
+   381→  const [assetForm, setAssetForm] = useState({
+   382→    name: '',
+   383→    assetTag: '',
+   384→    category: 'furniture' as AssetCategory,
+   385→    subCategory: '',
+   386→    roomId: '',
+   387→    purchaseDate: '',
+   388→    purchasePrice: '',
+   389→    currentValue: '',
+   390→    depreciationRate: '',
+   391→    vendor: '',
+   392→    warrantyExpiry: '',
+   393→    condition: 'good' as AssetCondition,
+   394→    assignedTo: '',
+   395→    notes: '',
+   396→    status: 'active' as AssetStatus,
+   397→  })
+   398→
+   399→  // Laundry form
+   400→  const [laundryForm, setLaundryForm] = useState({
+   401→    name: '',
+   402→    category: 'bedding' as LaundryCategory,
+   403→    roomId: '',
+   404→    totalQuantity: '',
+   405→    issuedQuantity: '',
+   406→    condition: 'good' as LaundryCondition,
+   407→    notes: '',
+   408→  })
+   409→
+   410→  // Edit laundry form
+   411→  const [editLaundryForm, setEditLaundryForm] = useState({
+   412→    id: '',
+   413→    name: '',
+   414→    category: 'bedding' as LaundryCategory,
+   415→    roomId: '',
+   416→    totalQuantity: '',
+   417→    issuedQuantity: '',
+   418→    inLaundry: '',
+   419→    damagedQuantity: '',
+   420→    condition: 'good' as LaundryCondition,
+   421→    status: 'in_use' as LaundryStatus,
+   422→    notes: '',
+   423→  })
+   424→
+   425→  // Housekeeping form
+   426→  const [housekeepingForm, setHousekeepingForm] = useState({
+   427→    name: '',
+   428→    category: 'cleaning' as HousekeepingCategory,
+   429→    unit: 'pcs',
+   430→    currentStock: '',
+   431→    minStock: '',
+   432→    unitPrice: '',
+   433→    notes: '',
+   434→  })
+   435→
+   436→  // Restock form
+   437→  const [restockForm, setRestockForm] = useState({
+   438→    id: '',
+   439→    name: '',
+   440→    currentStock: 0,
+   441→    addQuantity: '',
+   442→    unitPrice: '',
+   443→  })
+   444→
+   445→  // ── Data Fetching ──────────────────────────────────────────────────────────
+   446→
+   447→  const fetchAssets = useCallback(async () => {
+   448→    setAssetsLoading(true)
+   449→    try {
+   450→      const params = new URLSearchParams({ type: 'assets' })
+   451→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   452→      const res = await fetch(`/api/assets?${params}`)
+   453→      if (res.ok) {
+   454→        const data = await res.json()
+   455→        setAssets(data.assets || [])
+   456→        setAssetStats(data.assetStats || { total: 0, active: 0, underMaintenance: 0, disposed: 0, totalValue: 0, byCategory: {} })
+   457→      }
+   458→    } catch (err) {
+   459→      console.error('Failed to fetch assets:', err)
+   460→    } finally {
+   461→      setAssetsLoading(false)
+   462→    }
+   463→  }, [selectedPropertyId])
+   464→
+   465→  const fetchLaundry = useCallback(async () => {
+   466→    setLaundryLoading(true)
+   467→    try {
+   468→      const params = new URLSearchParams({ type: 'laundry' })
+   469→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   470→      const res = await fetch(`/api/assets?${params}`)
+   471→      if (res.ok) {
+   472→        const data = await res.json()
+   473→        setLaundry(data.laundry || [])
+   474→        setLaundryStats(data.laundryStats || { totalItems: 0, inUse: 0, inLaundry: 0, damaged: 0 })
+   475→      }
+   476→    } catch (err) {
+   477→      console.error('Failed to fetch laundry:', err)
+   478→    } finally {
+   479→      setLaundryLoading(false)
+   480→    }
+   481→  }, [selectedPropertyId])
+   482→
+   483→  const fetchHousekeeping = useCallback(async () => {
+   484→    setHousekeepingLoading(true)
+   485→    try {
+   486→      const params = new URLSearchParams({ type: 'housekeeping' })
+   487→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   488→      const res = await fetch(`/api/assets?${params}`)
+   489→      if (res.ok) {
+   490→        const data = await res.json()
+   491→        setHousekeeping(data.housekeeping || [])
+   492→        setHousekeepingStats(data.housekeepingStats || { totalItems: 0, lowStock: 0, totalValue: 0 })
+   493→      }
+   494→    } catch (err) {
+   495→      console.error('Failed to fetch housekeeping:', err)
+   496→    } finally {
+   497→      setHousekeepingLoading(false)
+   498→    }
+   499→  }, [selectedPropertyId])
+   500→
+   501→  const fetchRooms = useCallback(async () => {
+   502→    setRoomsLoading(true)
+   503→    try {
+   504→      const res = await fetch('/api/rooms')
+   505→      if (res.ok) {
+   506→        const data = await res.json()
+   507→        const roomList: RoomInfo[] = data.map((r: any) => ({
+   508→          id: r.id,
+   509→          name: r.name,
+   510→          number: r.number,
+   511→        }))
+   512→        setRooms(roomList)
+   513→      }
+   514→    } catch (err) {
+   515→      console.error('Failed to fetch rooms:', err)
+   516→    } finally {
+   517→      setRoomsLoading(false)
+   518→    }
+   519→  }, [])
+   520→
+   521→  useEffect(() => {
+   522→    fetchAssets()
+   523→    fetchLaundry()
+   524→    fetchHousekeeping()
+   525→    fetchRooms()
+   526→  }, [fetchAssets, fetchLaundry, fetchHousekeeping, fetchRooms])
+   527→
+   528→  // ── Filtered Data ──────────────────────────────────────────────────────────
+   529→
+   530→  const filteredAssets = useMemo(() => {
+   531→    let result = assets
+   532→    if (assetCategoryFilter !== 'all') {
+   533→      result = result.filter((a) => a.category === assetCategoryFilter)
+   534→    }
+   535→    if (assetSearch.trim()) {
+   536→      const q = assetSearch.toLowerCase()
+   537→      result = result.filter(
+   538→        (a) =>
+   539→          a.name.toLowerCase().includes(q) ||
+   540→          (a.assetTag && a.assetTag.toLowerCase().includes(q)) ||
+   541→          (a.subCategory && a.subCategory.toLowerCase().includes(q)) ||
+   542→          (a.room && a.room.name.toLowerCase().includes(q)) ||
+   543→          (a.vendor && a.vendor.toLowerCase().includes(q))
+   544→      )
+   545→    }
+   546→    return result
+   547→  }, [assets, assetCategoryFilter, assetSearch])
+   548→
+   549→  const filteredLaundry = useMemo(() => {
+   550→    if (!laundrySearch.trim()) return laundry
+   551→    const q = laundrySearch.toLowerCase()
+   552→    return laundry.filter(
+   553→      (l) =>
+   554→        l.name.toLowerCase().includes(q) ||
+   555→        l.category.toLowerCase().includes(q) ||
+   556→        (l.room && l.room.name.toLowerCase().includes(q))
+   557→    )
+   558→  }, [laundry, laundrySearch])
+   559→
+   560→  const filteredHousekeeping = useMemo(() => {
+   561→    if (!housekeepingSearch.trim()) return housekeeping
+   562→    const q = housekeepingSearch.toLowerCase()
+   563→    return housekeeping.filter(
+   564→      (h) =>
+   565→        h.name.toLowerCase().includes(q) ||
+   566→        h.category.toLowerCase().includes(q) ||
+   567→        h.unit.toLowerCase().includes(q)
+   568→    )
+   569→  }, [housekeeping, housekeepingSearch])
+   570→
+   571→  // ── Asset CRUD ─────────────────────────────────────────────────────────────
+   572→
+   573→  const resetAssetForm = () => {
+   574→    setAssetForm({
+   575→      name: '',
+   576→      assetTag: '',
+   577→      category: 'furniture',
+   578→      subCategory: '',
+   579→      roomId: '',
+   580→      purchaseDate: '',
+   581→      purchasePrice: '',
+   582→      currentValue: '',
+   583→      depreciationRate: '',
+   584→      vendor: '',
+   585→      warrantyExpiry: '',
+   586→      condition: 'good',
+   587→      assignedTo: '',
+   588→      notes: '',
+   589→      status: 'active',
+   590→    })
+   591→  }
+   592→
+   593→  const openAddAssetDialog = () => {
+   594→    resetAssetForm()
+   595→    setAssetDialogOpen(true)
+   596→  }
+   597→
+   598→  const openEditAssetDialog = (asset: AssetItem) => {
+   599→    setSelectedAsset(asset)
+   600→    setAssetForm({
+   601→      name: asset.name,
+   602→      assetTag: asset.assetTag || '',
+   603→      category: asset.category as AssetCategory,
+   604→      subCategory: asset.subCategory || '',
+   605→      roomId: asset.room?.id || '',
+   606→      purchaseDate: asset.purchaseDate ? new Date(asset.purchaseDate).toISOString().split('T')[0] : '',
+   607→      purchasePrice: asset.purchasePrice?.toString() || '',
+   608→      currentValue: asset.currentValue?.toString() || '',
+   609→      depreciationRate: asset.depreciationRate?.toString() || '',
+   610→      vendor: asset.vendor || '',
+   611→      warrantyExpiry: asset.warrantyExpiry ? new Date(asset.warrantyExpiry).toISOString().split('T')[0] : '',
+   612→      condition: asset.condition,
+   613→      assignedTo: asset.assignedTo || '',
+   614→      notes: asset.notes || '',
+   615→      status: asset.status,
+   616→    })
+   617→    setEditAssetDialogOpen(true)
+   618→  }
+   619→
+   620→  const handleAddAsset = async () => {
+   621→    if (!assetForm.name.trim()) {
+   622→      toast({ title: 'Validation Error', description: 'Asset name is required', variant: 'destructive' })
+   623→      return
+   624→    }
+   625→    setActionLoading(true)
+   626→    try {
+   627→      const payload: any = {
+   628→        type: 'asset',
+   629→        name: assetForm.name.trim(),
+   630→        assetTag: assetForm.assetTag.trim() || null,
+   631→        category: assetForm.category,
+   632→        subCategory: assetForm.subCategory.trim() || null,
+   633→        propertyId: selectedPropertyId,
+   634→        roomId: assetForm.roomId || null,
+   635→        purchaseDate: assetForm.purchaseDate || null,
+   636→        purchasePrice: assetForm.purchasePrice ? parseFloat(assetForm.purchasePrice) : null,
+   637→        currentValue: assetForm.currentValue ? parseFloat(assetForm.currentValue) : null,
+   638→        depreciationRate: assetForm.depreciationRate ? parseFloat(assetForm.depreciationRate) : null,
+   639→        vendor: assetForm.vendor.trim() || null,
+   640→        warrantyExpiry: assetForm.warrantyExpiry || null,
+   641→        condition: assetForm.condition,
+   642→        assignedTo: assetForm.assignedTo.trim() || null,
+   643→        notes: assetForm.notes.trim() || null,
+   644→      }
+   645→      const res = await fetch('/api/assets', {
+   646→        method: 'POST',
+   647→        headers: { 'Content-Type': 'application/json' },
+   648→        body: JSON.stringify(payload),
+   649→      })
+   650→      if (res.ok) {
+   651→        toast({ title: 'Success', description: 'Asset added successfully' })
+   652→        setAssetDialogOpen(false)
+   653→        resetAssetForm()
+   654→        fetchAssets()
+   655→      } else {
+   656→        const data = await res.json()
+   657→        toast({ title: 'Error', description: data.error || 'Failed to add asset', variant: 'destructive' })
+   658→      }
+   659→    } catch (err) {
+   660→      toast({ title: 'Error', description: 'Failed to add asset', variant: 'destructive' })
+   661→    } finally {
+   662→      setActionLoading(false)
+   663→    }
+   664→  }
+   665→
+   666→  const handleEditAsset = async () => {
+   667→    if (!selectedAsset || !assetForm.name.trim()) {
+   668→      toast({ title: 'Validation Error', description: 'Asset name is required', variant: 'destructive' })
+   669→      return
+   670→    }
+   671→    setActionLoading(true)
+   672→    try {
+   673→      const payload: any = {
+   674→        type: 'asset',
+   675→        id: selectedAsset.id,
+   676→        name: assetForm.name.trim(),
+   677→        assetTag: assetForm.assetTag.trim() || null,
+   678→        category: assetForm.category,
+   679→        subCategory: assetForm.subCategory.trim() || null,
+   680→        roomId: assetForm.roomId || null,
+   681→        currentValue: assetForm.currentValue ? parseFloat(assetForm.currentValue) : null,
+   682→        status: assetForm.status,
+   683→        condition: assetForm.condition,
+   684→        assignedTo: assetForm.assignedTo.trim() || null,
+   685→        notes: assetForm.notes.trim() || null,
+   686→      }
+   687→      const res = await fetch('/api/assets', {
+   688→        method: 'PATCH',
+   689→        headers: { 'Content-Type': 'application/json' },
+   690→        body: JSON.stringify(payload),
+   691→      })
+   692→      if (res.ok) {
+   693→        toast({ title: 'Success', description: 'Asset updated successfully' })
+   694→        setEditAssetDialogOpen(false)
+   695→        setSelectedAsset(null)
+   696→        fetchAssets()
+   697→      } else {
+   698→        const data = await res.json()
+   699→        toast({ title: 'Error', description: data.error || 'Failed to update asset', variant: 'destructive' })
+   700→      }
+   701→    } catch (err) {
+   702→      toast({ title: 'Error', description: 'Failed to update asset', variant: 'destructive' })
+   703→    } finally {
+   704→      setActionLoading(false)
+   705→    }
+   706→  }
+   707→
+   708→  // ── Laundry CRUD ───────────────────────────────────────────────────────────
+   709→
+   710→  const resetLaundryForm = () => {
+   711→    setLaundryForm({
+   712→      name: '',
+   713→      category: 'bedding',
+   714→      roomId: '',
+   715→      totalQuantity: '',
+   716→      issuedQuantity: '',
+   717→      condition: 'good',
+   718→      notes: '',
+   719→    })
+   720→  }
+   721→
+   722→  const resetEditLaundryForm = () => {
+   723→    setEditLaundryForm({
+   724→      id: '',
+   725→      name: '',
+   726→      category: 'bedding',
+   727→      roomId: '',
+   728→      totalQuantity: '',
+   729→      issuedQuantity: '',
+   730→      inLaundry: '',
+   731→      damagedQuantity: '',
+   732→      condition: 'good',
+   733→      status: 'in_use',
+   734→      notes: '',
+   735→    })
+   736→  }
+   737→
+   738→  const openAddLaundryDialog = () => {
+   739→    resetLaundryForm()
+   740→    setLaundryDialogOpen(true)
+   741→  }
+   742→
+   743→  const openEditLaundryDialog = (item: LaundryItemData) => {
+   744→    setSelectedLaundry(item)
+   745→    setEditLaundryForm({
+   746→      id: item.id,
+   747→      name: item.name,
+   748→      category: item.category,
+   749→      roomId: item.room?.id || '',
+   750→      totalQuantity: item.totalQuantity.toString(),
+   751→      issuedQuantity: item.issuedQuantity.toString(),
+   752→      inLaundry: item.inLaundry.toString(),
+   753→      damagedQuantity: item.damagedQuantity.toString(),
+   754→      condition: item.condition,
+   755→      status: item.status,
+   756→      notes: item.notes || '',
+   757→    })
+   758→    setEditLaundryDialogOpen(true)
+   759→  }
+   760→
+   761→  const handleAddLaundry = async () => {
+   762→    if (!laundryForm.name.trim()) {
+   763→      toast({ title: 'Validation Error', description: 'Item name is required', variant: 'destructive' })
+   764→      return
+   765→    }
+   766→    setActionLoading(true)
+   767→    try {
+   768→      const payload: any = {
+   769→        type: 'laundry',
+   770→        name: laundryForm.name.trim(),
+   771→        category: laundryForm.category,
+   772→        propertyId: selectedPropertyId,
+   773→        roomId: laundryForm.roomId || null,
+   774→        totalQuantity: laundryForm.totalQuantity ? parseInt(laundryForm.totalQuantity) : 0,
+   775→        issuedQuantity: laundryForm.issuedQuantity ? parseInt(laundryForm.issuedQuantity) : 0,
+   776→        condition: laundryForm.condition,
+   777→        notes: laundryForm.notes.trim() || null,
+   778→      }
+   779→      const res = await fetch('/api/assets', {
+   780→        method: 'POST',
+   781→        headers: { 'Content-Type': 'application/json' },
+   782→        body: JSON.stringify(payload),
+   783→      })
+   784→      if (res.ok) {
+   785→        toast({ title: 'Success', description: 'Laundry item added successfully' })
+   786→        setLaundryDialogOpen(false)
+   787→        resetLaundryForm()
+   788→        fetchLaundry()
+   789→      } else {
+   790→        const data = await res.json()
+   791→        toast({ title: 'Error', description: data.error || 'Failed to add laundry item', variant: 'destructive' })
+   792→      }
+   793→    } catch (err) {
+   794→      toast({ title: 'Error', description: 'Failed to add laundry item', variant: 'destructive' })
+   795→    } finally {
+   796→      setActionLoading(false)
+   797→    }
+   798→  }
+   799→
+   800→  const handleEditLaundry = async () => {
+   801→    if (!selectedLaundry || !editLaundryForm.name.trim()) {
+   802→      toast({ title: 'Validation Error', description: 'Item name is required', variant: 'destructive' })
+   803→      return
+   804→    }
+   805→    setActionLoading(true)
+   806→    try {
+   807→      const payload: any = {
+   808→        type: 'laundry',
+   809→        id: selectedLaundry.id,
+   810→        totalQuantity: editLaundryForm.totalQuantity ? parseInt(editLaundryForm.totalQuantity) : undefined,
+   811→        issuedQuantity: editLaundryForm.issuedQuantity ? parseInt(editLaundryForm.issuedQuantity) : undefined,
+   812→        inLaundry: editLaundryForm.inLaundry ? parseInt(editLaundryForm.inLaundry) : undefined,
+   813→        damagedQuantity: editLaundryForm.damagedQuantity ? parseInt(editLaundryForm.damagedQuantity) : undefined,
+   814→        condition: editLaundryForm.condition,
+   815→        status: editLaundryForm.status,
+   816→        notes: editLaundryForm.notes.trim() || null,
+   817→      }
+   818→      const res = await fetch('/api/assets', {
+   819→        method: 'PATCH',
+   820→        headers: { 'Content-Type': 'application/json' },
+   821→        body: JSON.stringify(payload),
+   822→      })
+   823→      if (res.ok) {
+   824→        toast({ title: 'Success', description: 'Laundry item updated successfully' })
+   825→        setEditLaundryDialogOpen(false)
+   826→        setSelectedLaundry(null)
+   827→        fetchLaundry()
+   828→      } else {
+   829→        const data = await res.json()
+   830→        toast({ title: 'Error', description: data.error || 'Failed to update laundry item', variant: 'destructive' })
+   831→      }
+   832→    } catch (err) {
+   833→      toast({ title: 'Error', description: 'Failed to update laundry item', variant: 'destructive' })
+   834→    } finally {
+   835→      setActionLoading(false)
+   836→    }
+   837→  }
+   838→
+   839→  // Quick actions for laundry
+   840→  const handleSendToLaundry = async (item: LaundryItemData) => {
+   841→    if (item.issuedQuantity <= 0) {
+   842→      toast({ title: 'Cannot Send', description: 'No items are currently issued to send to laundry', variant: 'destructive' })
+   843→      return
+   844→    }
+   845→    setActionLoading(true)
+   846→    try {
+   847→      const payload = {
+   848→        type: 'laundry',
+   849→        id: item.id,
+   850→        issuedQuantity: item.issuedQuantity - 1,
+   851→        inLaundry: item.inLaundry + 1,
+   852→        status: 'in_laundry' as LaundryStatus,
+   853→        lastWashDate: new Date().toISOString(),
+   854→      }
+   855→      const res = await fetch('/api/assets', {
+   856→        method: 'PATCH',
+   857→        headers: { 'Content-Type': 'application/json' },
+   858→        body: JSON.stringify(payload),
+   859→      })
+   860→      if (res.ok) {
+   861→        toast({ title: 'Success', description: `${item.name} sent to laundry` })
+   862→        fetchLaundry()
+   863→      } else {
+   864→        toast({ title: 'Error', description: 'Failed to send to laundry', variant: 'destructive' })
+   865→      }
+   866→    } catch {
+   867→      toast({ title: 'Error', description: 'Failed to send to laundry', variant: 'destructive' })
+   868→    } finally {
+   869→      setActionLoading(false)
+   870→    }
+   871→  }
+   872→
+   873→  const handleReturnFromLaundry = async (item: LaundryItemData) => {
+   874→    if (item.inLaundry <= 0) {
+   875→      toast({ title: 'Cannot Return', description: 'No items are currently in laundry', variant: 'destructive' })
+   876→      return
+   877→    }
+   878→    setActionLoading(true)
+   879→    try {
+   880→      const payload = {
+   881→        type: 'laundry',
+   882→        id: item.id,
+   883→        issuedQuantity: item.issuedQuantity + 1,
+   884→        inLaundry: item.inLaundry - 1,
+   885→        status: 'in_use' as LaundryStatus,
+   886→        lastWashDate: new Date().toISOString(),
+   887→      }
+   888→      const res = await fetch('/api/assets', {
+   889→        method: 'PATCH',
+   890→        headers: { 'Content-Type': 'application/json' },
+   891→        body: JSON.stringify(payload),
+   892→      })
+   893→      if (res.ok) {
+   894→        toast({ title: 'Success', description: `${item.name} returned from laundry` })
+   895→        fetchLaundry()
+   896→      } else {
+   897→        toast({ title: 'Error', description: 'Failed to return from laundry', variant: 'destructive' })
+   898→      }
+   899→    } catch {
+   900→      toast({ title: 'Error', description: 'Failed to return from laundry', variant: 'destructive' })
+   901→    } finally {
+   902→      setActionLoading(false)
+   903→    }
+   904→  }
+   905→
+   906→  const handleMarkDamaged = async (item: LaundryItemData) => {
+   907→    if (item.issuedQuantity <= 0 && item.inLaundry <= 0) {
+   908→      toast({ title: 'Cannot Mark', description: 'No items available to mark as damaged', variant: 'destructive' })
+   909→      return
+   910→    }
+   911→    setActionLoading(true)
+   912→    try {
+   913→      const wasIssued = item.issuedQuantity > 0
+   914→      const payload = {
+   915→        type: 'laundry',
+   916→        id: item.id,
+   917→        issuedQuantity: wasIssued ? item.issuedQuantity - 1 : item.issuedQuantity,
+   918→        inLaundry: wasIssued ? item.inLaundry : item.inLaundry - 1,
+   919→        damagedQuantity: item.damagedQuantity + 1,
+   920→        condition: 'poor' as LaundryCondition,
+   921→        status: 'damaged' as LaundryStatus,
+   922→      }
+   923→      const res = await fetch('/api/assets', {
+   924→        method: 'PATCH',
+   925→        headers: { 'Content-Type': 'application/json' },
+   926→        body: JSON.stringify(payload),
+   927→      })
+   928→      if (res.ok) {
+   929→        toast({ title: 'Success', description: `${item.name} marked as damaged` })
+   930→        fetchLaundry()
+   931→      } else {
+   932→        toast({ title: 'Error', description: 'Failed to mark as damaged', variant: 'destructive' })
+   933→      }
+   934→    } catch {
+   935→      toast({ title: 'Error', description: 'Failed to mark as damaged', variant: 'destructive' })
+   936→    } finally {
+   937→      setActionLoading(false)
+   938→    }
+   939→  }
+   940→
+   941→  // ── Housekeeping CRUD ──────────────────────────────────────────────────────
+   942→
+   943→  const resetHousekeepingForm = () => {
+   944→    setHousekeepingForm({
+   945→      name: '',
+   946→      category: 'cleaning',
+   947→      unit: 'pcs',
+   948→      currentStock: '',
+   949→      minStock: '',
+   950→      unitPrice: '',
+   951→      notes: '',
+   952→    })
+   953→  }
+   954→
+   955→  const openAddHousekeepingDialog = () => {
+   956→    resetHousekeepingForm()
+   957→    setHousekeepingDialogOpen(true)
+   958→  }
+   959→
+   960→  const openRestockDialog = (item: HousekeepingItemData) => {
+   961→    setSelectedHousekeeping(item)
+   962→    setRestockForm({
+   963→      id: item.id,
+   964→      name: item.name,
+   965→      currentStock: item.currentStock,
+   966→      addQuantity: '',
+   967→      unitPrice: item.unitPrice.toString(),
+   968→    })
+   969→    setRestockDialogOpen(true)
+   970→  }
+   971→
+   972→  const handleAddHousekeeping = async () => {
+   973→    if (!housekeepingForm.name.trim()) {
+   974→      toast({ title: 'Validation Error', description: 'Item name is required', variant: 'destructive' })
+   975→      return
+   976→    }
+   977→    setActionLoading(true)
+   978→    try {
+   979→      const payload: any = {
+   980→        type: 'housekeeping',
+   981→        name: housekeepingForm.name.trim(),
+   982→        category: housekeepingForm.category,
+   983→        propertyId: selectedPropertyId,
+   984→        unit: housekeepingForm.unit,
+   985→        currentStock: housekeepingForm.currentStock ? parseFloat(housekeepingForm.currentStock) : 0,
+   986→        minStock: housekeepingForm.minStock ? parseFloat(housekeepingForm.minStock) : 0,
+   987→        unitPrice: housekeepingForm.unitPrice ? parseFloat(housekeepingForm.unitPrice) : 0,
+   988→        notes: housekeepingForm.notes.trim() || null,
+   989→      }
+   990→      const res = await fetch('/api/assets', {
+   991→        method: 'POST',
+   992→        headers: { 'Content-Type': 'application/json' },
+   993→        body: JSON.stringify(payload),
+   994→      })
+   995→      if (res.ok) {
+   996→        toast({ title: 'Success', description: 'Housekeeping item added successfully' })
+   997→        setHousekeepingDialogOpen(false)
+   998→        resetHousekeepingForm()
+   999→        fetchHousekeeping()
+  1000→      } else {
+  1001→        const data = await res.json()
+  1002→        toast({ title: 'Error', description: data.error || 'Failed to add housekeeping item', variant: 'destructive' })
+  1003→      }
+  1004→    } catch (err) {
+  1005→      toast({ title: 'Error', description: 'Failed to add housekeeping item', variant: 'destructive' })
+  1006→    } finally {
+  1007→      setActionLoading(false)
+  1008→    }
+  1009→  }
+  1010→
+  1011→  const handleRestock = async () => {
+  1012→    if (!restockForm.addQuantity || parseFloat(restockForm.addQuantity) <= 0) {
+  1013→      toast({ title: 'Validation Error', description: 'Please enter a valid quantity', variant: 'destructive' })
+  1014→      return
+  1015→    }
+  1016→    setActionLoading(true)
+  1017→    try {
+  1018→      const newStock = restockForm.currentStock + parseFloat(restockForm.addQuantity)
+  1019→      const payload = {
+  1020→        type: 'housekeeping',
+  1021→        id: restockForm.id,
+  1022→        currentStock: newStock,
+  1023→        unitPrice: restockForm.unitPrice ? parseFloat(restockForm.unitPrice) : undefined,
+  1024→        lastRestocked: new Date().toISOString(),
+  1025→      }
+  1026→      const res = await fetch('/api/assets', {
+  1027→        method: 'PATCH',
+  1028→        headers: { 'Content-Type': 'application/json' },
+  1029→        body: JSON.stringify(payload),
+  1030→      })
+  1031→      if (res.ok) {
+  1032→        toast({ title: 'Success', description: `${restockForm.name} restocked successfully. New stock: ${newStock}` })
+  1033→        setRestockDialogOpen(false)
+  1034→        fetchHousekeeping()
+  1035→      } else {
+  1036→        toast({ title: 'Error', description: 'Failed to restock item', variant: 'destructive' })
+  1037→      }
+  1038→    } catch {
+  1039→      toast({ title: 'Error', description: 'Failed to restock item', variant: 'destructive' })
+  1040→    } finally {
+  1041→      setActionLoading(false)
+  1042→    }
+  1043→  }
+  1044→
+  1045→  // ── Delete ─────────────────────────────────────────────────────────────────
+  1046→
+  1047→  const openDeleteDialog = (type: 'asset' | 'laundry' | 'housekeeping', id: string, name: string) => {
+  1048→    setDeleteTarget({ type, id, name })
+  1049→    setDeleteDialogOpen(true)
+  1050→  }
+  1051→
+  1052→  const handleDelete = async () => {
+  1053→    if (!deleteTarget) return
+  1054→    setActionLoading(true)
+  1055→    try {
+  1056→      const payload: any = {
+  1057→        type: deleteTarget.type,
+  1058→        id: deleteTarget.id,
+  1059→      }
+  1060→      if (deleteTarget.type === 'asset') {
+  1061→        payload.status = 'disposed'
+  1062→      } else if (deleteTarget.type === 'laundry') {
+  1063→        payload.status = 'disposed'
+  1064→      } else if (deleteTarget.type === 'housekeeping') {
+  1065→        payload.isActive = false
+  1066→      }
+  1067→      const res = await fetch('/api/assets', {
+  1068→        method: 'PATCH',
+  1069→        headers: { 'Content-Type': 'application/json' },
+  1070→        body: JSON.stringify(payload),
+  1071→      })
+  1072→      if (res.ok) {
+  1073→        toast({ title: 'Success', description: `${deleteTarget.name} has been removed` })
+  1074→        if (deleteTarget.type === 'asset') fetchAssets()
+  1075→        else if (deleteTarget.type === 'laundry') fetchLaundry()
+  1076→        else fetchHousekeeping()
+  1077→      } else {
+  1078→        toast({ title: 'Error', description: 'Failed to remove item', variant: 'destructive' })
+  1079→      }
+  1080→    } catch {
+  1081→      toast({ title: 'Error', description: 'Failed to remove item', variant: 'destructive' })
+  1082→    } finally {
+  1083→      setActionLoading(false)
+  1084→      setDeleteDialogOpen(false)
+  1085→      setDeleteTarget(null)
+  1086→    }
+  1087→  }
+  1088→
+  1089→  // ── Render ─────────────────────────────────────────────────────────────────
+  1090→
+  1091→  return (
+  1092→    <div className="space-y-6">
+  1093→      {/* Header */}
+  1094→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  1095→        <div>
+  1096→          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+  1097→            Assets, Laundry & Housekeeping
+  1098→          </h1>
+  1099→          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+  1100→            Manage property assets, laundry items, and housekeeping inventory
+  1101→          </p>
+  1102→        </div>
+  1103→      </div>
+  1104→
+  1105→      {/* Tabs */}
+  1106→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+  1107→        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+  1108→          <TabsTrigger value="assets" className="gap-2">
+  1109→            <Package className="h-4 w-4" />
+  1110→            Assets
+  1111→          </TabsTrigger>
+  1112→          <TabsTrigger value="laundry" className="gap-2">
+  1113→            <Shirt className="h-4 w-4" />
+  1114→            Laundry
+  1115→          </TabsTrigger>
+  1116→          <TabsTrigger value="housekeeping" className="gap-2">
+  1117→            <SprayCan className="h-4 w-4" />
+  1118→            Housekeeping
+  1119→          </TabsTrigger>
+  1120→        </TabsList>
+  1121→
+  1122→        {/* ── Assets Tab ──────────────────────────────────────────────────── */}
+  1123→        <TabsContent value="assets" className="space-y-6 mt-6">
+  1124→          {/* Stats Cards */}
+  1125→          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+  1126→            <Card>
+  1127→              <CardContent className="p-4">
+  1128→                <div className="flex items-center gap-3">
+  1129→                  <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+  1130→                    <Database className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+  1131→                  </div>
+  1132→                  <div>
+  1133→                    <p className="text-sm text-slate-500 dark:text-slate-400">Total Assets</p>
+  1134→                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+  1135→                      {assetsLoading ? <Skeleton className="h-7 w-12" /> : assetStats.total}
+  1136→                    </div>
+  1137→                  </div>
+  1138→                </div>
+  1139→              </CardContent>
+  1140→            </Card>
+  1141→            <Card>
+  1142→              <CardContent className="p-4">
+  1143→                <div className="flex items-center gap-3">
+  1144→                  <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+  1145→                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+  1146→                  </div>
+  1147→                  <div>
+  1148→                    <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
+  1149→                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+  1150→                      {assetsLoading ? <Skeleton className="h-7 w-12" /> : assetStats.active}
+  1151→                    </div>
+  1152→                  </div>
+  1153→                </div>
+  1154→              </CardContent>
+  1155→            </Card>
+  1156→            <Card>
+  1157→              <CardContent className="p-4">
+  1158→                <div className="flex items-center gap-3">
+  1159→                  <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+  1160→                    <Wrench className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+  1161→                  </div>
+  1162→                  <div>
+  1163→                    <p className="text-sm text-slate-500 dark:text-slate-400">Under Maintenance</p>
+  1164→                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+  1165→                      {assetsLoading ? <Skeleton className="h-7 w-12" /> : assetStats.underMaintenance}
+  1166→                    </div>
+  1167→                  </div>
+  1168→                </div>
+  1169→              </CardContent>
+  1170→            </Card>
+  1171→            <Card>
+  1172→              <CardContent className="p-4">
+  1173→                <div className="flex items-center gap-3">
+  1174→                  <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+  1175→                    <IndianRupee className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+  1176→                  </div>
+  1177→                  <div>
+  1178→                    <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
+  1179→                    <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+  1180→                      {assetsLoading ? <Skeleton className="h-7 w-20" /> : formatCurrency(assetStats.totalValue)}
+  1181→                    </div>
+  1182→                  </div>
+  1183→                </div>
+  1184→              </CardContent>
+  1185→            </Card>
+  1186→          </div>
+  1187→
+  1188→          {/* Category Filter Chips + Search + Add */}
+  1189→          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+  1190→            <div className="flex flex-wrap gap-2">
+  1191→              <Button
+  1192→                variant={assetCategoryFilter === 'all' ? 'default' : 'outline'}
+  1193→                size="sm"
+  1194→                onClick={() => setAssetCategoryFilter('all')}
+  1195→                className="h-8"
+  1196→              >
+  1197→                All
+  1198→              </Button>
+  1199→              {ASSET_CATEGORIES.map((cat) => (
+  1200→                <Button
+  1201→                  key={cat.value}
+  1202→                  variant={assetCategoryFilter === cat.value ? 'default' : 'outline'}
+  1203→                  size="sm"
+  1204→                  onClick={() => setAssetCategoryFilter(cat.value)}
+  1205→                  className="h-8 gap-1.5"
+  1206→                >
+  1207→                  {cat.icon}
+  1208→                  {cat.label}
+  1209→                  {assetStats.byCategory[cat.value] ? (
+  1210→                    <span className="ml-1 text-xs opacity-70">({assetStats.byCategory[cat.value]})</span>
+  1211→                  ) : null}
+  1212→                </Button>
+  1213→              ))}
+  1214→            </div>
+  1215→            <div className="flex gap-2 w-full sm:w-auto">
+  1216→              <div className="relative flex-1 sm:w-64">
+  1217→                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1218→                <Input
+  1219→                  placeholder="Search assets..."
+  1220→                  value={assetSearch}
+  1221→                  onChange={(e) => setAssetSearch(e.target.value)}
+  1222→                  className="pl-9 h-9"
+  1223→                />
+  1224→              </div>
+  1225→              <Button onClick={openAddAssetDialog} size="sm" className="h-9 gap-1.5">
+  1226→                <Plus className="h-4 w-4" />
+  1227→                Add Asset
+  1228→              </Button>
+  1229→            </div>
+  1230→          </div>
+  1231→
+  1232→          {/* Assets Table */}
+  1233→          <Card>
+  1234→            <CardContent className="p-0">
+  1235→              {assetsLoading ? (
+  1236→                <div className="p-6 space-y-4">
+  1237→                  {Array.from({ length: 5 }).map((_, i) => (
+  1238→                    <Skeleton key={i} className="h-12 w-full" />
+  1239→                  ))}
+  1240→                </div>
+  1241→              ) : filteredAssets.length === 0 ? (
+  1242→                <div className="flex flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400">
+  1243→                  <Package className="h-12 w-12 mb-4 opacity-40" />
+  1244→                  <p className="text-lg font-medium">No assets found</p>
+  1245→                  <p className="text-sm mt-1">Add your first asset to get started</p>
+  1246→                </div>
+  1247→              ) : (
+  1248→                <div className="overflow-x-auto">
+  1249→                  <Table>
+  1250→                    <TableHeader>
+  1251→                      <TableRow>
+  1252→                        <TableHead className="min-w-[180px]">Name</TableHead>
+  1253→                        <TableHead className="min-w-[100px]">Asset Tag</TableHead>
+  1254→                        <TableHead className="min-w-[100px]">Category</TableHead>
+  1255→                        <TableHead className="min-w-[100px]">Sub-category</TableHead>
+  1256→                        <TableHead className="min-w-[100px]">Room</TableHead>
+  1257→                        <TableHead className="min-w-[100px]">Purchase Date</TableHead>
+  1258→                        <TableHead className="min-w-[100px]">Purchase Price</TableHead>
+  1259→                        <TableHead className="min-w-[100px]">Current Value</TableHead>
+  1260→                        <TableHead className="min-w-[90px]">Condition</TableHead>
+  1261→                        <TableHead className="min-w-[110px]">Status</TableHead>
+  1262→                        <TableHead className="min-w-[110px]">Warranty Expiry</TableHead>
+  1263→                        <TableHead className="min-w-[80px] text-right">Actions</TableHead>
+  1264→                      </TableRow>
+  1265→                    </TableHeader>
+  1266→                    <TableBody>
+  1267→                      {filteredAssets.map((asset) => (
+  1268→                        <TableRow key={asset.id} className="group">
+  1269→                          <TableCell className="font-medium">{asset.name}</TableCell>
+  1270→                          <TableCell>
+  1271→                            {asset.assetTag ? (
+  1272→                              <Badge variant="outline" className="font-mono text-xs">
+  1273→                                {asset.assetTag}
+  1274→                              </Badge>
+  1275→                            ) : (
+  1276→                              <span className="text-slate-400">—</span>
+  1277→                            )}
+  1278→                          </TableCell>
+  1279→                          <TableCell>
+  1280→                            <Badge variant="secondary" className="font-normal">
+  1281→                              {getCategoryLabel(asset.category)}
+  1282→                            </Badge>
+  1283→                          </TableCell>
+  1284→                          <TableCell className="text-sm text-slate-600 dark:text-slate-400">
+  1285→                            {asset.subCategory ? getSubCategoryLabel(asset.subCategory) : '—'}
+  1286→                          </TableCell>
+  1287→                          <TableCell>
+  1288→                            {asset.room ? (
+  1289→                              <span className="text-sm">
+  1290→                                {asset.room.name} ({asset.room.number})
+  1291→                              </span>
+  1292→                            ) : (
+  1293→                              <span className="text-slate-400">—</span>
+  1294→                            )}
+  1295→                          </TableCell>
+  1296→                          <TableCell className="text-sm">{formatDate(asset.purchaseDate)}</TableCell>
+  1297→                          <TableCell className="text-sm">{formatCurrency(asset.purchasePrice)}</TableCell>
+  1298→                          <TableCell className="text-sm font-medium">{formatCurrency(asset.currentValue)}</TableCell>
+  1299→                          <TableCell>{getConditionBadge(asset.condition)}</TableCell>
+  1300→                          <TableCell>{getAssetStatusBadge(asset.status)}</TableCell>
+  1301→                          <TableCell>
+  1302→                            {asset.warrantyExpiry ? (
+  1303→                              <div className="flex items-center gap-1.5">
+  1304→                                <span className="text-sm">{formatDate(asset.warrantyExpiry)}</span>
+  1305→                                {isWarrantyExpired(asset.warrantyExpiry) && (
+  1306→                                  <XCircle className="h-3.5 w-3.5 text-red-500" />
+  1307→                                )}
+  1308→                                {isWarrantyExpiringSoon(asset.warrantyExpiry) && (
+  1309→                                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+  1310→                                )}
+  1311→                              </div>
+  1312→                            ) : (
+  1313→                              <span className="text-slate-400">—</span>
+  1314→                            )}
+  1315→                          </TableCell>
+  1316→                          <TableCell className="text-right">
+  1317→                            <DropdownMenu>
+  1318→                              <DropdownMenuTrigger asChild>
+  1319→                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+  1320→                                  <MoreVertical className="h-4 w-4" />
+  1321→                                </Button>
+  1322→                              </DropdownMenuTrigger>
+  1323→                              <DropdownMenuContent align="end">
+  1324→                                <DropdownMenuItem onClick={() => openEditAssetDialog(asset)}>
+  1325→                                  <Edit3 className="h-4 w-4 mr-2" />
+  1326→                                  Edit Asset
+  1327→                                </DropdownMenuItem>
+  1328→                                <DropdownMenuItem
+  1329→                                  onClick={() => openDeleteDialog('asset', asset.id, asset.name)}
+  1330→                                  className="text-red-600 dark:text-red-400"
+  1331→                                >
+  1332→                                  <Trash2 className="h-4 w-4 mr-2" />
+  1333→                                  Dispose Asset
+  1334→                                </DropdownMenuItem>
+  1335→                              </DropdownMenuContent>
+  1336→                            </DropdownMenu>
+  1337→                          </TableCell>
+  1338→                        </TableRow>
+  1339→                      ))}
+  1340→                    </TableBody>
+  1341→                  </Table>
+  1342→                </div>
+  1343→              )}
+  1344→            </CardContent>
+  1345→          </Card>
+  1346→        </TabsContent>
+  1347→
+  1348→        {/* ── Laundry Tab ──────────────────────────────────────────────────── */}
+  1349→        <TabsContent value="laundry" className="space-y-6 mt-6">
+  1350→          {/* Stats Cards */}
+  1351→          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+  1352→            <Card>
+  1353→              <CardContent className="p-4">
+  1354→                <div className="flex items-center gap-3">
+  1355→                  <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+  1356→                    <Shirt className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+  1357→                  </div>
+  1358→                  <div>
+  1359→                    <p className="text-sm text-slate-500 dark:text-slate-400">Total Items</p>
+  1360→                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+  1361→                      {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.totalItems}
+  1362→                    </div>
+  1363→                  </div>
+  1364→                </div>
+  1365→              </CardContent>
+  1366→            </Card>
+  1367→            <Card>
+  1368→              <CardContent className="p-4">
+  1369→                <div className="flex items-center gap-3">
+  1370→                  <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+  1371→                    <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+  1372→                  </div>
+  1373→                  <div>
+  1374→                    <p className="text-sm text-slate-500 dark:text-slate-400">In Use</p>
+  1375→                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+  1376→                      {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.inUse}
+  1377→                    </div>
+  1378→                  </div>
+  1379→                </div>
+  1380→              </CardContent>
+  1381→            </Card>
+  1382→            <Card>
+  1383→              <CardContent className="p-4">
+  1384→                <div className="flex items-center gap-3">
+  1385→                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+  1386→                    <Droplets className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+  1387→                  </div>
+  1388→                  <div>
+  1389→                    <p className="text-sm text-slate-500 dark:text-slate-400">In Laundry</p>
+  1390→                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+  1391→                      {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.inLaundry}
+  1392→                    </div>
+  1393→                  </div>
+  1394→                </div>
+  1395→              </CardContent>
+  1396→            </Card>
+  1397→            <Card>
+  1398→              <CardContent className="p-4">
+  1399→                <div className="flex items-center gap-3">
+  1400→                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+  1401→                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+  1402→                  </div>
+  1403→                  <div>
+  1404→                    <p className="text-sm text-slate-500 dark:text-slate-400">Damaged</p>
+  1405→                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+  1406→                      {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.damaged}
+  1407→                    </div>
+  1408→                  </div>
+  1409→                </div>
+  1410→              </CardContent>
+  1411→            </Card>
+  1412→          </div>
+  1413→
+  1414→          {/* Search + Add */}
+  1415→          <div className="flex gap-2 items-center justify-between">
+  1416→            <div className="relative flex-1 max-w-sm">
+  1417→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1418→              <Input
+  1419→                placeholder="Search laundry items..."
+  1420→                value={laundrySearch}
+  1421→                onChange={(e) => setLaundrySearch(e.target.value)}
+  1422→                className="pl-9 h-9"
+  1423→              />
+  1424→            </div>
+  1425→            <Button onClick={openAddLaundryDialog} size="sm" className="h-9 gap-1.5">
+  1426→              <Plus className="h-4 w-4" />
+  1427→              Add Item
+  1428→            </Button>
+  1429→          </div>
+  1430→
+  1431→          {/* Laundry Table */}
+  1432→          <Card>
+  1433→            <CardContent className="p-0">
+  1434→              {laundryLoading ? (
+  1435→                <div className="p-6 space-y-4">
+  1436→                  {Array.from({ length: 5 }).map((_, i) => (
+  1437→                    <Skeleton key={i} className="h-12 w-full" />
+  1438→                  ))}
+  1439→                </div>
+  1440→              ) : filteredLaundry.length === 0 ? (
+  1441→                <div className="flex flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400">
+  1442→                  <Shirt className="h-12 w-12 mb-4 opacity-40" />
+  1443→                  <p className="text-lg font-medium">No laundry items found</p>
+  1444→                  <p className="text-sm mt-1">Add your first laundry item to get started</p>
+  1445→                </div>
+  1446→              ) : (
+  1447→                <div className="overflow-x-auto">
+  1448→                  <Table>
+  1449→                    <TableHeader>
+  1450→                      <TableRow>
+  1451→                        <TableHead className="min-w-[150px]">Name</TableHead>
+  1452→                        <TableHead className="min-w-[90px]">Category</TableHead>
+  1453→                        <TableHead className="min-w-[90px]">Room</TableHead>
+  1454→                        <TableHead className="min-w-[70px] text-center">Total Qty</TableHead>
+  1455→                        <TableHead className="min-w-[70px] text-center">Issued</TableHead>
+  1456→                        <TableHead className="min-w-[70px] text-center">In Laundry</TableHead>
+  1457→                        <TableHead className="min-w-[70px] text-center">Damaged</TableHead>
+  1458→                        <TableHead className="min-w-[90px]">Condition</TableHead>
+  1459→                        <TableHead className="min-w-[100px]">Last Wash</TableHead>
+  1460→                        <TableHead className="min-w-[100px]">Next Wash</TableHead>
+  1461→                        <TableHead className="min-w-[90px]">Status</TableHead>
+  1462→                        <TableHead className="min-w-[120px] text-right">Actions</TableHead>
+  1463→                      </TableRow>
+  1464→                    </TableHeader>
+  1465→                    <TableBody>
+  1466→                      {filteredLaundry.map((item) => (
+  1467→                        <TableRow key={item.id} className="group">
+  1468→                          <TableCell className="font-medium">{item.name}</TableCell>
+  1469→                          <TableCell>
+  1470→                            <Badge variant="secondary" className="font-normal">
+  1471→                              {getCategoryLabel(item.category)}
+  1472→                            </Badge>
+  1473→                          </TableCell>
+  1474→                          <TableCell>
+  1475→                            {item.room ? (
+  1476→                              <span className="text-sm">{item.room.name} ({item.room.number})</span>
+  1477→                            ) : (
+  1478→                              <span className="text-slate-400">—</span>
+  1479→                            )}
+  1480→                          </TableCell>
+  1481→                          <TableCell className="text-center font-medium">{item.totalQuantity}</TableCell>
+  1482→                          <TableCell className="text-center">{item.issuedQuantity}</TableCell>
+  1483→                          <TableCell className="text-center">
+  1484→                            <span className={item.inLaundry > 0 ? 'text-blue-600 dark:text-blue-400 font-medium' : ''}>
+  1485→                              {item.inLaundry}
+  1486→                            </span>
+  1487→                          </TableCell>
+  1488→                          <TableCell className="text-center">
+  1489→                            <span className={item.damagedQuantity > 0 ? 'text-red-600 dark:text-red-400 font-medium' : ''}>
+  1490→                              {item.damagedQuantity}
+  1491→                            </span>
+  1492→                          </TableCell>
+  1493→                          <TableCell>{getConditionBadge(item.condition)}</TableCell>
+  1494→                          <TableCell className="text-sm">{formatDate(item.lastWashDate)}</TableCell>
+  1495→                          <TableCell className="text-sm">{formatDate(item.nextWashDate)}</TableCell>
+  1496→                          <TableCell>{getLaundryStatusBadge(item.status)}</TableCell>
+  1497→                          <TableCell className="text-right">
+  1498→                            <DropdownMenu>
+  1499→                              <DropdownMenuTrigger asChild>
+  1500→                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+  1501→                                  <MoreVertical className="h-4 w-4" />
+  1502→                                </Button>
+  1503→                              </DropdownMenuTrigger>
+  1504→                              <DropdownMenuContent align="end">
+  1505→                                <DropdownMenuItem onClick={() => openEditLaundryDialog(item)}>
+  1506→                                  <Edit3 className="h-4 w-4 mr-2" />
+  1507→                                  Edit Item
+  1508→                                </DropdownMenuItem>
+  1509→                                <DropdownMenuItem onClick={() => handleSendToLaundry(item)} disabled={item.issuedQuantity <= 0}>
+  1510→                                  <ArrowDownToLine className="h-4 w-4 mr-2" />
+  1511→                                  Send to Laundry
+  1512→                                </DropdownMenuItem>
+  1513→                                <DropdownMenuItem onClick={() => handleReturnFromLaundry(item)} disabled={item.inLaundry <= 0}>
+  1514→                                  <ArrowUpFromLine className="h-4 w-4 mr-2" />
+  1515→                                  Return from Laundry
+  1516→                                </DropdownMenuItem>
+  1517→                                <DropdownMenuItem onClick={() => handleMarkDamaged(item)} disabled={item.issuedQuantity <= 0 && item.inLaundry <= 0}>
+  1518→                                  <AlertTriangle className="h-4 w-4 mr-2" />
+  1519→                                  Mark Damaged
+  1520→                                </DropdownMenuItem>
+  1521→                                <DropdownMenuItem
+  1522→                                  onClick={() => openDeleteDialog('laundry', item.id, item.name)}
+  1523→                                  className="text-red-600 dark:text-red-400"
+  1524→                                >
+  1525→                                  <Trash2 className="h-4 w-4 mr-2" />
+  1526→                                  Dispose Item
+  1527→                                </DropdownMenuItem>
+  1528→                              </DropdownMenuContent>
+  1529→                            </DropdownMenu>
+  1530→                          </TableCell>
+  1531→                        </TableRow>
+  1532→                      ))}
+  1533→                    </TableBody>
+  1534→                  </Table>
+  1535→                </div>
+  1536→              )}
+  1537→            </CardContent>
+  1538→          </Card>
+  1539→        </TabsContent>
+  1540→
+  1541→        {/* ── Housekeeping Tab ─────────────────────────────────────────────── */}
+  1542→        <TabsContent value="housekeeping" className="space-y-6 mt-6">
+  1543→          {/* Stats Cards */}
+  1544→          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+  1545→            <Card>
+  1546→              <CardContent className="p-4">
+  1547→                <div className="flex items-center gap-3">
+  1548→                  <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
+  1549→                    <SprayCan className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+  1550→                  </div>
+  1551→                  <div>
+  1552→                    <p className="text-sm text-slate-500 dark:text-slate-400">Total Items</p>
+  1553→                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+  1554→                      {housekeepingLoading ? <Skeleton className="h-7 w-12" /> : housekeepingStats.totalItems}
+  1555→                    </div>
+  1556→                  </div>
+  1557→                </div>
+  1558→              </CardContent>
+  1559→            </Card>
+  1560→            <Card>
+  1561→              <CardContent className="p-4">
+  1562→                <div className="flex items-center gap-3">
+  1563→                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+  1564→                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+  1565→                  </div>
+  1566→                  <div>
+  1567→                    <p className="text-sm text-slate-500 dark:text-slate-400">Low Stock</p>
+  1568→                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+  1569→                      {housekeepingLoading ? <Skeleton className="h-7 w-12" /> : housekeepingStats.lowStock}
+  1570→                    </div>
+  1571→                  </div>
+  1572→                </div>
+  1573→              </CardContent>
+  1574→            </Card>
+  1575→            <Card>
+  1576→              <CardContent className="p-4">
+  1577→                <div className="flex items-center gap-3">
+  1578→                  <div className="p-2 rounded-lg bg-violet-100 dark:bg-violet-900/30">
+  1579→                    <IndianRupee className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+  1580→                  </div>
+  1581→                  <div>
+  1582→                    <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
+  1583→                    <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+  1584→                      {housekeepingLoading ? <Skeleton className="h-7 w-20" /> : formatCurrency(housekeepingStats.totalValue)}
+  1585→                    </div>
+  1586→                  </div>
+  1587→                </div>
+  1588→              </CardContent>
+  1589→            </Card>
+  1590→          </div>
+  1591→
+  1592→          {/* Search + Add */}
+  1593→          <div className="flex gap-2 items-center justify-between">
+  1594→            <div className="relative flex-1 max-w-sm">
+  1595→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1596→              <Input
+  1597→                placeholder="Search housekeeping items..."
+  1598→                value={housekeepingSearch}
+  1599→                onChange={(e) => setHousekeepingSearch(e.target.value)}
+  1600→                className="pl-9 h-9"
+  1601→              />
+  1602→            </div>
+  1603→            <Button onClick={openAddHousekeepingDialog} size="sm" className="h-9 gap-1.5">
+  1604→              <Plus className="h-4 w-4" />
+  1605→              Add Item
+  1606→            </Button>
+  1607→          </div>
+  1608→
+  1609→          {/* Housekeeping Table */}
+  1610→          <Card>
+  1611→            <CardContent className="p-0">
+  1612→              {housekeepingLoading ? (
+  1613→                <div className="p-6 space-y-4">
+  1614→                  {Array.from({ length: 5 }).map((_, i) => (
+  1615→                    <Skeleton key={i} className="h-12 w-full" />
+  1616→                  ))}
+  1617→                </div>
+  1618→              ) : filteredHousekeeping.length === 0 ? (
+  1619→                <div className="flex flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400">
+  1620→                  <SprayCan className="h-12 w-12 mb-4 opacity-40" />
+  1621→                  <p className="text-lg font-medium">No housekeeping items found</p>
+  1622→                  <p className="text-sm mt-1">Add your first housekeeping item to get started</p>
+  1623→                </div>
+  1624→              ) : (
+  1625→                <div className="overflow-x-auto">
+  1626→                  <Table>
+  1627→                    <TableHeader>
+  1628→                      <TableRow>
+  1629→                        <TableHead className="min-w-[150px]">Name</TableHead>
+  1630→                        <TableHead className="min-w-[90px]">Category</TableHead>
+  1631→                        <TableHead className="min-w-[60px]">Unit</TableHead>
+  1632→                        <TableHead className="min-w-[90px] text-center">Current Stock</TableHead>
+  1633→                        <TableHead className="min-w-[80px] text-center">Min Stock</TableHead>
+  1634→                        <TableHead className="min-w-[90px]">Unit Price</TableHead>
+  1635→                        <TableHead className="min-w-[90px]">Stock Value</TableHead>
+  1636→                        <TableHead className="min-w-[100px]">Last Restocked</TableHead>
+  1637→                        <TableHead className="min-w-[90px]">Status</TableHead>
+  1638→                        <TableHead className="min-w-[80px] text-right">Actions</TableHead>
+  1639→                      </TableRow>
+  1640→                    </TableHeader>
+  1641→                    <TableBody>
+  1642→                      {filteredHousekeeping.map((item) => {
+  1643→                        const isLowStock = item.currentStock <= item.minStock
+  1644→                        const isOutOfStock = item.currentStock <= 0
+  1645→                        const stockValue = item.currentStock * item.unitPrice
+  1646→                        return (
+  1647→                          <TableRow key={item.id} className={`group ${isOutOfStock ? 'bg-red-50 dark:bg-red-950/20' : isLowStock ? 'bg-amber-50 dark:bg-amber-950/20' : ''}`}>
+  1648→                            <TableCell className="font-medium">
+  1649→                              <div className="flex items-center gap-2">
+  1650→                                {item.name}
+  1651→                                {isLowStock && (
+  1652→                                  <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+  1653→                                )}
+  1654→                              </div>
+  1655→                            </TableCell>
+  1656→                            <TableCell>
+  1657→                              <Badge variant="secondary" className="font-normal">
+  1658→                                {getCategoryLabel(item.category)}
+  1659→                              </Badge>
+  1660→                            </TableCell>
+  1661→                            <TableCell className="text-sm text-slate-600 dark:text-slate-400">{item.unit}</TableCell>
+  1662→                            <TableCell className="text-center">
+  1663→                              <span className={`font-bold ${isOutOfStock ? 'text-red-600 dark:text-red-400' : isLowStock ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+  1664→                                {item.currentStock}
+  1665→                              </span>
+  1666→                            </TableCell>
+  1667→                            <TableCell className="text-center text-sm text-slate-600 dark:text-slate-400">{item.minStock}</TableCell>
+  1668→                            <TableCell className="text-sm">{formatCurrency(item.unitPrice)}</TableCell>
+  1669→                            <TableCell className="text-sm font-medium">{formatCurrency(stockValue)}</TableCell>
+  1670→                            <TableCell className="text-sm">{formatDate(item.lastRestocked)}</TableCell>
+  1671→                            <TableCell>{getHousekeepingStatusBadge(item)}</TableCell>
+  1672→                            <TableCell className="text-right">
+  1673→                              <DropdownMenu>
+  1674→                                <DropdownMenuTrigger asChild>
+  1675→                                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+  1676→                                    <MoreVertical className="h-4 w-4" />
+  1677→                                  </Button>
+  1678→                                </DropdownMenuTrigger>
+  1679→                                <DropdownMenuContent align="end">
+  1680→                                  <DropdownMenuItem onClick={() => openRestockDialog(item)}>
+  1681→                                    <RefreshCw className="h-4 w-4 mr-2" />
+  1682→                                    Restock
+  1683→                                  </DropdownMenuItem>
+  1684→                                  <DropdownMenuItem
+  1685→                                    onClick={() => openDeleteDialog('housekeeping', item.id, item.name)}
+  1686→                                    className="text-red-600 dark:text-red-400"
+  1687→                                  >
+  1688→                                    <Trash2 className="h-4 w-4 mr-2" />
+  1689→                                    Remove Item
+  1690→                                  </DropdownMenuItem>
+  1691→                                </DropdownMenuContent>
+  1692→                              </DropdownMenu>
+  1693→                            </TableCell>
+  1694→                          </TableRow>
+  1695→                        )
+  1696→                      })}
+  1697→                    </TableBody>
+  1698→                  </Table>
+  1699→                </div>
+  1700→              )}
+  1701→            </CardContent>
+  1702→          </Card>
+  1703→        </TabsContent>
+  1704→      </Tabs>
+  1705→
+  1706→      {/* ── Add Asset Dialog ──────────────────────────────────────────────────── */}
+  1707→      <Dialog open={assetDialogOpen} onOpenChange={setAssetDialogOpen}>
+  1708→        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+  1709→          <DialogHeader>
+  1710→            <DialogTitle>Add New Asset</DialogTitle>
+  1711→            <DialogDescription>Add a new asset to the property inventory</DialogDescription>
+  1712→          </DialogHeader>
+  1713→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+  1714→            <div className="space-y-2">
+  1715→              <Label htmlFor="asset-name">Name *</Label>
+  1716→              <Input
+  1717→                id="asset-name"
+  1718→                placeholder="e.g., Office Chair"
+  1719→                value={assetForm.name}
+  1720→                onChange={(e) => setAssetForm({ ...assetForm, name: e.target.value })}
+  1721→              />
+  1722→            </div>
+  1723→            <div className="space-y-2">
+  1724→              <Label htmlFor="asset-tag">Asset Tag</Label>
+  1725→              <Input
+  1726→                id="asset-tag"
+  1727→                placeholder="e.g., AST-001"
+  1728→                value={assetForm.assetTag}
+  1729→                onChange={(e) => setAssetForm({ ...assetForm, assetTag: e.target.value })}
+  1730→              />
+  1731→            </div>
+  1732→            <div className="space-y-2">
+  1733→              <Label htmlFor="asset-category">Category *</Label>
+  1734→              <Select value={assetForm.category} onValueChange={(v) => setAssetForm({ ...assetForm, category: v as AssetCategory, subCategory: '' })}>
+  1735→                <SelectTrigger id="asset-category">
+  1736→                  <SelectValue placeholder="Select category" />
+  1737→                </SelectTrigger>
+  1738→                <SelectContent>
+  1739→                  {ASSET_CATEGORIES.map((cat) => (
+  1740→                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+  1741→                  ))}
+  1742→                </SelectContent>
+  1743→              </Select>
+  1744→            </div>
+  1745→            <div className="space-y-2">
+  1746→              <Label htmlFor="asset-subcategory">Sub-category</Label>
+  1747→              <Select value={assetForm.subCategory} onValueChange={(v) => setAssetForm({ ...assetForm, subCategory: v })}>
+  1748→                <SelectTrigger id="asset-subcategory">
+  1749→                  <SelectValue placeholder="Select sub-category" />
+  1750→                </SelectTrigger>
+  1751→                <SelectContent>
+  1752→                  {(ASSET_SUB_CATEGORIES[assetForm.category] || []).map((sub) => (
+  1753→                    <SelectItem key={sub} value={sub}>{getSubCategoryLabel(sub)}</SelectItem>
+  1754→                  ))}
+  1755→                </SelectContent>
+  1756→              </Select>
+  1757→            </div>
+  1758→            <div className="space-y-2">
+  1759→              <Label htmlFor="asset-room">Room</Label>
+  1760→              <Select value={assetForm.roomId} onValueChange={(v) => setAssetForm({ ...assetForm, roomId: v })}>
+  1761→                <SelectTrigger id="asset-room">
+  1762→                  <SelectValue placeholder="Select room (optional)" />
+  1763→                </SelectTrigger>
+  1764→                <SelectContent>
+  1765→                  {rooms.map((room) => (
+  1766→                    <SelectItem key={room.id} value={room.id}>
+  1767→                      {room.name} ({room.number})
+  1768→                    </SelectItem>
+  1769→                  ))}
+  1770→                </SelectContent>
+  1771→              </Select>
+  1772→            </div>
+  1773→            <div className="space-y-2">
+  1774→              <Label htmlFor="asset-purchase-date">Purchase Date</Label>
+  1775→              <Input
+  1776→                id="asset-purchase-date"
+  1777→                type="date"
+  1778→                value={assetForm.purchaseDate}
+  1779→                onChange={(e) => setAssetForm({ ...assetForm, purchaseDate: e.target.value })}
+  1780→              />
+  1781→            </div>
+  1782→            <div className="space-y-2">
+  1783→              <Label htmlFor="asset-purchase-price">Purchase Price (₹)</Label>
+  1784→              <Input
+  1785→                id="asset-purchase-price"
+  1786→                type="number"
+  1787→                placeholder="0.00"
+  1788→                value={assetForm.purchasePrice}
+  1789→                onChange={(e) => setAssetForm({ ...assetForm, purchasePrice: e.target.value })}
+  1790→              />
+  1791→            </div>
+  1792→            <div className="space-y-2">
+  1793→              <Label htmlFor="asset-current-value">Current Value (₹)</Label>
+  1794→              <Input
+  1795→                id="asset-current-value"
+  1796→                type="number"
+  1797→                placeholder="0.00"
+  1798→                value={assetForm.currentValue}
+  1799→                onChange={(e) => setAssetForm({ ...assetForm, currentValue: e.target.value })}
+  1800→              />
+  1801→            </div>
+  1802→            <div className="space-y-2">
+  1803→              <Label htmlFor="asset-depreciation">Depreciation Rate (%)</Label>
+  1804→              <Input
+  1805→                id="asset-depreciation"
+  1806→                type="number"
+  1807→                placeholder="0"
+  1808→                value={assetForm.depreciationRate}
+  1809→                onChange={(e) => setAssetForm({ ...assetForm, depreciationRate: e.target.value })}
+  1810→              />
+  1811→            </div>
+  1812→            <div className="space-y-2">
+  1813→              <Label htmlFor="asset-vendor">Vendor</Label>
+  1814→              <Input
+  1815→                id="asset-vendor"
+  1816→                placeholder="e.g., ABC Suppliers"
+  1817→                value={assetForm.vendor}
+  1818→                onChange={(e) => setAssetForm({ ...assetForm, vendor: e.target.value })}
+  1819→              />
+  1820→            </div>
+  1821→            <div className="space-y-2">
+  1822→              <Label htmlFor="asset-warranty">Warranty Expiry</Label>
+  1823→              <Input
+  1824→                id="asset-warranty"
+  1825→                type="date"
+  1826→                value={assetForm.warrantyExpiry}
+  1827→                onChange={(e) => setAssetForm({ ...assetForm, warrantyExpiry: e.target.value })}
+  1828→              />
+  1829→            </div>
+  1830→            <div className="space-y-2">
+  1831→              <Label htmlFor="asset-condition">Condition</Label>
+  1832→              <Select value={assetForm.condition} onValueChange={(v) => setAssetForm({ ...assetForm, condition: v as AssetCondition })}>
+  1833→                <SelectTrigger id="asset-condition">
+  1834→                  <SelectValue />
+  1835→                </SelectTrigger>
+  1836→                <SelectContent>
+  1837→                  <SelectItem value="excellent">Excellent</SelectItem>
+  1838→                  <SelectItem value="good">Good</SelectItem>
+  1839→                  <SelectItem value="fair">Fair</SelectItem>
+  1840→                  <SelectItem value="poor">Poor</SelectItem>
+  1841→                  <SelectItem value="broken">Broken</SelectItem>
+  1842→                </SelectContent>
+  1843→              </Select>
+  1844→            </div>
+  1845→            <div className="space-y-2">
+  1846→              <Label htmlFor="asset-assigned">Assigned To</Label>
+  1847→              <Input
+  1848→                id="asset-assigned"
+  1849→                placeholder="e.g., Room 101"
+  1850→                value={assetForm.assignedTo}
+  1851→                onChange={(e) => setAssetForm({ ...assetForm, assignedTo: e.target.value })}
+  1852→              />
+  1853→            </div>
+  1854→            <div className="space-y-2 sm:col-span-2">
+  1855→              <Label htmlFor="asset-notes">Notes</Label>
+  1856→              <Textarea
+  1857→                id="asset-notes"
+  1858→                placeholder="Additional notes..."
+  1859→                value={assetForm.notes}
+  1860→                onChange={(e) => setAssetForm({ ...assetForm, notes: e.target.value })}
+  1861→                rows={3}
+  1862→              />
+  1863→            </div>
+  1864→          </div>
+  1865→          <DialogFooter>
+  1866→            <Button variant="outline" onClick={() => setAssetDialogOpen(false)} disabled={actionLoading}>
+  1867→              Cancel
+  1868→            </Button>
+  1869→            <Button onClick={handleAddAsset} disabled={actionLoading}>
+  1870→              {actionLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+  1871→              Add Asset
+  1872→            </Button>
+  1873→          </DialogFooter>
+  1874→        </DialogContent>
+  1875→      </Dialog>
+  1876→
+  1877→      {/* ── Edit Asset Dialog ──────────────────────────────────────────────────── */}
+  1878→      <Dialog open={editAssetDialogOpen} onOpenChange={setEditAssetDialogOpen}>
+  1879→        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+  1880→          <DialogHeader>
+  1881→            <DialogTitle>Edit Asset</DialogTitle>
+  1882→            <DialogDescription>Update asset details and status</DialogDescription>
+  1883→          </DialogHeader>
+  1884→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+  1885→            <div className="space-y-2">
+  1886→              <Label htmlFor="edit-asset-name">Name *</Label>
+  1887→              <Input
+  1888→                id="edit-asset-name"
+  1889→                value={assetForm.name}
+  1890→                onChange={(e) => setAssetForm({ ...assetForm, name: e.target.value })}
+  1891→              />
+  1892→            </div>
+  1893→            <div className="space-y-2">
+  1894→              <Label htmlFor="edit-asset-tag">Asset Tag</Label>
+  1895→              <Input
+  1896→                id="edit-asset-tag"
+  1897→                value={assetForm.assetTag}
+  1898→                onChange={(e) => setAssetForm({ ...assetForm, assetTag: e.target.value })}
+  1899→              />
+  1900→            </div>
+  1901→            <div className="space-y-2">
+  1902→              <Label htmlFor="edit-asset-category">Category</Label>
+  1903→              <Select value={assetForm.category} onValueChange={(v) => setAssetForm({ ...assetForm, category: v as AssetCategory, subCategory: '' })}>
+  1904→                <SelectTrigger id="edit-asset-category">
+  1905→                  <SelectValue />
+  1906→                </SelectTrigger>
+  1907→                <SelectContent>
+  1908→                  {ASSET_CATEGORIES.map((cat) => (
+  1909→                    <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+  1910→                  ))}
+  1911→                </SelectContent>
+  1912→              </Select>
+  1913→            </div>
+  1914→            <div className="space-y-2">
+  1915→              <Label htmlFor="edit-asset-subcategory">Sub-category</Label>
+  1916→              <Select value={assetForm.subCategory} onValueChange={(v) => setAssetForm({ ...assetForm, subCategory: v })}>
+  1917→                <SelectTrigger id="edit-asset-subcategory">
+  1918→                  <SelectValue placeholder="Select sub-category" />
+  1919→                </SelectTrigger>
+  1920→                <SelectContent>
+  1921→                  {(ASSET_SUB_CATEGORIES[assetForm.category] || []).map((sub) => (
+  1922→                    <SelectItem key={sub} value={sub}>{getSubCategoryLabel(sub)}</SelectItem>
+  1923→                  ))}
+  1924→                </SelectContent>
+  1925→              </Select>
+  1926→            </div>
+  1927→            <div className="space-y-2">
+  1928→              <Label htmlFor="edit-asset-room">Room</Label>
+  1929→              <Select value={assetForm.roomId} onValueChange={(v) => setAssetForm({ ...assetForm, roomId: v })}>
+  1930→                <SelectTrigger id="edit-asset-room">
+  1931→                  <SelectValue placeholder="Select room (optional)" />
+  1932→                </SelectTrigger>
+  1933→                <SelectContent>
+  1934→                  {rooms.map((room) => (
+  1935→                    <SelectItem key={room.id} value={room.id}>
+  1936→                      {room.name} ({room.number})
+  1937→                    </SelectItem>
+  1938→                  ))}
+  1939→                </SelectContent>
+  1940→              </Select>
+  1941→            </div>
+  1942→            <div className="space-y-2">
+  1943→              <Label htmlFor="edit-asset-current-value">Current Value (₹)</Label>
+  1944→              <Input
+  1945→                id="edit-asset-current-value"
+  1946→                type="number"
+  1947→                value={assetForm.currentValue}
+  1948→                onChange={(e) => setAssetForm({ ...assetForm, currentValue: e.target.value })}
+  1949→              />
+  1950→            </div>
+  1951→            <div className="space-y-2">
+  1952→              <Label htmlFor="edit-asset-condition">Condition</Label>
+  1953→              <Select value={assetForm.condition} onValueChange={(v) => setAssetForm({ ...assetForm, condition: v as AssetCondition })}>
+  1954→                <SelectTrigger id="edit-asset-condition">
+  1955→                  <SelectValue />
+  1956→                </SelectTrigger>
+  1957→                <SelectContent>
+  1958→                  <SelectItem value="excellent">Excellent</SelectItem>
+  1959→                  <SelectItem value="good">Good</SelectItem>
+  1960→                  <SelectItem value="fair">Fair</SelectItem>
+  1961→                  <SelectItem value="poor">Poor</SelectItem>
+  1962→                  <SelectItem value="broken">Broken</SelectItem>
+  1963→                </SelectContent>
+  1964→              </Select>
+  1965→            </div>
+  1966→            <div className="space-y-2">
+  1967→              <Label htmlFor="edit-asset-status">Status</Label>
+  1968→              <Select value={assetForm.status} onValueChange={(v) => setAssetForm({ ...assetForm, status: v as AssetStatus })}>
+  1969→                <SelectTrigger id="edit-asset-status">
+  1970→                  <SelectValue />
+  1971→                </SelectTrigger>
+  1972→                <SelectContent>
+  1973→                  <SelectItem value="active">Active</SelectItem>
+  1974→                  <SelectItem value="under_maintenance">Under Maintenance</SelectItem>
+  1975→                  <SelectItem value="disposed">Disposed</SelectItem>
+  1976→                  <SelectItem value="lost">Lost</SelectItem>
+  1977→                </SelectContent>
+  1978→              </Select>
+  1979→            </div>
+  1980→            <div className="space-y-2">
+  1981→              <Label htmlFor="edit-asset-assigned">Assigned To</Label>
+  1982→              <Input
+  1983→                id="edit-asset-assigned"
+  1984→                value={assetForm.assignedTo}
+  1985→                onChange={(e) => setAssetForm({ ...assetForm, assignedTo: e.target.value })}
+  1986→              />
+  1987→            </div>
+  1988→            <div className="space-y-2">
+  1989→              <Label htmlFor="edit-asset-vendor">Vendor</Label>
+  1990→              <Input
+  1991→                id="edit-asset-vendor"
+  1992→                value={assetForm.vendor}
+  1993→                onChange={(e) => setAssetForm({ ...assetForm, vendor: e.target.value })}
+  1994→              />
+  1995→            </div>
+  1996→            <div className="space-y-2 sm:col-span-2">
+  1997→              <Label htmlFor="edit-asset-notes">Notes</Label>
+  1998→              <Textarea
+  1999→                id="edit-asset-notes"
+  2000→                value={assetForm.notes}
+
+[showing lines 1-2000 of 2402; use offset=2001 with limit to continue reading]

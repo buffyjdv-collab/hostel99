@@ -1,0 +1,864 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Progress } from '@/components/ui/progress'
+    12→import { Skeleton } from '@/components/ui/skeleton'
+    13→import { Checkbox } from '@/components/ui/checkbox'
+    14→import { ScrollArea } from '@/components/ui/scroll-area'
+    15→import {
+    16→  Dialog,
+    17→  DialogContent,
+    18→  DialogDescription,
+    19→  DialogFooter,
+    20→  DialogHeader,
+    21→  DialogTitle,
+    22→  DialogTrigger,
+    23→} from '@/components/ui/dialog'
+    24→import {
+    25→  Select,
+    26→  SelectContent,
+    27→  SelectItem,
+    28→  SelectTrigger,
+    29→  SelectValue,
+    30→} from '@/components/ui/select'
+    31→import {
+    32→  Building2,
+    33→  Plus,
+    34→  Search,
+    35→  Eye,
+    36→  Pencil,
+    37→  DoorOpen,
+    38→  BedDouble,
+    39→  BarChart3,
+    40→  MapPin,
+    41→  Star,
+    42→  LayoutGrid,
+    43→  List,
+    44→  Filter,
+    45→  Loader2,
+    46→  Home,
+    47→  Building,
+    48→  Users,
+    49→  Warehouse,
+    50→} from 'lucide-react'
+    51→
+    52→// ── Types ────────────────────────────────────────────────────────────────────
+    53→
+    54→type PropertyType = 'pg' | 'hostel' | 'co_living' | 'apartment'
+    55→
+    56→interface PropertyData {
+    57→  id: string
+    58→  name: string
+    59→  type: PropertyType
+    60→  address: string
+    61→  city: string
+    62→  state?: string
+    63→  pincode?: string
+    64→  landmark?: string
+    65→  description?: string
+    66→  totalRooms: number
+    67→  totalBeds: number
+    68→  occupancy: number
+    69→  amenities?: string
+    70→  images?: string
+    71→  isActive: boolean
+    72→  ownerId: string
+    73→  owner?: { id: string; name: string; email: string }
+    74→  buildingsCount?: number
+    75→  roomsCount?: number
+    76→  occupancyPercentage?: number
+    77→  createdAt: string
+    78→  updatedAt: string
+    79→}
+    80→
+    81→interface PropertyFormData {
+    82→  name: string
+    83→  type: PropertyType
+    84→  address: string
+    85→  city: string
+    86→  state: string
+    87→  pincode: string
+    88→  landmark: string
+    89→  description: string
+    90→  amenities: string[]
+    91→}
+    92→
+    93→// ── Constants ────────────────────────────────────────────────────────────────
+    94→
+    95→const PROPERTY_TYPE_CONFIG: Record<PropertyType, { label: string; color: string; bgClass: string; textClass: string; borderClass: string }> = {
+    96→  pg: {
+    97→    label: 'PG',
+    98→    color: 'emerald',
+    99→    bgClass: 'bg-emerald-100 dark:bg-emerald-950/50',
+   100→    textClass: 'text-emerald-700 dark:text-emerald-300',
+   101→    borderClass: 'border-emerald-200 dark:border-emerald-800',
+   102→  },
+   103→  hostel: {
+   104→    label: 'Hostel',
+   105→    color: 'blue',
+   106→    bgClass: 'bg-blue-100 dark:bg-blue-950/50',
+   107→    textClass: 'text-blue-700 dark:text-blue-300',
+   108→    borderClass: 'border-blue-200 dark:border-blue-800',
+   109→  },
+   110→  co_living: {
+   111→    label: 'Co-Living',
+   112→    color: 'purple',
+   113→    bgClass: 'bg-purple-100 dark:bg-purple-950/50',
+   114→    textClass: 'text-purple-700 dark:text-purple-300',
+   115→    borderClass: 'border-purple-200 dark:border-purple-800',
+   116→  },
+   117→  apartment: {
+   118→    label: 'Apartment',
+   119→    color: 'orange',
+   120→    bgClass: 'bg-orange-100 dark:bg-orange-950/50',
+   121→    textClass: 'text-orange-700 dark:text-orange-300',
+   122→    borderClass: 'border-orange-200 dark:border-orange-800',
+   123→  },
+   124→}
+   125→
+   126→const AMENITIES_OPTIONS = [
+   127→  'WiFi',
+   128→  'AC',
+   129→  'Laundry',
+   130→  'Meals',
+   131→  'Parking',
+   132→  'Gym',
+   133→  'CCTV',
+   134→  'Power Backup',
+   135→  'Water Purifier',
+   136→  'Housekeeping',
+   137→  'Refrigerator',
+   138→  'Washing Machine',
+   139→  'TV',
+   140→  'Lift',
+   141→  'Intercom',
+   142→  'Security',
+   143→]
+   144→
+   145→const FILTER_OPTIONS: { value: string; label: string }[] = [
+   146→  { value: 'all', label: 'All Types' },
+   147→  { value: 'pg', label: 'PG' },
+   148→  { value: 'hostel', label: 'Hostel' },
+   149→  { value: 'co_living', label: 'Co-Living' },
+   150→  { value: 'apartment', label: 'Apartment' },
+   151→]
+   152→
+   153→// ── Helpers ──────────────────────────────────────────────────────────────────
+   154→
+   155→function parseAmenities(amenitiesStr?: string | null): string[] {
+   156→  if (!amenitiesStr) return []
+   157→  try {
+   158→    const parsed = JSON.parse(amenitiesStr)
+   159→    return Array.isArray(parsed) ? parsed : []
+   160→  } catch {
+   161→    return amenitiesStr.split(',').map((a) => a.trim()).filter(Boolean)
+   162→  }
+   163→}
+   164→
+   165→function PropertyTypeIcon({ type, className }: { type: PropertyType; className?: string }) {
+   166→  switch (type) {
+   167→    case 'pg': return <Home className={className} />
+   168→    case 'hostel': return <Building className={className} />
+   169→    case 'co_living': return <Users className={className} />
+   170→    case 'apartment': return <Warehouse className={className} />
+   171→    default: return <Building2 className={className} />
+   172→  }
+   173→}
+   174→
+   175→// ── Sub-components ───────────────────────────────────────────────────────────
+   176→
+   177→function PropertyCardSkeleton() {
+   178→  return (
+   179→    <Card className="overflow-hidden">
+   180→      <CardHeader className="pb-3">
+   181→        <div className="flex items-start justify-between">
+   182→          <div className="space-y-2">
+   183→            <Skeleton className="h-5 w-40" />
+   184→            <Skeleton className="h-4 w-24" />
+   185→          </div>
+   186→          <Skeleton className="h-6 w-16 rounded-full" />
+   187→        </div>
+   188→      </CardHeader>
+   189→      <CardContent className="space-y-4">
+   190→        <Skeleton className="h-4 w-56" />
+   191→        <div className="grid grid-cols-3 gap-3">
+   192→          <Skeleton className="h-12 w-full rounded-lg" />
+   193→          <Skeleton className="h-12 w-full rounded-lg" />
+   194→          <Skeleton className="h-12 w-full rounded-lg" />
+   195→        </div>
+   196→        <Skeleton className="h-2 w-full rounded-full" />
+   197→        <div className="flex flex-wrap gap-1.5">
+   198→          <Skeleton className="h-5 w-14 rounded-full" />
+   199→          <Skeleton className="h-5 w-12 rounded-full" />
+   200→          <Skeleton className="h-5 w-10 rounded-full" />
+   201→        </div>
+   202→      </CardContent>
+   203→      <CardFooter className="gap-2">
+   204→        <Skeleton className="h-8 w-20" />
+   205→        <Skeleton className="h-8 w-20" />
+   206→        <Skeleton className="h-8 w-28" />
+   207→      </CardFooter>
+   208→    </Card>
+   209→  )
+   210→}
+   211→
+   212→function StatCardSkeleton() {
+   213→  return (
+   214→    <Card>
+   215→      <CardContent className="p-4">
+   216→        <div className="flex items-center gap-3">
+   217→          <Skeleton className="h-10 w-10 rounded-lg" />
+   218→          <div className="space-y-1.5">
+   219→            <Skeleton className="h-4 w-20" />
+   220→            <Skeleton className="h-6 w-12" />
+   221→          </div>
+   222→        </div>
+   223→      </CardContent>
+   224→    </Card>
+   225→  )
+   226→}
+   227→
+   228→// ── Main Component ───────────────────────────────────────────────────────────
+   229→
+   230→export function PropertiesPage() {
+   231→  const { currentUser } = useAppStore()
+   232→
+   233→  // ── State ────────────────────────────────────────────────────────────────
+   234→  const [properties, setProperties] = useState<PropertyData[]>([])
+   235→  const [loading, setLoading] = useState(true)
+   236→  const [searchQuery, setSearchQuery] = useState('')
+   237→  const [typeFilter, setTypeFilter] = useState('all')
+   238→  const [dialogOpen, setDialogOpen] = useState(false)
+   239→  const [submitting, setSubmitting] = useState(false)
+   240→  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+   241→
+   242→  const [formData, setFormData] = useState<PropertyFormData>({
+   243→    name: '',
+   244→    type: 'pg',
+   245→    address: '',
+   246→    city: '',
+   247→    state: '',
+   248→    pincode: '',
+   249→    landmark: '',
+   250→    description: '',
+   251→    amenities: [],
+   252→  })
+   253→
+   254→  // ── Data Fetching ────────────────────────────────────────────────────────
+   255→  useEffect(() => {
+   256→    fetchProperties()
+   257→  }, [])
+   258→
+   259→  async function fetchProperties() {
+   260→    try {
+   261→      setLoading(true)
+   262→      const res = await fetch('/api/properties')
+   263→      if (res.ok) {
+   264→        const data = await res.json()
+   265→        setProperties(data)
+   266→      }
+   267→    } catch (error) {
+   268→      console.error('Failed to fetch properties:', error)
+   269→    } finally {
+   270→      setLoading(false)
+   271→    }
+   272→  }
+   273→
+   274→  // ── Computed Values ──────────────────────────────────────────────────────
+   275→  const stats = useMemo(() => {
+   276→    const totalProperties = properties.length
+   277→    const totalRooms = properties.reduce((sum, p) => sum + (p.roomsCount ?? p.totalRooms), 0)
+   278→    const totalBeds = properties.reduce((sum, p) => sum + p.totalBeds, 0)
+   279→    const totalOccupancy = properties.reduce((sum, p) => sum + p.occupancy, 0)
+   280→    const avgOccupancy = totalBeds > 0 ? Math.round((totalOccupancy / totalBeds) * 100) : 0
+   281→    return { totalProperties, totalRooms, totalBeds, avgOccupancy }
+   282→  }, [properties])
+   283→
+   284→  const filteredProperties = useMemo(() => {
+   285→    let result = properties
+   286→    if (typeFilter !== 'all') {
+   287→      result = result.filter((p) => p.type === typeFilter)
+   288→    }
+   289→    if (searchQuery.trim()) {
+   290→      const q = searchQuery.toLowerCase()
+   291→      result = result.filter(
+   292→        (p) =>
+   293→          p.name.toLowerCase().includes(q) ||
+   294→          p.address.toLowerCase().includes(q) ||
+   295→          p.city.toLowerCase().includes(q) ||
+   296→          (p.landmark && p.landmark.toLowerCase().includes(q))
+   297→      )
+   298→    }
+   299→    return result
+   300→  }, [properties, typeFilter, searchQuery])
+   301→
+   302→  // ── Form Handlers ────────────────────────────────────────────────────────
+   303→  function handleFormChange(field: keyof PropertyFormData, value: string | string[]) {
+   304→    setFormData((prev) => ({ ...prev, [field]: value }))
+   305→  }
+   306→
+   307→  function handleAmenityToggle(amenity: string) {
+   308→    setFormData((prev) => ({
+   309→      ...prev,
+   310→      amenities: prev.amenities.includes(amenity)
+   311→        ? prev.amenities.filter((a) => a !== amenity)
+   312→        : [...prev.amenities, amenity],
+   313→    }))
+   314→  }
+   315→
+   316→  async function handleSubmit(e: React.FormEvent) {
+   317→    e.preventDefault()
+   318→    if (!formData.name || !formData.address || !formData.city) return
+   319→
+   320→    try {
+   321→      setSubmitting(true)
+   322→      const res = await fetch('/api/properties', {
+   323→        method: 'POST',
+   324→        headers: { 'Content-Type': 'application/json' },
+   325→        body: JSON.stringify({
+   326→          ...formData,
+   327→          ownerId: currentUser?.id || 'default-owner',
+   328→          amenities: formData.amenities.length > 0 ? JSON.stringify(formData.amenities) : null,
+   329→        }),
+   330→      })
+   331→
+   332→      if (res.ok) {
+   333→        const newProperty = await res.json()
+   334→        setProperties((prev) => [newProperty, ...prev])
+   335→        setDialogOpen(false)
+   336→        resetForm()
+   337→      }
+   338→    } catch (error) {
+   339→      console.error('Failed to create property:', error)
+   340→    } finally {
+   341→      setSubmitting(false)
+   342→    }
+   343→  }
+   344→
+   345→  function resetForm() {
+   346→    setFormData({
+   347→      name: '',
+   348→      type: 'pg',
+   349→      address: '',
+   350→      city: '',
+   351→      state: '',
+   352→      pincode: '',
+   353→      landmark: '',
+   354→      description: '',
+   355→      amenities: [],
+   356→    })
+   357→  }
+   358→
+   359→  // ── Render ───────────────────────────────────────────────────────────────
+   360→  return (
+   361→    <ScrollArea className="h-full">
+   362→      <div className="p-4 md:p-6 space-y-6">
+   363→        {/* ── Page Header ─────────────────────────────────────────────────── */}
+   364→        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   365→          <div>
+   366→            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+   367→              Properties
+   368→            </h1>
+   369→            <p className="text-muted-foreground mt-1">
+   370→              Manage your properties, rooms, and occupancy across all locations
+   371→            </p>
+   372→          </div>
+   373→          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
+   374→            <DialogTrigger asChild>
+   375→              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+   376→                <Plus className="mr-2 h-4 w-4" />
+   377→                Add Property
+   378→              </Button>
+   379→            </DialogTrigger>
+   380→            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+   381→              <DialogHeader>
+   382→                <DialogTitle>Add New Property</DialogTitle>
+   383→                <DialogDescription>
+   384→                  Fill in the details to register a new property in your portfolio.
+   385→                </DialogDescription>
+   386→              </DialogHeader>
+   387→              <form onSubmit={handleSubmit} className="space-y-4">
+   388→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+   389→                  {/* Name */}
+   390→                  <div className="sm:col-span-2 space-y-2">
+   391→                    <Label htmlFor="prop-name">Property Name *</Label>
+   392→                    <Input
+   393→                      id="prop-name"
+   394→                      placeholder="e.g. Sunshine PG"
+   395→                      value={formData.name}
+   396→                      onChange={(e) => handleFormChange('name', e.target.value)}
+   397→                      required
+   398→                    />
+   399→                  </div>
+   400→                  {/* Type */}
+   401→                  <div className="space-y-2">
+   402→                    <Label>Property Type *</Label>
+   403→                    <Select
+   404→                      value={formData.type}
+   405→                      onValueChange={(v) => handleFormChange('type', v)}
+   406→                    >
+   407→                      <SelectTrigger className="w-full">
+   408→                        <SelectValue placeholder="Select type" />
+   409→                      </SelectTrigger>
+   410→                      <SelectContent>
+   411→                        {Object.entries(PROPERTY_TYPE_CONFIG).map(([key, cfg]) => (
+   412→                          <SelectItem key={key} value={key}>
+   413→                            {cfg.label}
+   414→                          </SelectItem>
+   415→                        ))}
+   416→                      </SelectContent>
+   417→                    </Select>
+   418→                  </div>
+   419→                  {/* City */}
+   420→                  <div className="space-y-2">
+   421→                    <Label htmlFor="prop-city">City *</Label>
+   422→                    <Input
+   423→                      id="prop-city"
+   424→                      placeholder="e.g. Mumbai"
+   425→                      value={formData.city}
+   426→                      onChange={(e) => handleFormChange('city', e.target.value)}
+   427→                      required
+   428→                    />
+   429→                  </div>
+   430→                  {/* Address */}
+   431→                  <div className="sm:col-span-2 space-y-2">
+   432→                    <Label htmlFor="prop-address">Address *</Label>
+   433→                    <Input
+   434→                      id="prop-address"
+   435→                      placeholder="Full street address"
+   436→                      value={formData.address}
+   437→                      onChange={(e) => handleFormChange('address', e.target.value)}
+   438→                      required
+   439→                    />
+   440→                  </div>
+   441→                  {/* State */}
+   442→                  <div className="space-y-2">
+   443→                    <Label htmlFor="prop-state">State</Label>
+   444→                    <Input
+   445→                      id="prop-state"
+   446→                      placeholder="e.g. Maharashtra"
+   447→                      value={formData.state}
+   448→                      onChange={(e) => handleFormChange('state', e.target.value)}
+   449→                    />
+   450→                  </div>
+   451→                  {/* Pincode */}
+   452→                  <div className="space-y-2">
+   453→                    <Label htmlFor="prop-pincode">Pincode</Label>
+   454→                    <Input
+   455→                      id="prop-pincode"
+   456→                      placeholder="e.g. 400001"
+   457→                      value={formData.pincode}
+   458→                      onChange={(e) => handleFormChange('pincode', e.target.value)}
+   459→                    />
+   460→                  </div>
+   461→                  {/* Landmark */}
+   462→                  <div className="sm:col-span-2 space-y-2">
+   463→                    <Label htmlFor="prop-landmark">Landmark</Label>
+   464→                    <Input
+   465→                      id="prop-landmark"
+   466→                      placeholder="Nearby landmark for easy navigation"
+   467→                      value={formData.landmark}
+   468→                      onChange={(e) => handleFormChange('landmark', e.target.value)}
+   469→                    />
+   470→                  </div>
+   471→                  {/* Description */}
+   472→                  <div className="sm:col-span-2 space-y-2">
+   473→                    <Label htmlFor="prop-desc">Description</Label>
+   474→                    <Textarea
+   475→                      id="prop-desc"
+   476→                      placeholder="Brief description of the property..."
+   477→                      value={formData.description}
+   478→                      onChange={(e) => handleFormChange('description', e.target.value)}
+   479→                      rows={3}
+   480→                    />
+   481→                  </div>
+   482→                </div>
+   483→                {/* Amenities */}
+   484→                <div className="space-y-3">
+   485→                  <Label>Amenities</Label>
+   486→                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+   487→                    {AMENITIES_OPTIONS.map((amenity) => (
+   488→                      <label
+   489→                        key={amenity}
+   490→                        className="flex items-center gap-2 text-sm cursor-pointer rounded-md border px-3 py-2 hover:bg-accent/50 transition-colors"
+   491→                      >
+   492→                        <Checkbox
+   493→                          checked={formData.amenities.includes(amenity)}
+   494→                          onCheckedChange={() => handleAmenityToggle(amenity)}
+   495→                        />
+   496→                        <span>{amenity}</span>
+   497→                      </label>
+   498→                    ))}
+   499→                  </div>
+   500→                </div>
+   501→                <DialogFooter>
+   502→                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+   503→                    Cancel
+   504→                  </Button>
+   505→                  <Button
+   506→                    type="submit"
+   507→                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   508→                    disabled={submitting}
+   509→                  >
+   510→                    {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+   511→                    Create Property
+   512→                  </Button>
+   513→                </DialogFooter>
+   514→              </form>
+   515→            </DialogContent>
+   516→          </Dialog>
+   517→        </div>
+   518→
+   519→        {/* ── Stats Cards ─────────────────────────────────────────────────── */}
+   520→        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+   521→          {loading ? (
+   522→            <>
+   523→              <StatCardSkeleton />
+   524→              <StatCardSkeleton />
+   525→              <StatCardSkeleton />
+   526→              <StatCardSkeleton />
+   527→            </>
+   528→          ) : (
+   529→            <>
+   530→              <Card className="border-l-4 border-l-emerald-500">
+   531→                <CardContent className="p-4">
+   532→                  <div className="flex items-center gap-3">
+   533→                    <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/50 p-2.5">
+   534→                      <Building2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   535→                    </div>
+   536→                    <div>
+   537→                      <p className="text-sm text-muted-foreground">Total Properties</p>
+   538→                      <p className="text-2xl font-bold">{stats.totalProperties}</p>
+   539→                    </div>
+   540→                  </div>
+   541→                </CardContent>
+   542→              </Card>
+   543→              <Card className="border-l-4 border-l-teal-500">
+   544→                <CardContent className="p-4">
+   545→                  <div className="flex items-center gap-3">
+   546→                    <div className="rounded-lg bg-teal-100 dark:bg-teal-950/50 p-2.5">
+   547→                      <DoorOpen className="h-5 w-5 text-teal-600 dark:text-teal-400" />
+   548→                    </div>
+   549→                    <div>
+   550→                      <p className="text-sm text-muted-foreground">Total Rooms</p>
+   551→                      <p className="text-2xl font-bold">{stats.totalRooms}</p>
+   552→                    </div>
+   553→                  </div>
+   554→                </CardContent>
+   555→              </Card>
+   556→              <Card className="border-l-4 border-l-cyan-500">
+   557→                <CardContent className="p-4">
+   558→                  <div className="flex items-center gap-3">
+   559→                    <div className="rounded-lg bg-cyan-100 dark:bg-cyan-950/50 p-2.5">
+   560→                      <BedDouble className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+   561→                    </div>
+   562→                    <div>
+   563→                      <p className="text-sm text-muted-foreground">Total Beds</p>
+   564→                      <p className="text-2xl font-bold">{stats.totalBeds}</p>
+   565→                    </div>
+   566→                  </div>
+   567→                </CardContent>
+   568→              </Card>
+   569→              <Card className="border-l-4 border-l-emerald-500">
+   570→                <CardContent className="p-4">
+   571→                  <div className="flex items-center gap-3">
+   572→                    <div className="rounded-lg bg-emerald-100 dark:bg-emerald-950/50 p-2.5">
+   573→                      <BarChart3 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   574→                    </div>
+   575→                    <div>
+   576→                      <p className="text-sm text-muted-foreground">Avg. Occupancy</p>
+   577→                      <p className="text-2xl font-bold">{stats.avgOccupancy}%</p>
+   578→                    </div>
+   579→                  </div>
+   580→                </CardContent>
+   581→              </Card>
+   582→            </>
+   583→          )}
+   584→        </div>
+   585→
+   586→        {/* ── Filters & Search ─────────────────────────────────────────────── */}
+   587→        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   588→          <div className="flex flex-wrap items-center gap-2">
+   589→            <Filter className="h-4 w-4 text-muted-foreground" />
+   590→            {FILTER_OPTIONS.map((opt) => (
+   591→              <Button
+   592→                key={opt.value}
+   593→                variant={typeFilter === opt.value ? 'default' : 'outline'}
+   594→                size="sm"
+   595→                onClick={() => setTypeFilter(opt.value)}
+   596→                className={
+   597→                  typeFilter === opt.value
+   598→                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+   599→                    : ''
+   600→                }
+   601→              >
+   602→                {opt.label}
+   603→              </Button>
+   604→            ))}
+   605→          </div>
+   606→          <div className="flex items-center gap-2">
+   607→            <div className="relative">
+   608→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+   609→              <Input
+   610→                placeholder="Search properties..."
+   611→                value={searchQuery}
+   612→                onChange={(e) => setSearchQuery(e.target.value)}
+   613→                className="pl-9 w-64"
+   614→              />
+   615→            </div>
+   616→            <div className="flex items-center rounded-md border">
+   617→              <Button
+   618→                variant="ghost"
+   619→                size="sm"
+   620→                className={viewMode === 'grid' ? 'bg-accent' : ''}
+   621→                onClick={() => setViewMode('grid')}
+   622→              >
+   623→                <LayoutGrid className="h-4 w-4" />
+   624→              </Button>
+   625→              <Button
+   626→                variant="ghost"
+   627→                size="sm"
+   628→                className={viewMode === 'list' ? 'bg-accent' : ''}
+   629→                onClick={() => setViewMode('list')}
+   630→              >
+   631→                <List className="h-4 w-4" />
+   632→              </Button>
+   633→            </div>
+   634→          </div>
+   635→        </div>
+   636→
+   637→        {/* ── Property Grid / List ─────────────────────────────────────────── */}
+   638→        {loading ? (
+   639→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   640→            <PropertyCardSkeleton />
+   641→            <PropertyCardSkeleton />
+   642→            <PropertyCardSkeleton />
+   643→            <PropertyCardSkeleton />
+   644→            <PropertyCardSkeleton />
+   645→            <PropertyCardSkeleton />
+   646→          </div>
+   647→        ) : filteredProperties.length === 0 ? (
+   648→          <Card className="border-dashed">
+   649→            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+   650→              <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
+   651→              <h3 className="text-lg font-semibold">No properties found</h3>
+   652→              <p className="text-muted-foreground mt-1 max-w-sm">
+   653→                {searchQuery || typeFilter !== 'all'
+   654→                  ? 'Try adjusting your search or filters to find what you\'re looking for.'
+   655→                  : 'Get started by adding your first property to the system.'}
+   656→              </p>
+   657→              {!searchQuery && typeFilter === 'all' && (
+   658→                <Button
+   659→                  className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white"
+   660→                  onClick={() => setDialogOpen(true)}
+   661→                >
+   662→                  <Plus className="mr-2 h-4 w-4" />
+   663→                  Add Property
+   664→                </Button>
+   665→              )}
+   666→            </CardContent>
+   667→          </Card>
+   668→        ) : viewMode === 'grid' ? (
+   669→          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   670→            {filteredProperties.map((property) => (
+   671→              <PropertyCard key={property.id} property={property} />
+   672→            ))}
+   673→          </div>
+   674→        ) : (
+   675→          <div className="space-y-3">
+   676→            {filteredProperties.map((property) => (
+   677→              <PropertyListItem key={property.id} property={property} />
+   678→            ))}
+   679→          </div>
+   680→        )}
+   681→      </div>
+   682→    </ScrollArea>
+   683→  )
+   684→}
+   685→
+   686→// ── Property Card (Grid View) ────────────────────────────────────────────────
+   687→
+   688→function PropertyCard({ property }: { property: PropertyData }) {
+   689→  const typeConfig = PROPERTY_TYPE_CONFIG[property.type] || PROPERTY_TYPE_CONFIG.pg
+   690→  const amenities = parseAmenities(property.amenities)
+   691→  const occupancyPct = property.occupancyPercentage ?? (property.totalBeds > 0 ? Math.round((property.occupancy / property.totalBeds) * 100) : 0)
+   692→
+   693→  return (
+   694→    <Card className="overflow-hidden hover:shadow-md transition-shadow group">
+   695→      {/* Color bar at top */}
+   696→      <div className={`h-1.5 ${
+   697→        property.type === 'pg' ? 'bg-emerald-500' :
+   698→        property.type === 'hostel' ? 'bg-blue-500' :
+   699→        property.type === 'co_living' ? 'bg-purple-500' :
+   700→        'bg-orange-500'
+   701→      }`} />
+   702→      <CardHeader className="pb-3">
+   703→        <div className="flex items-start justify-between gap-2">
+   704→          <div className="flex items-start gap-2.5 min-w-0">
+   705→            <div className={`rounded-lg p-2 ${typeConfig.bgClass} shrink-0`}>
+   706→              <PropertyTypeIcon type={property.type} className={`h-4 w-4 ${typeConfig.textClass}`} />
+   707→            </div>
+   708→            <div className="min-w-0">
+   709→              <CardTitle className="text-base truncate">{property.name}</CardTitle>
+   710→              <Badge
+   711→                variant="outline"
+   712→                className={`mt-1 text-[10px] px-1.5 py-0 ${typeConfig.bgClass} ${typeConfig.textClass} ${typeConfig.borderClass}`}
+   713→              >
+   714→                {typeConfig.label}
+   715→              </Badge>
+   716→            </div>
+   717→          </div>
+   718→          <Badge variant="outline" className="text-[10px] shrink-0">
+   719→            {property.isActive ? 'Active' : 'Inactive'}
+   720→          </Badge>
+   721→        </div>
+   722→      </CardHeader>
+   723→      <CardContent className="space-y-4">
+   724→        {/* Address */}
+   725→        <div className="flex items-start gap-1.5 text-sm text-muted-foreground">
+   726→          <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+   727→          <span className="line-clamp-2">
+   728→            {property.address}, {property.city}
+   729→            {property.state && `, ${property.state}`}
+   730→            {property.pincode && ` - ${property.pincode}`}
+   731→          </span>
+   732→        </div>
+   733→
+   734→        {/* Stats row */}
+   735→        <div className="grid grid-cols-3 gap-2">
+   736→          <div className="rounded-lg bg-muted/50 p-2 text-center">
+   737→            <p className="text-lg font-bold text-foreground">{property.roomsCount ?? property.totalRooms}</p>
+   738→            <p className="text-[10px] text-muted-foreground">Rooms</p>
+   739→          </div>
+   740→          <div className="rounded-lg bg-muted/50 p-2 text-center">
+   741→            <p className="text-lg font-bold text-foreground">{property.totalBeds}</p>
+   742→            <p className="text-[10px] text-muted-foreground">Beds</p>
+   743→          </div>
+   744→          <div className="rounded-lg bg-muted/50 p-2 text-center">
+   745→            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{occupancyPct}%</p>
+   746→            <p className="text-[10px] text-muted-foreground">Occupancy</p>
+   747→          </div>
+   748→        </div>
+   749→
+   750→        {/* Occupancy bar */}
+   751→        <div className="space-y-1.5">
+   752→          <div className="flex items-center justify-between text-xs">
+   753→            <span className="text-muted-foreground">Occupancy</span>
+   754→            <span className="font-medium">{property.occupancy}/{property.totalBeds} beds</span>
+   755→          </div>
+   756→          <Progress value={occupancyPct} className="h-2" />
+   757→        </div>
+   758→
+   759→        {/* Amenities */}
+   760→        {amenities.length > 0 && (
+   761→          <div className="flex flex-wrap gap-1.5">
+   762→            {amenities.slice(0, 5).map((amenity) => (
+   763→              <Badge key={amenity} variant="secondary" className="text-[10px] px-1.5 py-0">
+   764→                {amenity}
+   765→              </Badge>
+   766→            ))}
+   767→            {amenities.length > 5 && (
+   768→              <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+   769→                +{amenities.length - 5}
+   770→              </Badge>
+   771→            )}
+   772→          </div>
+   773→        )}
+   774→      </CardContent>
+   775→      <CardFooter className="gap-2 pt-0">
+   776→        <Button variant="outline" size="sm" className="flex-1">
+   777→          <Eye className="mr-1.5 h-3.5 w-3.5" />
+   778→          View
+   779→        </Button>
+   780→        <Button variant="outline" size="sm" className="flex-1">
+   781→          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+   782→          Edit
+   783→        </Button>
+   784→        <Button variant="outline" size="sm" className="flex-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50">
+   785→          <DoorOpen className="mr-1.5 h-3.5 w-3.5" />
+   786→          Rooms
+   787→        </Button>
+   788→      </CardFooter>
+   789→    </Card>
+   790→  )
+   791→}
+   792→
+   793→// ── Property List Item (List View) ──────────────────────────────────────────
+   794→
+   795→function PropertyListItem({ property }: { property: PropertyData }) {
+   796→  const typeConfig = PROPERTY_TYPE_CONFIG[property.type] || PROPERTY_TYPE_CONFIG.pg
+   797→  const amenities = parseAmenities(property.amenities)
+   798→  const occupancyPct = property.occupancyPercentage ?? (property.totalBeds > 0 ? Math.round((property.occupancy / property.totalBeds) * 100) : 0)
+   799→
+   800→  return (
+   801→    <Card className="hover:shadow-md transition-shadow">
+   802→      <CardContent className="p-4">
+   803→        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   804→          <div className="flex items-start gap-3 min-w-0">
+   805→            <div className={`rounded-lg p-2.5 ${typeConfig.bgClass} shrink-0`}>
+   806→              <PropertyTypeIcon type={property.type} className={`h-5 w-5 ${typeConfig.textClass}`} />
+   807→            </div>
+   808→            <div className="min-w-0">
+   809→              <div className="flex items-center gap-2 flex-wrap">
+   810→                <h3 className="font-semibold truncate">{property.name}</h3>
+   811→                <Badge
+   812→                  variant="outline"
+   813→                  className={`text-[10px] px-1.5 py-0 ${typeConfig.bgClass} ${typeConfig.textClass} ${typeConfig.borderClass}`}
+   814→                >
+   815→                  {typeConfig.label}
+   816→                </Badge>
+   817→              </div>
+   818→              <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
+   819→                <MapPin className="h-3.5 w-3.5 shrink-0" />
+   820→                <span className="truncate">
+   821→                  {property.address}, {property.city}
+   822→                  {property.state && `, ${property.state}`}
+   823→                </span>
+   824→              </div>
+   825→              {amenities.length > 0 && (
+   826→                <div className="flex flex-wrap gap-1 mt-2">
+   827→                  {amenities.slice(0, 4).map((a) => (
+   828→                    <Badge key={a} variant="secondary" className="text-[10px] px-1.5 py-0">{a}</Badge>
+   829→                  ))}
+   830→                  {amenities.length > 4 && (
+   831→                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">+{amenities.length - 4}</Badge>
+   832→                  )}
+   833→                </div>
+   834→              )}
+   835→            </div>
+   836→          </div>
+   837→
+   838→          <div className="flex items-center gap-6 shrink-0">
+   839→            <div className="text-center">
+   840→              <p className="text-lg font-bold">{property.roomsCount ?? property.totalRooms}</p>
+   841→              <p className="text-[10px] text-muted-foreground">Rooms</p>
+   842→            </div>
+   843→            <div className="text-center">
+   844→              <p className="text-lg font-bold">{property.totalBeds}</p>
+   845→              <p className="text-[10px] text-muted-foreground">Beds</p>
+   846→            </div>
+   847→            <div className="text-center min-w-[60px]">
+   848→              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{occupancyPct}%</p>
+   849→              <p className="text-[10px] text-muted-foreground">Occupancy</p>
+   850→            </div>
+   851→            <div className="flex gap-1.5">
+   852→              <Button variant="outline" size="sm"><Eye className="h-3.5 w-3.5" /></Button>
+   853→              <Button variant="outline" size="sm"><Pencil className="h-3.5 w-3.5" /></Button>
+   854→              <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/50">
+   855→                <DoorOpen className="h-3.5 w-3.5" />
+   856→              </Button>
+   857→            </div>
+   858→          </div>
+   859→        </div>
+   860→      </CardContent>
+   861→    </Card>
+   862→  )
+   863→}
+   864→

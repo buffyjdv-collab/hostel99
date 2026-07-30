@@ -1,0 +1,917 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { Separator } from '@/components/ui/separator'
+    13→import {
+    14→  Dialog,
+    15→  DialogContent,
+    16→  DialogDescription,
+    17→  DialogFooter,
+    18→  DialogHeader,
+    19→  DialogTitle,
+    20→} from '@/components/ui/dialog'
+    21→import {
+    22→  Select,
+    23→  SelectContent,
+    24→  SelectItem,
+    25→  SelectTrigger,
+    26→  SelectValue,
+    27→} from '@/components/ui/select'
+    28→import {
+    29→  Table,
+    30→  TableBody,
+    31→  TableCell,
+    32→  TableHead,
+    33→  TableHeader,
+    34→  TableRow,
+    35→} from '@/components/ui/table'
+    36→import {
+    37→  DropdownMenu,
+    38→  DropdownMenuContent,
+    39→  DropdownMenuItem,
+    40→  DropdownMenuTrigger,
+    41→} from '@/components/ui/dropdown-menu'
+    42→import {
+    43→  Tooltip,
+    44→  TooltipContent,
+    45→  TooltipProvider,
+    46→  TooltipTrigger,
+    47→} from '@/components/ui/tooltip'
+    48→import {
+    49→  Truck,
+    50→  Plus,
+    51→  Search,
+    52→  Star,
+    53→  Phone,
+    54→  Mail,
+    55→  MapPin,
+    56→  Building2,
+    57→  MoreHorizontal,
+    58→  Edit,
+    59→  Eye,
+    60→  ShoppingCart,
+    61→  Ban,
+    62→  CheckCircle2,
+    63→  XCircle,
+    64→  Loader2,
+    65→  FileText,
+    66→  CreditCard,
+    67→  Banknote,
+    68→  Globe,
+    69→} from 'lucide-react'
+    70→import { useToast } from '@/hooks/use-toast'
+    71→
+    72→// ── Types ────────────────────────────────────────────────────────
+    73→
+    74→interface VendorData {
+    75→  id: string
+    76→  name: string
+    77→  contactPerson: string | null
+    78→  phone: string
+    79→  email: string | null
+    80→  address: string | null
+    81→  city: string | null
+    82→  state: string | null
+    83→  pincode: string | null
+    84→  gstNumber: string | null
+    85→  panNumber: string | null
+    86→  bankName: string | null
+    87→  bankAccount: string | null
+    88→  ifscCode: string | null
+    89→  paymentTerms: string | null
+    90→  rating: number
+    91→  status: string
+    92→  propertyId: string
+    93→  property: { id: string; name: string }
+    94→  _count: { purchaseOrders: number; quotations: number }
+    95→  createdAt: string
+    96→}
+    97→
+    98→interface VendorStats {
+    99→  totalVendors: number
+   100→  activeVendors: number
+   101→  avgRating: string
+   102→}
+   103→
+   104→// ── Constants ────────────────────────────────────────────────────
+   105→
+   106→const PAYMENT_TERMS = [
+   107→  { value: 'COD', label: 'Cash on Delivery' },
+   108→  { value: 'Net 15', label: 'Net 15 Days' },
+   109→  { value: 'Net 30', label: 'Net 30 Days' },
+   110→  { value: 'Net 45', label: 'Net 45 Days' },
+   111→  { value: 'Net 60', label: 'Net 60 Days' },
+   112→  { value: 'Advance', label: 'Advance Payment' },
+   113→  { value: '50-50', label: '50% Advance, 50% on Delivery' },
+   114→]
+   115→
+   116→function getStatusBadge(status: string) {
+   117→  switch (status) {
+   118→    case 'active':
+   119→      return <Badge className="bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 border-0"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+   120→    case 'inactive':
+   121→      return <Badge className="bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-0"><XCircle className="h-3 w-3 mr-1" />Inactive</Badge>
+   122→    case 'blacklisted':
+   123→      return <Badge className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-0"><Ban className="h-3 w-3 mr-1" />Blacklisted</Badge>
+   124→    default:
+   125→      return <Badge variant="outline">{status}</Badge>
+   126→  }
+   127→}
+   128→
+   129→function renderStars(rating: number) {
+   130→  return (
+   131→    <div className="flex items-center gap-0.5">
+   132→      {[1, 2, 3, 4, 5].map((star) => (
+   133→        <Star
+   134→          key={star}
+   135→          className={`h-3.5 w-3.5 ${star <= rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300 dark:text-slate-600'}`}
+   136→        />
+   137→      ))}
+   138→      <span className="text-xs text-slate-500 ml-1">{rating.toFixed(1)}</span>
+   139→    </div>
+   140→  )
+   141→}
+   142→
+   143→// ── Component ────────────────────────────────────────────────────
+   144→
+   145→export function VendorsPage() {
+   146→  const { selectedPropertyId, currentUser } = useAppStore()
+   147→  const { toast } = useToast()
+   148→
+   149→  const [vendors, setVendors] = useState<VendorData[]>([])
+   150→  const [stats, setStats] = useState<VendorStats>({ totalVendors: 0, activeVendors: 0, avgRating: '0' })
+   151→  const [loading, setLoading] = useState(true)
+   152→  const [search, setSearch] = useState('')
+   153→  const [statusFilter, setStatusFilter] = useState<string>('all')
+   154→
+   155→  // Dialogs
+   156→  const [addDialogOpen, setAddDialogOpen] = useState(false)
+   157→  const [editDialogOpen, setEditDialogOpen] = useState(false)
+   158→  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+   159→  const [selectedVendor, setSelectedVendor] = useState<VendorData | null>(null)
+   160→
+   161→  // Form state
+   162→  const [form, setForm] = useState({
+   163→    name: '',
+   164→    contactPerson: '',
+   165→    phone: '',
+   166→    email: '',
+   167→    address: '',
+   168→    city: '',
+   169→    state: '',
+   170→    pincode: '',
+   171→    gstNumber: '',
+   172→    panNumber: '',
+   173→    bankName: '',
+   174→    bankAccount: '',
+   175→    ifscCode: '',
+   176→    paymentTerms: 'Net 30',
+   177→    rating: 0,
+   178→  })
+   179→
+   180→  const [editForm, setEditForm] = useState(form)
+   181→  const [submitting, setSubmitting] = useState(false)
+   182→
+   183→  // ── Data Fetching ──────────────────────────────────────────────
+   184→
+   185→  const fetchVendors = useCallback(async () => {
+   186→    setLoading(true)
+   187→    try {
+   188→      const params = new URLSearchParams()
+   189→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   190→      const res = await fetch(`/api/vendors?${params}`)
+   191→      if (res.ok) {
+   192→        const data = await res.json()
+   193→        setVendors(data.vendors || [])
+   194→        setStats(data.stats || { totalVendors: 0, activeVendors: 0, avgRating: '0' })
+   195→      }
+   196→    } catch (err) {
+   197→      console.error('Failed to fetch vendors:', err)
+   198→    } finally {
+   199→      setLoading(false)
+   200→    }
+   201→  }, [selectedPropertyId])
+   202→
+   203→  useEffect(() => { fetchVendors() }, [fetchVendors])
+   204→
+   205→  // ── Filtering ──────────────────────────────────────────────────
+   206→
+   207→  const filteredVendors = useMemo(() => {
+   208→    let result = vendors
+   209→    if (search) {
+   210→      const q = search.toLowerCase()
+   211→      result = result.filter(v =>
+   212→        v.name.toLowerCase().includes(q) ||
+   213→        (v.contactPerson || '').toLowerCase().includes(q) ||
+   214→        (v.city || '').toLowerCase().includes(q) ||
+   215→        (v.email || '').toLowerCase().includes(q) ||
+   216→        (v.gstNumber || '').toLowerCase().includes(q)
+   217→      )
+   218→    }
+   219→    if (statusFilter !== 'all') {
+   220→      result = result.filter(v => v.status === statusFilter)
+   221→    }
+   222→    return result
+   223→  }, [vendors, search, statusFilter])
+   224→
+   225→  // ── Form Handlers ──────────────────────────────────────────────
+   226→
+   227→  const resetForm = () => {
+   228→    setForm({
+   229→      name: '', contactPerson: '', phone: '', email: '', address: '',
+   230→      city: '', state: '', pincode: '', gstNumber: '', panNumber: '',
+   231→      bankName: '', bankAccount: '', ifscCode: '', paymentTerms: 'Net 30', rating: 0,
+   232→    })
+   233→  }
+   234→
+   235→  const handleAdd = async () => {
+   236→    if (!form.name || !form.phone) {
+   237→      toast({ title: 'Validation Error', description: 'Name and phone are required', variant: 'destructive' })
+   238→      return
+   239→    }
+   240→    setSubmitting(true)
+   241→    try {
+   242→      const res = await fetch('/api/vendors', {
+   243→        method: 'POST',
+   244→        headers: { 'Content-Type': 'application/json' },
+   245→        body: JSON.stringify({ ...form, propertyId: selectedPropertyId }),
+   246→      })
+   247→      if (res.ok) {
+   248→        toast({ title: 'Success', description: 'Vendor added successfully' })
+   249→        setAddDialogOpen(false)
+   250→        resetForm()
+   251→        fetchVendors()
+   252→      } else {
+   253→        toast({ title: 'Error', description: 'Failed to add vendor', variant: 'destructive' })
+   254→      }
+   255→    } catch {
+   256→      toast({ title: 'Error', description: 'Failed to add vendor', variant: 'destructive' })
+   257→    } finally {
+   258→      setSubmitting(false)
+   259→    }
+   260→  }
+   261→
+   262→  const handleEdit = async () => {
+   263→    if (!selectedVendor) return
+   264→    setSubmitting(true)
+   265→    try {
+   266→      const res = await fetch('/api/vendors', {
+   267→        method: 'PATCH',
+   268→        headers: { 'Content-Type': 'application/json' },
+   269→        body: JSON.stringify({ id: selectedVendor.id, ...editForm }),
+   270→      })
+   271→      if (res.ok) {
+   272→        toast({ title: 'Success', description: 'Vendor updated successfully' })
+   273→        setEditDialogOpen(false)
+   274→        fetchVendors()
+   275→      } else {
+   276→        toast({ title: 'Error', description: 'Failed to update vendor', variant: 'destructive' })
+   277→      }
+   278→    } catch {
+   279→      toast({ title: 'Error', description: 'Failed to update vendor', variant: 'destructive' })
+   280→    } finally {
+   281→      setSubmitting(false)
+   282→    }
+   283→  }
+   284→
+   285→  const handleStatusChange = async (vendor: VendorData, newStatus: string) => {
+   286→    try {
+   287→      const res = await fetch('/api/vendors', {
+   288→        method: 'PATCH',
+   289→        headers: { 'Content-Type': 'application/json' },
+   290→        body: JSON.stringify({ id: vendor.id, status: newStatus }),
+   291→      })
+   292→      if (res.ok) {
+   293→        toast({ title: 'Success', description: `Vendor ${newStatus === 'active' ? 'activated' : newStatus === 'blacklisted' ? 'blacklisted' : 'deactivated'}` })
+   294→        fetchVendors()
+   295→      }
+   296→    } catch {
+   297→      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   298→    }
+   299→  }
+   300→
+   301→  const openEdit = (vendor: VendorData) => {
+   302→    setSelectedVendor(vendor)
+   303→    setEditForm({
+   304→      name: vendor.name,
+   305→      contactPerson: vendor.contactPerson || '',
+   306→      phone: vendor.phone,
+   307→      email: vendor.email || '',
+   308→      address: vendor.address || '',
+   309→      city: vendor.city || '',
+   310→      state: vendor.state || '',
+   311→      pincode: vendor.pincode || '',
+   312→      gstNumber: vendor.gstNumber || '',
+   313→      panNumber: vendor.panNumber || '',
+   314→      bankName: vendor.bankName || '',
+   315→      bankAccount: vendor.bankAccount || '',
+   316→      ifscCode: vendor.ifscCode || '',
+   317→      paymentTerms: vendor.paymentTerms || 'Net 30',
+   318→      rating: vendor.rating,
+   319→    })
+   320→    setEditDialogOpen(true)
+   321→  }
+   322→
+   323→  const openDetail = (vendor: VendorData) => {
+   324→    setSelectedVendor(vendor)
+   325→    setDetailDialogOpen(true)
+   326→  }
+   327→
+   328→  // ── Render ─────────────────────────────────────────────────────
+   329→
+   330→  if (loading) {
+   331→    return (
+   332→      <div className="space-y-6">
+   333→        <Skeleton className="h-8 w-48" />
+   334→        <div className="grid gap-4 md:grid-cols-3">
+   335→          <Skeleton className="h-24 rounded-lg" />
+   336→          <Skeleton className="h-24 rounded-lg" />
+   337→          <Skeleton className="h-24 rounded-lg" />
+   338→        </div>
+   339→        <Skeleton className="h-[400px] rounded-lg" />
+   340→      </div>
+   341→    )
+   342→  }
+   343→
+   344→  return (
+   345→    <div className="space-y-6">
+   346→      {/* Header */}
+   347→      <div className="flex items-center justify-between">
+   348→        <div>
+   349→          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Vendor Management</h1>
+   350→          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage suppliers, track purchase history, and vendor performance</p>
+   351→        </div>
+   352→        <Button onClick={() => { resetForm(); setAddDialogOpen(true) }} className="bg-emerald-600 hover:bg-emerald-700">
+   353→          <Plus className="h-4 w-4 mr-2" /> Add Vendor
+   354→        </Button>
+   355→      </div>
+   356→
+   357→      {/* Stats */}
+   358→      <div className="grid gap-4 md:grid-cols-3">
+   359→        <Card>
+   360→          <CardContent className="p-4">
+   361→            <div className="flex items-center gap-3">
+   362→              <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+   363→                <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+   364→              </div>
+   365→              <div>
+   366→                <div className="text-sm text-slate-500 dark:text-slate-400">Total Vendors</div>
+   367→                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalVendors}</div>
+   368→              </div>
+   369→            </div>
+   370→          </CardContent>
+   371→        </Card>
+   372→        <Card>
+   373→          <CardContent className="p-4">
+   374→            <div className="flex items-center gap-3">
+   375→              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+   376→                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   377→              </div>
+   378→              <div>
+   379→                <div className="text-sm text-slate-500 dark:text-slate-400">Active Vendors</div>
+   380→                <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.activeVendors}</div>
+   381→              </div>
+   382→            </div>
+   383→          </CardContent>
+   384→        </Card>
+   385→        <Card>
+   386→          <CardContent className="p-4">
+   387→            <div className="flex items-center gap-3">
+   388→              <div className="p-2 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+   389→                <Star className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+   390→              </div>
+   391→              <div>
+   392→                <div className="text-sm text-slate-500 dark:text-slate-400">Average Rating</div>
+   393→                <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.avgRating} / 5</div>
+   394→              </div>
+   395→            </div>
+   396→          </CardContent>
+   397→        </Card>
+   398→      </div>
+   399→
+   400→      {/* Filters */}
+   401→      <div className="flex flex-col sm:flex-row gap-3">
+   402→        <div className="relative flex-1">
+   403→          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+   404→          <Input
+   405→            placeholder="Search vendors by name, contact, city, GST..."
+   406→            value={search}
+   407→            onChange={(e) => setSearch(e.target.value)}
+   408→            className="pl-10"
+   409→          />
+   410→        </div>
+   411→        <Select value={statusFilter} onValueChange={setStatusFilter}>
+   412→          <SelectTrigger className="w-[160px]">
+   413→            <SelectValue placeholder="Status" />
+   414→          </SelectTrigger>
+   415→          <SelectContent>
+   416→            <SelectItem value="all">All Status</SelectItem>
+   417→            <SelectItem value="active">Active</SelectItem>
+   418→            <SelectItem value="inactive">Inactive</SelectItem>
+   419→            <SelectItem value="blacklisted">Blacklisted</SelectItem>
+   420→          </SelectContent>
+   421→        </Select>
+   422→      </div>
+   423→
+   424→      {/* Table */}
+   425→      <Card>
+   426→        <CardContent className="p-0">
+   427→          <div className="overflow-x-auto">
+   428→            <Table>
+   429→              <TableHeader>
+   430→                <TableRow>
+   431→                  <TableHead>Vendor</TableHead>
+   432→                  <TableHead className="hidden md:table-cell">Contact Person</TableHead>
+   433→                  <TableHead>Phone</TableHead>
+   434→                  <TableHead className="hidden lg:table-cell">Email</TableHead>
+   435→                  <TableHead className="hidden xl:table-cell">GST Number</TableHead>
+   436→                  <TableHead className="hidden md:table-cell">City</TableHead>
+   437→                  <TableHead>Rating</TableHead>
+   438→                  <TableHead className="hidden lg:table-cell">POs</TableHead>
+   439→                  <TableHead>Status</TableHead>
+   440→                  <TableHead className="w-[50px]">Actions</TableHead>
+   441→                </TableRow>
+   442→              </TableHeader>
+   443→              <TableBody>
+   444→                {filteredVendors.length === 0 ? (
+   445→                  <TableRow>
+   446→                    <TableCell colSpan={10} className="text-center py-12">
+   447→                      <div className="flex flex-col items-center gap-2">
+   448→                        <Truck className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+   449→                        <div className="text-slate-500 dark:text-slate-400">No vendors found</div>
+   450→                        <div className="text-sm text-slate-400">Add your first vendor to get started</div>
+   451→                      </div>
+   452→                    </TableCell>
+   453→                  </TableRow>
+   454→                ) : (
+   455→                  filteredVendors.map((vendor) => (
+   456→                    <TableRow key={vendor.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer" onClick={() => openDetail(vendor)}>
+   457→                      <TableCell>
+   458→                        <div className="flex items-center gap-3">
+   459→                          <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-semibold text-sm">
+   460→                            {vendor.name.charAt(0)}
+   461→                          </div>
+   462→                          <div>
+   463→                            <div className="font-medium text-slate-900 dark:text-slate-100">{vendor.name}</div>
+   464→                            {vendor.paymentTerms && (
+   465→                              <div className="text-xs text-slate-400">{vendor.paymentTerms}</div>
+   466→                            )}
+   467→                          </div>
+   468→                        </div>
+   469→                      </TableCell>
+   470→                      <TableCell className="hidden md:table-cell text-slate-600 dark:text-slate-400">{vendor.contactPerson || '-'}</TableCell>
+   471→                      <TableCell>
+   472→                        <div className="flex items-center gap-1.5">
+   473→                          <Phone className="h-3 w-3 text-slate-400" />
+   474→                          <span>{vendor.phone}</span>
+   475→                        </div>
+   476→                      </TableCell>
+   477→                      <TableCell className="hidden lg:table-cell">
+   478→                        {vendor.email ? (
+   479→                          <div className="flex items-center gap-1.5">
+   480→                            <Mail className="h-3 w-3 text-slate-400" />
+   481→                            <span className="text-slate-600 dark:text-slate-400">{vendor.email}</span>
+   482→                          </div>
+   483→                        ) : '-'}
+   484→                      </TableCell>
+   485→                      <TableCell className="hidden xl:table-cell font-mono text-xs text-slate-500">{vendor.gstNumber || '-'}</TableCell>
+   486→                      <TableCell className="hidden md:table-cell">
+   487→                        {vendor.city ? (
+   488→                          <div className="flex items-center gap-1">
+   489→                            <MapPin className="h-3 w-3 text-slate-400" />
+   490→                            <span>{vendor.city}</span>
+   491→                          </div>
+   492→                        ) : '-'}
+   493→                      </TableCell>
+   494→                      <TableCell>{renderStars(vendor.rating)}</TableCell>
+   495→                      <TableCell className="hidden lg:table-cell">
+   496→                        <Badge variant="outline" className="text-xs">{vendor._count.purchaseOrders} POs</Badge>
+   497→                      </TableCell>
+   498→                      <TableCell>{getStatusBadge(vendor.status)}</TableCell>
+   499→                      <TableCell>
+   500→                        <DropdownMenu>
+   501→                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+   502→                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+   503→                              <MoreHorizontal className="h-4 w-4" />
+   504→                            </Button>
+   505→                          </DropdownMenuTrigger>
+   506→                          <DropdownMenuContent align="end">
+   507→                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDetail(vendor) }}>
+   508→                              <Eye className="h-4 w-4 mr-2" /> View Details
+   509→                            </DropdownMenuItem>
+   510→                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(vendor) }}>
+   511→                              <Edit className="h-4 w-4 mr-2" /> Edit
+   512→                            </DropdownMenuItem>
+   513→                            <DropdownMenuItem onClick={(e) => { e.stopPropagation() }}>
+   514→                              <ShoppingCart className="h-4 w-4 mr-2" /> Create PO
+   515→                            </DropdownMenuItem>
+   516→                            {vendor.status === 'active' && (
+   517→                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(vendor, 'inactive') }} className="text-amber-600">
+   518→                                <XCircle className="h-4 w-4 mr-2" /> Deactivate
+   519→                              </DropdownMenuItem>
+   520→                            )}
+   521→                            {vendor.status === 'inactive' && (
+   522→                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(vendor, 'active') }} className="text-emerald-600">
+   523→                                <CheckCircle2 className="h-4 w-4 mr-2" /> Activate
+   524→                              </DropdownMenuItem>
+   525→                            )}
+   526→                            {vendor.status !== 'blacklisted' && (
+   527→                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleStatusChange(vendor, 'blacklisted') }} className="text-red-600">
+   528→                                <Ban className="h-4 w-4 mr-2" /> Blacklist
+   529→                              </DropdownMenuItem>
+   530→                            )}
+   531→                          </DropdownMenuContent>
+   532→                        </DropdownMenu>
+   533→                      </TableCell>
+   534→                    </TableRow>
+   535→                  ))
+   536→                )}
+   537→              </TableBody>
+   538→            </Table>
+   539→          </div>
+   540→        </CardContent>
+   541→      </Card>
+   542→
+   543→      {/* Add Vendor Dialog */}
+   544→      <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+   545→        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   546→          <DialogHeader>
+   547→            <DialogTitle>Add New Vendor</DialogTitle>
+   548→            <DialogDescription>Register a new supplier for your hostel</DialogDescription>
+   549→          </DialogHeader>
+   550→          <div className="space-y-4 py-4">
+   551→            {/* Basic Info */}
+   552→            <div className="space-y-3">
+   553→              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+   554→                <Building2 className="h-4 w-4" /> Basic Information
+   555→              </div>
+   556→              <div className="grid grid-cols-2 gap-3">
+   557→                <div className="space-y-1.5">
+   558→                  <Label>Vendor Name *</Label>
+   559→                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Enter vendor name" />
+   560→                </div>
+   561→                <div className="space-y-1.5">
+   562→                  <Label>Contact Person</Label>
+   563→                  <Input value={form.contactPerson} onChange={(e) => setForm({ ...form, contactPerson: e.target.value })} placeholder="Contact person name" />
+   564→                </div>
+   565→                <div className="space-y-1.5">
+   566→                  <Label>Phone *</Label>
+   567→                  <Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone number" />
+   568→                </div>
+   569→                <div className="space-y-1.5">
+   570→                  <Label>Email</Label>
+   571→                  <Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email address" />
+   572→                </div>
+   573→              </div>
+   574→            </div>
+   575→
+   576→            <Separator />
+   577→
+   578→            {/* Address */}
+   579→            <div className="space-y-3">
+   580→              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+   581→                <MapPin className="h-4 w-4" /> Address Information
+   582→              </div>
+   583→              <div className="space-y-1.5">
+   584→                <Label>Address</Label>
+   585→                <Textarea value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Full address" rows={2} />
+   586→              </div>
+   587→              <div className="grid grid-cols-3 gap-3">
+   588→                <div className="space-y-1.5">
+   589→                  <Label>City</Label>
+   590→                  <Input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="City" />
+   591→                </div>
+   592→                <div className="space-y-1.5">
+   593→                  <Label>State</Label>
+   594→                  <Input value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="State" />
+   595→                </div>
+   596→                <div className="space-y-1.5">
+   597→                  <Label>Pincode</Label>
+   598→                  <Input value={form.pincode} onChange={(e) => setForm({ ...form, pincode: e.target.value })} placeholder="Pincode" />
+   599→                </div>
+   600→              </div>
+   601→            </div>
+   602→
+   603→            <Separator />
+   604→
+   605→            {/* Tax & Legal */}
+   606→            <div className="space-y-3">
+   607→              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+   608→                <Globe className="h-4 w-4" /> Tax & Legal
+   609→              </div>
+   610→              <div className="grid grid-cols-2 gap-3">
+   611→                <div className="space-y-1.5">
+   612→                  <Label>GST Number</Label>
+   613→                  <Input value={form.gstNumber} onChange={(e) => setForm({ ...form, gstNumber: e.target.value })} placeholder="GSTIN" />
+   614→                </div>
+   615→                <div className="space-y-1.5">
+   616→                  <Label>PAN Number</Label>
+   617→                  <Input value={form.panNumber} onChange={(e) => setForm({ ...form, panNumber: e.target.value })} placeholder="PAN number" />
+   618→                </div>
+   619→              </div>
+   620→            </div>
+   621→
+   622→            <Separator />
+   623→
+   624→            {/* Bank Details */}
+   625→            <div className="space-y-3">
+   626→              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+   627→                <Banknote className="h-4 w-4" /> Bank Details
+   628→              </div>
+   629→              <div className="grid grid-cols-3 gap-3">
+   630→                <div className="space-y-1.5">
+   631→                  <Label>Bank Name</Label>
+   632→                  <Input value={form.bankName} onChange={(e) => setForm({ ...form, bankName: e.target.value })} placeholder="Bank name" />
+   633→                </div>
+   634→                <div className="space-y-1.5">
+   635→                  <Label>Account Number</Label>
+   636→                  <Input value={form.bankAccount} onChange={(e) => setForm({ ...form, bankAccount: e.target.value })} placeholder="Account number" />
+   637→                </div>
+   638→                <div className="space-y-1.5">
+   639→                  <Label>IFSC Code</Label>
+   640→                  <Input value={form.ifscCode} onChange={(e) => setForm({ ...form, ifscCode: e.target.value })} placeholder="IFSC code" />
+   641→                </div>
+   642→              </div>
+   643→            </div>
+   644→
+   645→            <Separator />
+   646→
+   647→            {/* Payment & Rating */}
+   648→            <div className="space-y-3">
+   649→              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+   650→                <CreditCard className="h-4 w-4" /> Payment & Rating
+   651→              </div>
+   652→              <div className="grid grid-cols-2 gap-3">
+   653→                <div className="space-y-1.5">
+   654→                  <Label>Payment Terms</Label>
+   655→                  <Select value={form.paymentTerms} onValueChange={(v) => setForm({ ...form, paymentTerms: v })}>
+   656→                    <SelectTrigger><SelectValue /></SelectTrigger>
+   657→                    <SelectContent>
+   658→                      {PAYMENT_TERMS.map(pt => (
+   659→                        <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+   660→                      ))}
+   661→                    </SelectContent>
+   662→                  </Select>
+   663→                </div>
+   664→                <div className="space-y-1.5">
+   665→                  <Label>Rating</Label>
+   666→                  <div className="flex items-center gap-1 mt-2">
+   667→                    {[1, 2, 3, 4, 5].map((star) => (
+   668→                      <button key={star} type="button" onClick={() => setForm({ ...form, rating: star })}>
+   669→                        <Star className={`h-6 w-6 ${star <= form.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`} />
+   670→                      </button>
+   671→                    ))}
+   672→                  </div>
+   673→                </div>
+   674→              </div>
+   675→            </div>
+   676→          </div>
+   677→          <DialogFooter>
+   678→            <Button variant="outline" onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+   679→            <Button onClick={handleAdd} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
+   680→              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Add Vendor
+   681→            </Button>
+   682→          </DialogFooter>
+   683→        </DialogContent>
+   684→      </Dialog>
+   685→
+   686→      {/* Edit Vendor Dialog */}
+   687→      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+   688→        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   689→          <DialogHeader>
+   690→            <DialogTitle>Edit Vendor</DialogTitle>
+   691→            <DialogDescription>Update vendor information</DialogDescription>
+   692→          </DialogHeader>
+   693→          <div className="space-y-4 py-4">
+   694→            <div className="grid grid-cols-2 gap-3">
+   695→              <div className="space-y-1.5">
+   696→                <Label>Vendor Name *</Label>
+   697→                <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
+   698→              </div>
+   699→              <div className="space-y-1.5">
+   700→                <Label>Contact Person</Label>
+   701→                <Input value={editForm.contactPerson} onChange={(e) => setEditForm({ ...editForm, contactPerson: e.target.value })} />
+   702→              </div>
+   703→              <div className="space-y-1.5">
+   704→                <Label>Phone *</Label>
+   705→                <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+   706→              </div>
+   707→              <div className="space-y-1.5">
+   708→                <Label>Email</Label>
+   709→                <Input value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+   710→              </div>
+   711→            </div>
+   712→            <div className="space-y-1.5">
+   713→              <Label>Address</Label>
+   714→              <Textarea value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} rows={2} />
+   715→            </div>
+   716→            <div className="grid grid-cols-3 gap-3">
+   717→              <div className="space-y-1.5">
+   718→                <Label>City</Label>
+   719→                <Input value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+   720→              </div>
+   721→              <div className="space-y-1.5">
+   722→                <Label>State</Label>
+   723→                <Input value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} />
+   724→              </div>
+   725→              <div className="space-y-1.5">
+   726→                <Label>Pincode</Label>
+   727→                <Input value={editForm.pincode} onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })} />
+   728→              </div>
+   729→            </div>
+   730→            <div className="grid grid-cols-2 gap-3">
+   731→              <div className="space-y-1.5">
+   732→                <Label>GST Number</Label>
+   733→                <Input value={editForm.gstNumber} onChange={(e) => setEditForm({ ...editForm, gstNumber: e.target.value })} />
+   734→              </div>
+   735→              <div className="space-y-1.5">
+   736→                <Label>PAN Number</Label>
+   737→                <Input value={editForm.panNumber} onChange={(e) => setEditForm({ ...editForm, panNumber: e.target.value })} />
+   738→              </div>
+   739→            </div>
+   740→            <div className="grid grid-cols-3 gap-3">
+   741→              <div className="space-y-1.5">
+   742→                <Label>Bank Name</Label>
+   743→                <Input value={editForm.bankName} onChange={(e) => setEditForm({ ...editForm, bankName: e.target.value })} />
+   744→              </div>
+   745→              <div className="space-y-1.5">
+   746→                <Label>Account Number</Label>
+   747→                <Input value={editForm.bankAccount} onChange={(e) => setEditForm({ ...editForm, bankAccount: e.target.value })} />
+   748→              </div>
+   749→              <div className="space-y-1.5">
+   750→                <Label>IFSC Code</Label>
+   751→                <Input value={editForm.ifscCode} onChange={(e) => setEditForm({ ...editForm, ifscCode: e.target.value })} />
+   752→              </div>
+   753→            </div>
+   754→            <div className="grid grid-cols-2 gap-3">
+   755→              <div className="space-y-1.5">
+   756→                <Label>Payment Terms</Label>
+   757→                <Select value={editForm.paymentTerms} onValueChange={(v) => setEditForm({ ...editForm, paymentTerms: v })}>
+   758→                  <SelectTrigger><SelectValue /></SelectTrigger>
+   759→                  <SelectContent>
+   760→                    {PAYMENT_TERMS.map(pt => (
+   761→                      <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>
+   762→                    ))}
+   763→                  </SelectContent>
+   764→                </Select>
+   765→              </div>
+   766→              <div className="space-y-1.5">
+   767→                <Label>Rating</Label>
+   768→                <div className="flex items-center gap-1 mt-2">
+   769→                  {[1, 2, 3, 4, 5].map((star) => (
+   770→                    <button key={star} type="button" onClick={() => setEditForm({ ...editForm, rating: star })}>
+   771→                      <Star className={`h-6 w-6 ${star <= editForm.rating ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`} />
+   772→                    </button>
+   773→                  ))}
+   774→                </div>
+   775→              </div>
+   776→            </div>
+   777→          </div>
+   778→          <DialogFooter>
+   779→            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancel</Button>
+   780→            <Button onClick={handleEdit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
+   781→              {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Update Vendor
+   782→            </Button>
+   783→          </DialogFooter>
+   784→        </DialogContent>
+   785→      </Dialog>
+   786→
+   787→      {/* Vendor Detail Dialog */}
+   788→      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+   789→        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+   790→          <DialogHeader>
+   791→            <DialogTitle className="flex items-center gap-3">
+   792→              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold">
+   793→                {selectedVendor?.name.charAt(0)}
+   794→              </div>
+   795→              <div>
+   796→                <div>{selectedVendor?.name}</div>
+   797→                <div className="text-sm font-normal text-slate-500">{selectedVendor?.contactPerson || 'No contact person'}</div>
+   798→              </div>
+   799→            </DialogTitle>
+   800→          </DialogHeader>
+   801→          {selectedVendor && (
+   802→            <div className="space-y-4 py-4">
+   803→              {/* Status & Rating */}
+   804→              <div className="flex items-center gap-3">
+   805→                {getStatusBadge(selectedVendor.status)}
+   806→                {renderStars(selectedVendor.rating)}
+   807→              </div>
+   808→
+   809→              <Separator />
+   810→
+   811→              {/* Contact Info */}
+   812→              <div className="space-y-3">
+   813→                <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Contact Information</div>
+   814→                <div className="grid grid-cols-2 gap-3">
+   815→                  <div className="flex items-center gap-2">
+   816→                    <Phone className="h-4 w-4 text-slate-400" />
+   817→                    <div>
+   818→                      <div className="text-xs text-slate-400">Phone</div>
+   819→                      <div className="text-sm">{selectedVendor.phone}</div>
+   820→                    </div>
+   821→                  </div>
+   822→                  <div className="flex items-center gap-2">
+   823→                    <Mail className="h-4 w-4 text-slate-400" />
+   824→                    <div>
+   825→                      <div className="text-xs text-slate-400">Email</div>
+   826→                      <div className="text-sm">{selectedVendor.email || '-'}</div>
+   827→                    </div>
+   828→                  </div>
+   829→                </div>
+   830→              </div>
+   831→
+   832→              {/* Address */}
+   833→              {(selectedVendor.address || selectedVendor.city) && (
+   834→                <div className="space-y-2">
+   835→                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Address</div>
+   836→                  <div className="flex items-start gap-2">
+   837→                    <MapPin className="h-4 w-4 text-slate-400 mt-0.5" />
+   838→                    <div className="text-sm">
+   839→                      {selectedVendor.address && <div>{selectedVendor.address}</div>}
+   840→                      <div>{[selectedVendor.city, selectedVendor.state, selectedVendor.pincode].filter(Boolean).join(', ')}</div>
+   841→                    </div>
+   842→                  </div>
+   843→                </div>
+   844→              )}
+   845→
+   846→              <Separator />
+   847→
+   848→              {/* Tax & Banking */}
+   849→              <div className="grid grid-cols-2 gap-4">
+   850→                <div className="space-y-2">
+   851→                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Tax Information</div>
+   852→                  <div className="space-y-1.5">
+   853→                    <div className="flex justify-between text-sm">
+   854→                      <span className="text-slate-500">GST Number</span>
+   855→                      <span className="font-mono text-xs">{selectedVendor.gstNumber || '-'}</span>
+   856→                    </div>
+   857→                    <div className="flex justify-between text-sm">
+   858→                      <span className="text-slate-500">PAN Number</span>
+   859→                      <span className="font-mono text-xs">{selectedVendor.panNumber || '-'}</span>
+   860→                    </div>
+   861→                  </div>
+   862→                </div>
+   863→                <div className="space-y-2">
+   864→                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Bank Details</div>
+   865→                  <div className="space-y-1.5">
+   866→                    <div className="flex justify-between text-sm">
+   867→                      <span className="text-slate-500">Bank</span>
+   868→                      <span>{selectedVendor.bankName || '-'}</span>
+   869→                    </div>
+   870→                    <div className="flex justify-between text-sm">
+   871→                      <span className="text-slate-500">Account</span>
+   872→                      <span className="font-mono text-xs">{selectedVendor.bankAccount || '-'}</span>
+   873→                    </div>
+   874→                    <div className="flex justify-between text-sm">
+   875→                      <span className="text-slate-500">IFSC</span>
+   876→                      <span className="font-mono text-xs">{selectedVendor.ifscCode || '-'}</span>
+   877→                    </div>
+   878→                  </div>
+   879→                </div>
+   880→              </div>
+   881→
+   882→              <Separator />
+   883→
+   884→              {/* Payment & History */}
+   885→              <div className="grid grid-cols-2 gap-4">
+   886→                <div className="space-y-2">
+   887→                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Payment Terms</div>
+   888→                  <div className="text-sm">{selectedVendor.paymentTerms || '-'}</div>
+   889→                </div>
+   890→                <div className="space-y-2">
+   891→                  <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">Purchase History</div>
+   892→                  <div className="flex gap-4">
+   893→                    <div className="text-center">
+   894→                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{selectedVendor._count.purchaseOrders}</div>
+   895→                      <div className="text-xs text-slate-500">Orders</div>
+   896→                    </div>
+   897→                    <div className="text-center">
+   898→                      <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">{selectedVendor._count.quotations}</div>
+   899→                      <div className="text-xs text-slate-500">Quotations</div>
+   900→                    </div>
+   901→                  </div>
+   902→                </div>
+   903→              </div>
+   904→            </div>
+   905→          )}
+   906→          <DialogFooter>
+   907→            <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>Close</Button>
+   908→            <Button onClick={() => { setDetailDialogOpen(false); if (selectedVendor) openEdit(selectedVendor) }} className="bg-emerald-600 hover:bg-emerald-700">
+   909→              <Edit className="h-4 w-4 mr-2" /> Edit Vendor
+   910→            </Button>
+   911→          </DialogFooter>
+   912→        </DialogContent>
+   913→      </Dialog>
+   914→    </div>
+   915→  )
+   916→}
+   917→

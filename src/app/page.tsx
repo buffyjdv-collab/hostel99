@@ -22,6 +22,8 @@ import { KitchenPage } from '@/components/modules/kitchen'
 import { MessPage } from '@/components/modules/mess'
 import { AssetsPage } from '@/components/modules/assets'
 import { LoginPage } from '@/components/modules/login'
+import { UsersPage } from '@/components/modules/users'
+import { MyProfilePage } from '@/components/modules/my-profile'
 import { useRef, useEffect } from 'react'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -73,6 +75,8 @@ export default function Home() {
       case 'kitchen': return <KitchenPage />
       case 'mess': return <MessPage />
       case 'assets': return <AssetsPage />
+      case 'users': return <UsersPage />
+      case 'my-profile': return <MyProfilePage />
       default: return <DashboardPage />
     }
   }

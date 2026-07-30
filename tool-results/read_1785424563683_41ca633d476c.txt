@@ -1,0 +1,2002 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { ScrollArea } from '@/components/ui/scroll-area'
+    13→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    14→import { Separator } from '@/components/ui/separator'
+    15→import {
+    16→  Dialog,
+    17→  DialogContent,
+    18→  DialogDescription,
+    19→  DialogFooter,
+    20→  DialogHeader,
+    21→  DialogTitle,
+    22→} from '@/components/ui/dialog'
+    23→import {
+    24→  Select,
+    25→  SelectContent,
+    26→  SelectItem,
+    27→  SelectTrigger,
+    28→  SelectValue,
+    29→} from '@/components/ui/select'
+    30→import {
+    31→  Table,
+    32→  TableBody,
+    33→  TableCell,
+    34→  TableHead,
+    35→  TableHeader,
+    36→  TableRow,
+    37→} from '@/components/ui/table'
+    38→import {
+    39→  DropdownMenu,
+    40→  DropdownMenuContent,
+    41→  DropdownMenuItem,
+    42→  DropdownMenuTrigger,
+    43→} from '@/components/ui/dropdown-menu'
+    44→import {
+    45→  AlertDialog,
+    46→  AlertDialogAction,
+    47→  AlertDialogCancel,
+    48→  AlertDialogContent,
+    49→  AlertDialogDescription,
+    50→  AlertDialogFooter,
+    51→  AlertDialogHeader,
+    52→  AlertDialogTitle,
+    53→} from '@/components/ui/alert-dialog'
+    54→import { useToast } from '@/hooks/use-toast'
+    55→import {
+    56→  ShoppingCart,
+    57→  FileText,
+    58→  PackageCheck,
+    59→  Plus,
+    60→  Search,
+    61→  Eye,
+    62→  MoreVertical,
+    63→  Loader2,
+    64→  IndianRupee,
+    65→  Clock,
+    66→  CheckCircle2,
+    67→  Truck,
+    68→  ClipboardList,
+    69→  XCircle,
+    70→  AlertTriangle,
+    71→  Trash2,
+    72→  ChevronDown,
+    73→  ChevronUp,
+    74→  ArrowRight,
+    75→  Package,
+    76→} from 'lucide-react'
+    77→
+    78→// ── Types ────────────────────────────────────────────────────────────────────
+    79→
+    80→type POStatus = 'draft' | 'submitted' | 'approved' | 'partially_received' | 'received' | 'cancelled'
+    81→type PaymentStatus = 'unpaid' | 'partial' | 'paid'
+    82→type PRStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'cancelled' | 'converted'
+    83→type PRPriority = 'low' | 'normal' | 'high' | 'urgent'
+    84→type GRNStatus = 'pending_inspection' | 'accepted' | 'partially_accepted' | 'rejected'
+    85→
+    86→interface VendorInfo {
+    87→  id: string
+    88→  name: string
+    89→  phone?: string
+    90→}
+    91→
+    92→interface UserInfo {
+    93→  name: string
+    94→}
+    95→
+    96→interface InventoryItemInfo {
+    97→  name: string
+    98→  unit: string
+    99→}
+   100→
+   101→interface POItem {
+   102→  id: string
+   103→  itemName: string
+   104→  quantity: number
+   105→  unit: string
+   106→  unitPrice: number
+   107→  gstRate: number
+   108→  totalPrice: number
+   109→  receivedQty: number
+   110→  status: string
+   111→  item: InventoryItemInfo | null
+   112→}
+   113→
+   114→interface PurchaseOrder {
+   115→  id: string
+   116→  poNumber: string
+   117→  vendor: VendorInfo
+   118→  orderDate: string
+   119→  totalAmount: number
+   120→  gstAmount: number
+   121→  discount: number
+   122→  netAmount: number
+   123→  status: POStatus
+   124→  paymentStatus: PaymentStatus
+   125→  paymentMode: string | null
+   126→  createdBy: UserInfo
+   127→  items: POItem[]
+   128→  _count: { goodsReceivedNotes: number }
+   129→  expectedDelivery?: string | null
+   130→  notes?: string | null
+   131→}
+   132→
+   133→interface PRItem {
+   134→  id: string
+   135→  itemName: string
+   136→  description?: string | null
+   137→  quantity: number
+   138→  unit: string
+   139→  estimatedPrice?: number | null
+   140→  notes?: string | null
+   141→}
+   142→
+   143→interface PurchaseRequisition {
+   144→  id: string
+   145→  prNumber: string
+   146→  title: string
+   147→  description?: string | null
+   148→  requestedBy: UserInfo
+   149→  approvedBy: UserInfo | null
+   150→  status: PRStatus
+   151→  priority: PRPriority
+   152→  requiredBy?: string | null
+   153→  createdAt: string
+   154→  items: PRItem[]
+   155→  notes?: string | null
+   156→}
+   157→
+   158→interface GRNItem {
+   159→  id: string
+   160→  poItemId?: string | null
+   161→  itemName: string
+   162→  orderedQty: number
+   163→  receivedQty: number
+   164→  acceptedQty: number
+   165→  rejectedQty: number
+   166→  unitPrice: number
+   167→  batchNumber?: string | null
+   168→  notes?: string | null
+   169→}
+   170→
+   171→interface GoodsReceivedNote {
+   172→  id: string
+   173→  grnNumber: string
+   174→  purchaseOrderId: string
+   175→  purchaseOrder: { vendor: { name: string } }
+   176→  receivedBy: UserInfo
+   177→  receivedDate: string
+   178→  invoiceNumber?: string | null
+   179→  status: GRNStatus
+   180→  items: GRNItem[]
+   181→  notes?: string | null
+   182→}
+   183→
+   184→interface PurchaseStats {
+   185→  totalOrders: number
+   186→  pendingOrders: number
+   187→  totalValue: number
+   188→  receivedOrders: number
+   189→}
+   190→
+   191→interface VendorOption {
+   192→  id: string
+   193→  name: string
+   194→  phone?: string
+   195→}
+   196→
+   197→interface InventoryOption {
+   198→  id: string
+   199→  name: string
+   200→  unit: string
+   201→  unitPrice: number
+   202→}
+   203→
+   204→// ── PO Form Item ─────────────────────────────────────────────────────────────
+   205→
+   206→interface POFormItem {
+   207→  itemId: string
+   208→  itemName: string
+   209→  quantity: string
+   210→  unit: string
+   211→  unitPrice: string
+   212→  gstRate: string
+   213→  totalPrice: number
+   214→}
+   215→
+   216→interface PRFormItem {
+   217→  itemName: string
+   218→  description: string
+   219→  quantity: string
+   220→  unit: string
+   221→  estimatedPrice: string
+   222→}
+   223→
+   224→interface GRNFormItem {
+   225→  poItemId: string
+   226→  itemName: string
+   227→  orderedQty: number
+   228→  receivedQty: string
+   229→  acceptedQty: string
+   230→  rejectedQty: string
+   231→  unitPrice: number
+   232→  batchNumber: string
+   233→}
+   234→
+   235→// ── Constants ────────────────────────────────────────────────────────────────
+   236→
+   237→const PO_STATUS_CONFIG: Record<POStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   238→  draft: { label: 'Draft', bgClass: 'bg-gray-100 dark:bg-gray-800/50', textClass: 'text-gray-700 dark:text-gray-300', dotClass: 'bg-gray-500' },
+   239→  submitted: { label: 'Submitted', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500' },
+   240→  approved: { label: 'Approved', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', dotClass: 'bg-emerald-500' },
+   241→  partially_received: { label: 'Partially Received', bgClass: 'bg-teal-100 dark:bg-teal-950/50', textClass: 'text-teal-700 dark:text-teal-300', dotClass: 'bg-teal-500' },
+   242→  received: { label: 'Received', bgClass: 'bg-green-100 dark:bg-green-950/50', textClass: 'text-green-700 dark:text-green-300', dotClass: 'bg-green-500' },
+   243→  cancelled: { label: 'Cancelled', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', dotClass: 'bg-red-500' },
+   244→}
+   245→
+   246→const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string; bgClass: string; textClass: string }> = {
+   247→  unpaid: { label: 'Unpaid', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300' },
+   248→  partial: { label: 'Partial', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300' },
+   249→  paid: { label: 'Paid', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300' },
+   250→}
+   251→
+   252→const PR_STATUS_CONFIG: Record<PRStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   253→  draft: { label: 'Draft', bgClass: 'bg-gray-100 dark:bg-gray-800/50', textClass: 'text-gray-700 dark:text-gray-300', dotClass: 'bg-gray-500' },
+   254→  submitted: { label: 'Submitted', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500' },
+   255→  approved: { label: 'Approved', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', dotClass: 'bg-emerald-500' },
+   256→  rejected: { label: 'Rejected', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', dotClass: 'bg-red-500' },
+   257→  cancelled: { label: 'Cancelled', bgClass: 'bg-gray-100 dark:bg-gray-800/50', textClass: 'text-gray-500 dark:text-gray-400', dotClass: 'bg-gray-400' },
+   258→  converted: { label: 'Converted', bgClass: 'bg-teal-100 dark:bg-teal-950/50', textClass: 'text-teal-700 dark:text-teal-300', dotClass: 'bg-teal-500' },
+   259→}
+   260→
+   261→const PR_PRIORITY_CONFIG: Record<PRPriority, { label: string; bgClass: string; textClass: string }> = {
+   262→  low: { label: 'Low', bgClass: 'bg-gray-100 dark:bg-gray-800/50', textClass: 'text-gray-700 dark:text-gray-300' },
+   263→  normal: { label: 'Normal', bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300' },
+   264→  high: { label: 'High', bgClass: 'bg-orange-100 dark:bg-orange-950/50', textClass: 'text-orange-700 dark:text-orange-300' },
+   265→  urgent: { label: 'Urgent', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300' },
+   266→}
+   267→
+   268→const GRN_STATUS_CONFIG: Record<GRNStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   269→  pending_inspection: { label: 'Pending Inspection', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500' },
+   270→  accepted: { label: 'Accepted', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', dotClass: 'bg-emerald-500' },
+   271→  partially_accepted: { label: 'Partially Accepted', bgClass: 'bg-teal-100 dark:bg-teal-950/50', textClass: 'text-teal-700 dark:text-teal-300', dotClass: 'bg-teal-500' },
+   272→  rejected: { label: 'Rejected', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', dotClass: 'bg-red-500' },
+   273→}
+   274→
+   275→const UNITS = ['kg', 'g', 'ltr', 'ml', 'pcs', 'box', 'pack', 'dozen', 'm', 'cm', 'sqft', 'set', 'roll', 'bag', 'unit']
+   276→
+   277→const EMPTY_PO_ITEM: POFormItem = {
+   278→  itemId: '',
+   279→  itemName: '',
+   280→  quantity: '',
+   281→  unit: 'pcs',
+   282→  unitPrice: '',
+   283→  gstRate: '0',
+   284→  totalPrice: 0,
+   285→}
+   286→
+   287→const EMPTY_PR_ITEM: PRFormItem = {
+   288→  itemName: '',
+   289→  description: '',
+   290→  quantity: '',
+   291→  unit: 'pcs',
+   292→  estimatedPrice: '',
+   293→}
+   294→
+   295→// ── Helpers ──────────────────────────────────────────────────────────────────
+   296→
+   297→function formatCurrency(amount: number): string {
+   298→  return new Intl.NumberFormat('en-IN', {
+   299→    style: 'currency',
+   300→    currency: 'INR',
+   301→    minimumFractionDigits: 0,
+   302→    maximumFractionDigits: 0,
+   303→  }).format(amount)
+   304→}
+   305→
+   306→function formatDate(dateStr: string | null | undefined): string {
+   307→  if (!dateStr) return '—'
+   308→  const d = new Date(dateStr)
+   309→  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   310→}
+   311→
+   312→// ── Status Badge Component ───────────────────────────────────────────────────
+   313→
+   314→function StatusBadge({ config }: { config: { label: string; bgClass: string; textClass: string; dotClass?: string } }) {
+   315→  return (
+   316→    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bgClass} ${config.textClass}`}>
+   317→      {config.dotClass && <span className={`w-1.5 h-1.5 rounded-full ${config.dotClass}`} />}
+   318→      {config.label}
+   319→    </span>
+   320→  )
+   321→}
+   322→
+   323→// ── Main Component ───────────────────────────────────────────────────────────
+   324→
+   325→export function PurchasesPage() {
+   326→  const { selectedPropertyId, currentUser } = useAppStore()
+   327→  const { toast } = useToast()
+   328→
+   329→  // ── Tab state ──────────────────────────────────────────────────────────────
+   330→  const [activeTab, setActiveTab] = useState('orders')
+   331→
+   332→  // ── Data state ─────────────────────────────────────────────────────────────
+   333→  const [orders, setOrders] = useState<PurchaseOrder[]>([])
+   334→  const [requisitions, setRequisitions] = useState<PurchaseRequisition[]>([])
+   335→  const [grns, setGrns] = useState<GoodsReceivedNote[]>([])
+   336→  const [stats, setStats] = useState<PurchaseStats>({ totalOrders: 0, pendingOrders: 0, totalValue: 0, receivedOrders: 0 })
+   337→  const [loading, setLoading] = useState(true)
+   338→  const [actionLoading, setActionLoading] = useState(false)
+   339→
+   340→  // ── Search state ───────────────────────────────────────────────────────────
+   341→  const [orderSearch, setOrderSearch] = useState('')
+   342→  const [prSearch, setPrSearch] = useState('')
+   343→  const [grnSearch, setGrnSearch] = useState('')
+   344→
+   345→  // ── Dialog state ───────────────────────────────────────────────────────────
+   346→  const [showCreatePO, setShowCreatePO] = useState(false)
+   347→  const [showPODetail, setShowPODetail] = useState(false)
+   348→  const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null)
+   349→
+   350→  const [showCreatePR, setShowCreatePR] = useState(false)
+   351→  const [selectedPR, setSelectedPR] = useState<PurchaseRequisition | null>(null)
+   352→  const [showPRDetail, setShowPRDetail] = useState(false)
+   353→  const [showRejectPR, setShowRejectPR] = useState(false)
+   354→
+   355→  const [showCreateGRN, setShowCreateGRN] = useState(false)
+   356→  const [showGRNDetail, setShowGRNDetail] = useState(false)
+   357→  const [selectedGRN, setSelectedGRN] = useState<GoodsReceivedNote | null>(null)
+   358→
+   359→  // ── PO Form state ──────────────────────────────────────────────────────────
+   360→  const [poVendorId, setPoVendorId] = useState('')
+   361→  const [poItems, setPoItems] = useState<POFormItem[]>([{ ...EMPTY_PO_ITEM }])
+   362→  const [poExpectedDelivery, setPoExpectedDelivery] = useState('')
+   363→  const [poNotes, setPoNotes] = useState('')
+   364→  const [poDiscount, setPoDiscount] = useState('')
+   365→
+   366→  // ── PR Form state ──────────────────────────────────────────────────────────
+   367→  const [prTitle, setPrTitle] = useState('')
+   368→  const [prDescription, setPrDescription] = useState('')
+   369→  const [prPriority, setPrPriority] = useState<PRPriority>('normal')
+   370→  const [prItems, setPrItems] = useState<PRFormItem[]>([{ ...EMPTY_PR_ITEM }])
+   371→  const [prRequiredBy, setPrRequiredBy] = useState('')
+   372→  const [prNotes, setPrNotes] = useState('')
+   373→
+   374→  // ── GRN Form state ─────────────────────────────────────────────────────────
+   375→  const [grnPurchaseOrderId, setGrnPurchaseOrderId] = useState('')
+   376→  const [grnInvoiceNumber, setGrnInvoiceNumber] = useState('')
+   377→  const [grnItems, setGrnItems] = useState<GRNFormItem[]>([])
+   378→  const [grnNotes, setGrnNotes] = useState('')
+   379→
+   380→  // ── Vendor/Inventory options ───────────────────────────────────────────────
+   381→  const [vendors, setVendors] = useState<VendorOption[]>([])
+   382→  const [inventoryItems, setInventoryItems] = useState<InventoryOption[]>([])
+   383→
+   384→  // ── Fetch data ─────────────────────────────────────────────────────────────
+   385→
+   386→  const fetchOrders = useCallback(async () => {
+   387→    try {
+   388→      const params = new URLSearchParams({ type: 'orders' })
+   389→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   390→      const res = await fetch(`/api/purchases?${params}`)
+   391→      if (res.ok) {
+   392→        const data = await res.json()
+   393→        setOrders(data.orders || [])
+   394→        setStats(data.stats || { totalOrders: 0, pendingOrders: 0, totalValue: 0, receivedOrders: 0 })
+   395→      }
+   396→    } catch (err) {
+   397→      console.error('Failed to fetch orders:', err)
+   398→    }
+   399→  }, [selectedPropertyId])
+   400→
+   401→  const fetchRequisitions = useCallback(async () => {
+   402→    try {
+   403→      const params = new URLSearchParams({ type: 'requisitions' })
+   404→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   405→      const res = await fetch(`/api/purchases?${params}`)
+   406→      if (res.ok) {
+   407→        const data = await res.json()
+   408→        setRequisitions(data.requisitions || [])
+   409→      }
+   410→    } catch (err) {
+   411→      console.error('Failed to fetch requisitions:', err)
+   412→    }
+   413→  }, [selectedPropertyId])
+   414→
+   415→  const fetchGrns = useCallback(async () => {
+   416→    try {
+   417→      const params = new URLSearchParams({ type: 'grns' })
+   418→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   419→      const res = await fetch(`/api/purchases?${params}`)
+   420→      if (res.ok) {
+   421→        const data = await res.json()
+   422→        setGrns(data.grns || [])
+   423→      }
+   424→    } catch (err) {
+   425→      console.error('Failed to fetch GRNs:', err)
+   426→    }
+   427→  }, [selectedPropertyId])
+   428→
+   429→  const fetchVendors = useCallback(async () => {
+   430→    try {
+   431→      const params = new URLSearchParams()
+   432→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   433→      const res = await fetch(`/api/vendors?${params}`)
+   434→      if (res.ok) {
+   435→        const data = await res.json()
+   436→        setVendors((data.vendors || []).map((v: any) => ({ id: v.id, name: v.name, phone: v.phone })))
+   437→      }
+   438→    } catch (err) {
+   439→      console.error('Failed to fetch vendors:', err)
+   440→    }
+   441→  }, [selectedPropertyId])
+   442→
+   443→  const fetchInventory = useCallback(async () => {
+   444→    try {
+   445→      const params = new URLSearchParams()
+   446→      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+   447→      const res = await fetch(`/api/inventory?${params}`)
+   448→      if (res.ok) {
+   449→        const data = await res.json()
+   450→        setInventoryItems((data.items || []).map((i: any) => ({ id: i.id, name: i.name, unit: i.unit, unitPrice: i.unitPrice })))
+   451→      }
+   452→    } catch (err) {
+   453→      console.error('Failed to fetch inventory:', err)
+   454→    }
+   455→  }, [selectedPropertyId])
+   456→
+   457→  // ── Initial load ───────────────────────────────────────────────────────────
+   458→
+   459→  useEffect(() => {
+   460→    const loadAll = async () => {
+   461→      setLoading(true)
+   462→      await Promise.all([fetchOrders(), fetchRequisitions(), fetchGrns(), fetchVendors(), fetchInventory()])
+   463→      setLoading(false)
+   464→    }
+   465→    loadAll()
+   466→  }, [fetchOrders, fetchRequisitions, fetchGrns, fetchVendors, fetchInventory])
+   467→
+   468→  // ── Filtered data ──────────────────────────────────────────────────────────
+   469→
+   470→  const filteredOrders = useMemo(() => {
+   471→    if (!orderSearch.trim()) return orders
+   472→    const q = orderSearch.toLowerCase()
+   473→    return orders.filter(o =>
+   474→      o.poNumber.toLowerCase().includes(q) ||
+   475→      o.vendor.name.toLowerCase().includes(q) ||
+   476→      o.status.toLowerCase().includes(q)
+   477→    )
+   478→  }, [orders, orderSearch])
+   479→
+   480→  const filteredRequisitions = useMemo(() => {
+   481→    if (!prSearch.trim()) return requisitions
+   482→    const q = prSearch.toLowerCase()
+   483→    return requisitions.filter(r =>
+   484→      r.prNumber.toLowerCase().includes(q) ||
+   485→      r.title.toLowerCase().includes(q) ||
+   486→      r.requestedBy.name.toLowerCase().includes(q)
+   487→    )
+   488→  }, [requisitions, prSearch])
+   489→
+   490→  const filteredGrns = useMemo(() => {
+   491→    if (!grnSearch.trim()) return grns
+   492→    const q = grnSearch.toLowerCase()
+   493→    return grns.filter(g =>
+   494→      g.grnNumber.toLowerCase().includes(q) ||
+   495→      g.purchaseOrder.vendor.name.toLowerCase().includes(q) ||
+   496→      (g.invoiceNumber && g.invoiceNumber.toLowerCase().includes(q))
+   497→    )
+   498→  }, [grns, grnSearch])
+   499→
+   500→  // ── PO Form helpers ────────────────────────────────────────────────────────
+   501→
+   502→  const poSubtotal = useMemo(() => poItems.reduce((s, i) => s + i.totalPrice, 0), [poItems])
+   503→  const poGstTotal = useMemo(() => poItems.reduce((s, i) => s + (i.totalPrice * (parseFloat(i.gstRate) || 0) / 100), 0), [poItems])
+   504→  const poNetTotal = useMemo(() => poSubtotal + poGstTotal - (parseFloat(poDiscount) || 0), [poSubtotal, poGstTotal, poDiscount])
+   505→
+   506→  const updatePOItem = (index: number, field: keyof POFormItem, value: string | number) => {
+   507→    setPoItems(prev => {
+   508→      const updated = [...prev]
+   509→      updated[index] = { ...updated[index], [field]: value }
+   510→      if (field === 'quantity' || field === 'unitPrice') {
+   511→        const qty = parseFloat(updated[index].quantity) || 0
+   512→        const price = parseFloat(updated[index].unitPrice) || 0
+   513→        updated[index].totalPrice = qty * price
+   514→      }
+   515→      return updated
+   516→    })
+   517→  }
+   518→
+   519→  const addPOItem = () => setPoItems(prev => [...prev, { ...EMPTY_PO_ITEM }])
+   520→
+   521→  const removePOItem = (index: number) => {
+   522→    if (poItems.length <= 1) return
+   523→    setPoItems(prev => prev.filter((_, i) => i !== index))
+   524→  }
+   525→
+   526→  const handlePOItemSelect = (index: number, itemId: string) => {
+   527→    const invItem = inventoryItems.find(i => i.id === itemId)
+   528→    if (invItem) {
+   529→      setPoItems(prev => {
+   530→        const updated = [...prev]
+   531→        updated[index] = {
+   532→          ...updated[index],
+   533→          itemId: invItem.id,
+   534→          itemName: invItem.name,
+   535→          unit: invItem.unit,
+   536→          unitPrice: String(invItem.unitPrice),
+   537→          totalPrice: (parseFloat(updated[index].quantity) || 0) * invItem.unitPrice,
+   538→        }
+   539→        return updated
+   540→      })
+   541→    }
+   542→  }
+   543→
+   544→  // ── PR Form helpers ────────────────────────────────────────────────────────
+   545→
+   546→  const updatePRItem = (index: number, field: keyof PRFormItem, value: string) => {
+   547→    setPrItems(prev => {
+   548→      const updated = [...prev]
+   549→      updated[index] = { ...updated[index], [field]: value }
+   550→      return updated
+   551→    })
+   552→  }
+   553→
+   554→  const addPRItem = () => setPrItems(prev => [...prev, { ...EMPTY_PR_ITEM }])
+   555→
+   556→  const removePRItem = (index: number) => {
+   557→    if (prItems.length <= 1) return
+   558→    setPrItems(prev => prev.filter((_, i) => i !== index))
+   559→  }
+   560→
+   561→  // ── GRN Form helpers ───────────────────────────────────────────────────────
+   562→
+   563→  const approvedOrders = useMemo(() => orders.filter(o => ['approved', 'partially_received'].includes(o.status)), [orders])
+   564→
+   565→  const selectedPOForGRN = useMemo(() => {
+   566→    if (!grnPurchaseOrderId) return null
+   567→    return orders.find(o => o.id === grnPurchaseOrderId) || null
+   568→  }, [grnPurchaseOrderId, orders])
+   569→
+   570→  const handleGRNPOSelect = (poId: string) => {
+   571→    setGrnPurchaseOrderId(poId)
+   572→    const po = orders.find(o => o.id === poId)
+   573→    if (po) {
+   574→      setGrnItems(po.items.map(item => ({
+   575→        poItemId: item.id,
+   576→        itemName: item.itemName,
+   577→        orderedQty: item.quantity,
+   578→        receivedQty: '',
+   579→        acceptedQty: '',
+   580→        rejectedQty: '',
+   581→        unitPrice: item.unitPrice,
+   582→        batchNumber: '',
+   583→      })))
+   584→    } else {
+   585→      setGrnItems([])
+   586→    }
+   587→  }
+   588→
+   589→  const updateGRNItem = (index: number, field: keyof GRNFormItem, value: string | number) => {
+   590→    setGrnItems(prev => {
+   591→      const updated = [...prev]
+   592→      updated[index] = { ...updated[index], [field]: value }
+   593→      return updated
+   594→    })
+   595→  }
+   596→
+   597→  // ── Create PO ──────────────────────────────────────────────────────────────
+   598→
+   599→  const handleCreatePO = async () => {
+   600→    if (!poVendorId) {
+   601→      toast({ title: 'Validation Error', description: 'Please select a vendor', variant: 'destructive' })
+   602→      return
+   603→    }
+   604→    const validItems = poItems.filter(i => i.itemName && parseFloat(i.quantity) > 0 && parseFloat(i.unitPrice) > 0)
+   605→    if (validItems.length === 0) {
+   606→      toast({ title: 'Validation Error', description: 'Please add at least one valid item', variant: 'destructive' })
+   607→      return
+   608→    }
+   609→    setActionLoading(true)
+   610→    try {
+   611→      const res = await fetch('/api/purchases', {
+   612→        method: 'POST',
+   613→        headers: { 'Content-Type': 'application/json' },
+   614→        body: JSON.stringify({
+   615→          type: 'order',
+   616→          vendorId: poVendorId,
+   617→          propertyId: selectedPropertyId,
+   618→          userId: currentUser?.id,
+   619→          items: validItems.map(i => ({
+   620→            itemId: i.itemId || null,
+   621→            itemName: i.itemName,
+   622→            quantity: parseFloat(i.quantity),
+   623→            unit: i.unit,
+   624→            unitPrice: parseFloat(i.unitPrice),
+   625→            gstRate: parseFloat(i.gstRate) || 0,
+   626→            totalPrice: i.totalPrice,
+   627→          })),
+   628→          discount: parseFloat(poDiscount) || 0,
+   629→          expectedDelivery: poExpectedDelivery || null,
+   630→          notes: poNotes,
+   631→        }),
+   632→      })
+   633→      if (res.ok) {
+   634→        toast({ title: 'Success', description: 'Purchase order created successfully' })
+   635→        resetPOForm()
+   636→        setShowCreatePO(false)
+   637→        fetchOrders()
+   638→      } else {
+   639→        const data = await res.json()
+   640→        toast({ title: 'Error', description: data.error || 'Failed to create PO', variant: 'destructive' })
+   641→      }
+   642→    } catch (err) {
+   643→      toast({ title: 'Error', description: 'Failed to create purchase order', variant: 'destructive' })
+   644→    } finally {
+   645→      setActionLoading(false)
+   646→    }
+   647→  }
+   648→
+   649→  const resetPOForm = () => {
+   650→    setPoVendorId('')
+   651→    setPoItems([{ ...EMPTY_PO_ITEM }])
+   652→    setPoExpectedDelivery('')
+   653→    setPoNotes('')
+   654→    setPoDiscount('')
+   655→  }
+   656→
+   657→  // ── Create Requisition ─────────────────────────────────────────────────────
+   658→
+   659→  const handleCreatePR = async () => {
+   660→    if (!prTitle.trim()) {
+   661→      toast({ title: 'Validation Error', description: 'Please enter a title', variant: 'destructive' })
+   662→      return
+   663→    }
+   664→    const validItems = prItems.filter(i => i.itemName && parseFloat(i.quantity) > 0)
+   665→    if (validItems.length === 0) {
+   666→      toast({ title: 'Validation Error', description: 'Please add at least one item', variant: 'destructive' })
+   667→      return
+   668→    }
+   669→    setActionLoading(true)
+   670→    try {
+   671→      const res = await fetch('/api/purchases', {
+   672→        method: 'POST',
+   673→        headers: { 'Content-Type': 'application/json' },
+   674→        body: JSON.stringify({
+   675→          type: 'requisition',
+   676→          title: prTitle,
+   677→          description: prDescription,
+   678→          propertyId: selectedPropertyId,
+   679→          userId: currentUser?.id,
+   680→          priority: prPriority,
+   681→          requiredBy: prRequiredBy || null,
+   682→          notes: prNotes,
+   683→          items: validItems.map(i => ({
+   684→            itemName: i.itemName,
+   685→            description: i.description,
+   686→            quantity: parseFloat(i.quantity),
+   687→            unit: i.unit,
+   688→            estimatedPrice: parseFloat(i.estimatedPrice) || null,
+   689→          })),
+   690→        }),
+   691→      })
+   692→      if (res.ok) {
+   693→        toast({ title: 'Success', description: 'Requisition created successfully' })
+   694→        resetPRForm()
+   695→        setShowCreatePR(false)
+   696→        fetchRequisitions()
+   697→      } else {
+   698→        const data = await res.json()
+   699→        toast({ title: 'Error', description: data.error || 'Failed to create requisition', variant: 'destructive' })
+   700→      }
+   701→    } catch (err) {
+   702→      toast({ title: 'Error', description: 'Failed to create requisition', variant: 'destructive' })
+   703→    } finally {
+   704→      setActionLoading(false)
+   705→    }
+   706→  }
+   707→
+   708→  const resetPRForm = () => {
+   709→    setPrTitle('')
+   710→    setPrDescription('')
+   711→    setPrPriority('normal')
+   712→    setPrItems([{ ...EMPTY_PR_ITEM }])
+   713→    setPrRequiredBy('')
+   714→    setPrNotes('')
+   715→  }
+   716→
+   717→  // ── Create GRN ─────────────────────────────────────────────────────────────
+   718→
+   719→  const handleCreateGRN = async () => {
+   720→    if (!grnPurchaseOrderId) {
+   721→      toast({ title: 'Validation Error', description: 'Please select a purchase order', variant: 'destructive' })
+   722→      return
+   723→    }
+   724→    const validItems = grnItems.filter(i => parseFloat(i.receivedQty) > 0)
+   725→    if (validItems.length === 0) {
+   726→      toast({ title: 'Validation Error', description: 'Please enter received quantities', variant: 'destructive' })
+   727→      return
+   728→    }
+   729→    setActionLoading(true)
+   730→    try {
+   731→      const res = await fetch('/api/purchases', {
+   732→        method: 'POST',
+   733→        headers: { 'Content-Type': 'application/json' },
+   734→        body: JSON.stringify({
+   735→          type: 'grn',
+   736→          purchaseOrderId: grnPurchaseOrderId,
+   737→          propertyId: selectedPropertyId,
+   738→          userId: currentUser?.id,
+   739→          invoiceNumber: grnInvoiceNumber || null,
+   740→          notes: grnNotes,
+   741→          items: validItems.map(i => ({
+   742→            poItemId: i.poItemId,
+   743→            itemName: i.itemName,
+   744→            orderedQty: i.orderedQty,
+   745→            receivedQty: parseFloat(i.receivedQty),
+   746→            acceptedQty: parseFloat(i.acceptedQty) || parseFloat(i.receivedQty),
+   747→            rejectedQty: parseFloat(i.rejectedQty) || 0,
+   748→            unitPrice: i.unitPrice,
+   749→            batchNumber: i.batchNumber || null,
+   750→          })),
+   751→        }),
+   752→      })
+   753→      if (res.ok) {
+   754→        toast({ title: 'Success', description: 'Goods Received Note created successfully' })
+   755→        resetGRNForm()
+   756→        setShowCreateGRN(false)
+   757→        fetchGrns()
+   758→        fetchOrders()
+   759→      } else {
+   760→        const data = await res.json()
+   761→        toast({ title: 'Error', description: data.error || 'Failed to create GRN', variant: 'destructive' })
+   762→      }
+   763→    } catch (err) {
+   764→      toast({ title: 'Error', description: 'Failed to create GRN', variant: 'destructive' })
+   765→    } finally {
+   766→      setActionLoading(false)
+   767→    }
+   768→  }
+   769→
+   770→  const resetGRNForm = () => {
+   771→    setGrnPurchaseOrderId('')
+   772→    setGrnInvoiceNumber('')
+   773→    setGrnItems([])
+   774→    setGrnNotes('')
+   775→  }
+   776→
+   777→  // ── Update PO Status ───────────────────────────────────────────────────────
+   778→
+   779→  const updatePOStatus = async (poId: string, status: POStatus, extra?: Record<string, any>) => {
+   780→    setActionLoading(true)
+   781→    try {
+   782→      const res = await fetch('/api/purchases', {
+   783→        method: 'PATCH',
+   784→        headers: { 'Content-Type': 'application/json' },
+   785→        body: JSON.stringify({
+   786→          id: poId,
+   787→          status,
+   788→          approvedById: status === 'approved' ? currentUser?.id : undefined,
+   789→          ...extra,
+   790→        }),
+   791→      })
+   792→      if (res.ok) {
+   793→        toast({ title: 'Success', description: `PO status updated to ${PO_STATUS_CONFIG[status].label}` })
+   794→        fetchOrders()
+   795→      } else {
+   796→        toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   797→      }
+   798→    } catch (err) {
+   799→      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   800→    } finally {
+   801→      setActionLoading(false)
+   802→    }
+   803→  }
+   804→
+   805→  // ── Update PR Status ───────────────────────────────────────────────────────
+   806→
+   807→  const updatePRStatus = async (prId: string, status: PRStatus) => {
+   808→    setActionLoading(true)
+   809→    try {
+   810→      const res = await fetch('/api/purchases', {
+   811→        method: 'PATCH',
+   812→        headers: { 'Content-Type': 'application/json' },
+   813→        body: JSON.stringify({
+   814→          type: 'requisition',
+   815→          id: prId,
+   816→          status,
+   817→          approvedById: status === 'approved' ? currentUser?.id : undefined,
+   818→        }),
+   819→      })
+   820→      if (res.ok) {
+   821→        toast({ title: 'Success', description: `Requisition ${status === 'approved' ? 'approved' : 'rejected'}` })
+   822→        fetchRequisitions()
+   823→      } else {
+   824→        toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   825→      }
+   826→    } catch (err) {
+   827→      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   828→    } finally {
+   829→      setActionLoading(false)
+   830→    }
+   831→  }
+   832→
+   833→  // ── Update GRN Status ──────────────────────────────────────────────────────
+   834→
+   835→  const updateGRNStatus = async (grnId: string, status: GRNStatus) => {
+   836→    setActionLoading(true)
+   837→    try {
+   838→      const res = await fetch('/api/purchases', {
+   839→        method: 'PATCH',
+   840→        headers: { 'Content-Type': 'application/json' },
+   841→        body: JSON.stringify({
+   842→          type: 'grn',
+   843→          id: grnId,
+   844→          status,
+   845→        }),
+   846→      })
+   847→      if (res.ok) {
+   848→        toast({ title: 'Success', description: `GRN status updated to ${GRN_STATUS_CONFIG[status].label}` })
+   849→        fetchGrns()
+   850→        fetchOrders()
+   851→      } else {
+   852→        toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   853→      }
+   854→    } catch (err) {
+   855→      toast({ title: 'Error', description: 'Failed to update status', variant: 'destructive' })
+   856→    } finally {
+   857→      setActionLoading(false)
+   858→    }
+   859→  }
+   860→
+   861→  // ── View PO Detail ─────────────────────────────────────────────────────────
+   862→
+   863→  const openPODetail = (order: PurchaseOrder) => {
+   864→    setSelectedPO(order)
+   865→    setShowPODetail(true)
+   866→  }
+   867→
+   868→  // ── View PR Detail ─────────────────────────────────────────────────────────
+   869→
+   870→  const openPRDetail = (pr: PurchaseRequisition) => {
+   871→    setSelectedPR(pr)
+   872→    setShowPRDetail(true)
+   873→  }
+   874→
+   875→  // ── View GRN Detail ────────────────────────────────────────────────────────
+   876→
+   877→  const openGRNDetail = (grn: GoodsReceivedNote) => {
+   878→    setSelectedGRN(grn)
+   879→    setShowGRNDetail(true)
+   880→  }
+   881→
+   882→  // ── Render ─────────────────────────────────────────────────────────────────
+   883→
+   884→  if (loading) {
+   885→    return (
+   886→      <div className="space-y-6">
+   887→        <div className="flex items-center justify-between">
+   888→          <Skeleton className="h-8 w-48" />
+   889→          <Skeleton className="h-10 w-32" />
+   890→        </div>
+   891→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   892→          {[...Array(4)].map((_, i) => (
+   893→            <Skeleton key={i} className="h-28" />
+   894→          ))}
+   895→        </div>
+   896→        <Skeleton className="h-96" />
+   897→      </div>
+   898→    )
+   899→  }
+   900→
+   901→  return (
+   902→    <div className="space-y-6">
+   903→      {/* Header */}
+   904→      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   905→        <div>
+   906→          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Purchase Management</h1>
+   907→          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Manage purchase orders, requisitions & goods received</p>
+   908→        </div>
+   909→        <div className="flex gap-2">
+   910→          {activeTab === 'orders' && (
+   911→            <Button onClick={() => { resetPOForm(); setShowCreatePO(true) }} className="gap-2">
+   912→              <Plus className="h-4 w-4" /> New PO
+   913→            </Button>
+   914→          )}
+   915→          {activeTab === 'requisitions' && (
+   916→            <Button onClick={() => { resetPRForm(); setShowCreatePR(true) }} className="gap-2">
+   917→              <Plus className="h-4 w-4" /> New Requisition
+   918→            </Button>
+   919→          )}
+   920→          {activeTab === 'grns' && (
+   921→            <Button onClick={() => { resetGRNForm(); setShowCreateGRN(true) }} className="gap-2">
+   922→              <Plus className="h-4 w-4" /> New GRN
+   923→            </Button>
+   924→          )}
+   925→        </div>
+   926→      </div>
+   927→
+   928→      {/* Stats Cards */}
+   929→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   930→        <Card>
+   931→          <CardContent className="p-4">
+   932→            <div className="flex items-center justify-between">
+   933→              <div>
+   934→                <p className="text-sm text-slate-500 dark:text-slate-400">Total Orders</p>
+   935→                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{stats.totalOrders}</p>
+   936→              </div>
+   937→              <div className="h-10 w-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+   938→                <ShoppingCart className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+   939→              </div>
+   940→            </div>
+   941→          </CardContent>
+   942→        </Card>
+   943→        <Card>
+   944→          <CardContent className="p-4">
+   945→            <div className="flex items-center justify-between">
+   946→              <div>
+   947→                <p className="text-sm text-slate-500 dark:text-slate-400">Pending Orders</p>
+   948→                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{stats.pendingOrders}</p>
+   949→              </div>
+   950→              <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
+   951→                <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+   952→              </div>
+   953→            </div>
+   954→          </CardContent>
+   955→        </Card>
+   956→        <Card>
+   957→          <CardContent className="p-4">
+   958→            <div className="flex items-center justify-between">
+   959→              <div>
+   960→                <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
+   961→                <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">{formatCurrency(stats.totalValue)}</p>
+   962→              </div>
+   963→              <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+   964→                <IndianRupee className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+   965→              </div>
+   966→            </div>
+   967→          </CardContent>
+   968→        </Card>
+   969→        <Card>
+   970→          <CardContent className="p-4">
+   971→            <div className="flex items-center justify-between">
+   972→              <div>
+   973→                <p className="text-sm text-slate-500 dark:text-slate-400">Received Orders</p>
+   974→                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{stats.receivedOrders}</p>
+   975→              </div>
+   976→              <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-950/50 flex items-center justify-center">
+   977→                <PackageCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
+   978→              </div>
+   979→            </div>
+   980→          </CardContent>
+   981→        </Card>
+   982→      </div>
+   983→
+   984→      {/* Tabs */}
+   985→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   986→        <TabsList className="grid w-full grid-cols-3 max-w-lg">
+   987→          <TabsTrigger value="orders" className="gap-2">
+   988→            <ShoppingCart className="h-4 w-4 hidden sm:block" /> Purchase Orders
+   989→          </TabsTrigger>
+   990→          <TabsTrigger value="requisitions" className="gap-2">
+   991→            <ClipboardList className="h-4 w-4 hidden sm:block" /> Requisitions
+   992→          </TabsTrigger>
+   993→          <TabsTrigger value="grns" className="gap-2">
+   994→            <PackageCheck className="h-4 w-4 hidden sm:block" /> GRN
+   995→          </TabsTrigger>
+   996→        </TabsList>
+   997→
+   998→        {/* ═══════════════════════════════════════════════════════════════════════
+   999→            PURCHASE ORDERS TAB
+  1000→        ═══════════════════════════════════════════════════════════════════════ */}
+  1001→        <TabsContent value="orders" className="space-y-4">
+  1002→          {/* Search */}
+  1003→          <div className="flex items-center gap-3">
+  1004→            <div className="relative flex-1 max-w-sm">
+  1005→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1006→              <Input
+  1007→                placeholder="Search orders..."
+  1008→                value={orderSearch}
+  1009→                onChange={e => setOrderSearch(e.target.value)}
+  1010→                className="pl-9"
+  1011→              />
+  1012→            </div>
+  1013→          </div>
+  1014→
+  1015→          {/* Orders Table */}
+  1016→          <Card>
+  1017→            <CardContent className="p-0">
+  1018→              <div className="overflow-x-auto">
+  1019→                <Table>
+  1020→                  <TableHeader>
+  1021→                    <TableRow>
+  1022→                      <TableHead>PO Number</TableHead>
+  1023→                      <TableHead>Vendor</TableHead>
+  1024→                      <TableHead>Date</TableHead>
+  1025→                      <TableHead className="text-center">Items</TableHead>
+  1026→                      <TableHead className="text-right">Total</TableHead>
+  1027→                      <TableHead>Status</TableHead>
+  1028→                      <TableHead>Payment</TableHead>
+  1029→                      <TableHead className="text-right">Actions</TableHead>
+  1030→                    </TableRow>
+  1031→                  </TableHeader>
+  1032→                  <TableBody>
+  1033→                    {filteredOrders.length === 0 ? (
+  1034→                      <TableRow>
+  1035→                        <TableCell colSpan={8} className="text-center py-12 text-slate-500">
+  1036→                          <ShoppingCart className="h-10 w-10 mx-auto mb-2 opacity-40" />
+  1037→                          <p>No purchase orders found</p>
+  1038→                          <p className="text-xs mt-1">Create your first purchase order to get started</p>
+  1039→                        </TableCell>
+  1040→                      </TableRow>
+  1041→                    ) : (
+  1042→                      filteredOrders.map(order => (
+  1043→                        <TableRow key={order.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => openPODetail(order)}>
+  1044→                          <TableCell className="font-medium text-slate-900 dark:text-slate-100">{order.poNumber}</TableCell>
+  1045→                          <TableCell>
+  1046→                            <div>
+  1047→                              <p className="font-medium text-slate-900 dark:text-slate-100">{order.vendor.name}</p>
+  1048→                              {order.vendor.phone && <p className="text-xs text-slate-500">{order.vendor.phone}</p>}
+  1049→                            </div>
+  1050→                          </TableCell>
+  1051→                          <TableCell className="text-slate-600 dark:text-slate-400">{formatDate(order.orderDate)}</TableCell>
+  1052→                          <TableCell className="text-center">{order.items.length}</TableCell>
+  1053→                          <TableCell className="text-right font-medium">{formatCurrency(order.netAmount)}</TableCell>
+  1054→                          <TableCell>
+  1055→                            <StatusBadge config={PO_STATUS_CONFIG[order.status]} />
+  1056→                          </TableCell>
+  1057→                          <TableCell>
+  1058→                            <StatusBadge config={PAYMENT_STATUS_CONFIG[order.paymentStatus]} />
+  1059→                          </TableCell>
+  1060→                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+  1061→                            <DropdownMenu>
+  1062→                              <DropdownMenuTrigger asChild>
+  1063→                                <Button variant="ghost" size="icon" className="h-8 w-8">
+  1064→                                  <MoreVertical className="h-4 w-4" />
+  1065→                                </Button>
+  1066→                              </DropdownMenuTrigger>
+  1067→                              <DropdownMenuContent align="end">
+  1068→                                <DropdownMenuItem onClick={() => openPODetail(order)}>
+  1069→                                  <Eye className="h-4 w-4 mr-2" /> View Details
+  1070→                                </DropdownMenuItem>
+  1071→                                {order.status === 'draft' && (
+  1072→                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'submitted')}>
+  1073→                                    <ArrowRight className="h-4 w-4 mr-2" /> Submit
+  1074→                                  </DropdownMenuItem>
+  1075→                                )}
+  1076→                                {order.status === 'submitted' && (
+  1077→                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'approved')}>
+  1078→                                    <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+  1079→                                  </DropdownMenuItem>
+  1080→                                )}
+  1081→                                {order.status === 'approved' && (
+  1082→                                  <DropdownMenuItem onClick={() => { resetGRNForm(); setGrnPurchaseOrderId(order.id); const po = orders.find(o => o.id === order.id); if (po) { setGrnItems(po.items.map(item => ({ poItemId: item.id, itemName: item.itemName, orderedQty: item.quantity, receivedQty: '', acceptedQty: '', rejectedQty: '', unitPrice: item.unitPrice, batchNumber: '' }))); } setShowCreateGRN(true); }}>
+  1083→                                    <PackageCheck className="h-4 w-4 mr-2" /> Create GRN
+  1084→                                  </DropdownMenuItem>
+  1085→                                )}
+  1086→                                {['draft', 'submitted'].includes(order.status) && (
+  1087→                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, 'cancelled')} className="text-red-600">
+  1088→                                    <XCircle className="h-4 w-4 mr-2" /> Cancel
+  1089→                                  </DropdownMenuItem>
+  1090→                                )}
+  1091→                                {order.paymentStatus === 'unpaid' && order.status === 'received' && (
+  1092→                                  <DropdownMenuItem onClick={() => updatePOStatus(order.id, order.status, { paymentStatus: 'paid' })}>
+  1093→                                    <CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Paid
+  1094→                                  </DropdownMenuItem>
+  1095→                                )}
+  1096→                              </DropdownMenuContent>
+  1097→                            </DropdownMenu>
+  1098→                          </TableCell>
+  1099→                        </TableRow>
+  1100→                      ))
+  1101→                    )}
+  1102→                  </TableBody>
+  1103→                </Table>
+  1104→              </div>
+  1105→            </CardContent>
+  1106→          </Card>
+  1107→        </TabsContent>
+  1108→
+  1109→        {/* ═══════════════════════════════════════════════════════════════════════
+  1110→            REQUISITIONS TAB
+  1111→        ═══════════════════════════════════════════════════════════════════════ */}
+  1112→        <TabsContent value="requisitions" className="space-y-4">
+  1113→          {/* Search */}
+  1114→          <div className="flex items-center gap-3">
+  1115→            <div className="relative flex-1 max-w-sm">
+  1116→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1117→              <Input
+  1118→                placeholder="Search requisitions..."
+  1119→                value={prSearch}
+  1120→                onChange={e => setPrSearch(e.target.value)}
+  1121→                className="pl-9"
+  1122→              />
+  1123→            </div>
+  1124→          </div>
+  1125→
+  1126→          {/* Requisitions Table */}
+  1127→          <Card>
+  1128→            <CardContent className="p-0">
+  1129→              <div className="overflow-x-auto">
+  1130→                <Table>
+  1131→                  <TableHeader>
+  1132→                    <TableRow>
+  1133→                      <TableHead>PR Number</TableHead>
+  1134→                      <TableHead>Title</TableHead>
+  1135→                      <TableHead>Requested By</TableHead>
+  1136→                      <TableHead>Priority</TableHead>
+  1137→                      <TableHead>Status</TableHead>
+  1138→                      <TableHead>Date</TableHead>
+  1139→                      <TableHead className="text-right">Actions</TableHead>
+  1140→                    </TableRow>
+  1141→                  </TableHeader>
+  1142→                  <TableBody>
+  1143→                    {filteredRequisitions.length === 0 ? (
+  1144→                      <TableRow>
+  1145→                        <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+  1146→                          <ClipboardList className="h-10 w-10 mx-auto mb-2 opacity-40" />
+  1147→                          <p>No requisitions found</p>
+  1148→                          <p className="text-xs mt-1">Create your first requisition to get started</p>
+  1149→                        </TableCell>
+  1150→                      </TableRow>
+  1151→                    ) : (
+  1152→                      filteredRequisitions.map(pr => (
+  1153→                        <TableRow key={pr.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => openPRDetail(pr)}>
+  1154→                          <TableCell className="font-medium text-slate-900 dark:text-slate-100">{pr.prNumber}</TableCell>
+  1155→                          <TableCell>
+  1156→                            <div>
+  1157→                              <p className="font-medium text-slate-900 dark:text-slate-100">{pr.title}</p>
+  1158→                              {pr.items.length > 0 && <p className="text-xs text-slate-500">{pr.items.length} item(s)</p>}
+  1159→                            </div>
+  1160→                          </TableCell>
+  1161→                          <TableCell className="text-slate-600 dark:text-slate-400">{pr.requestedBy.name}</TableCell>
+  1162→                          <TableCell>
+  1163→                            <StatusBadge config={PR_PRIORITY_CONFIG[pr.priority]} />
+  1164→                          </TableCell>
+  1165→                          <TableCell>
+  1166→                            <StatusBadge config={PR_STATUS_CONFIG[pr.status]} />
+  1167→                          </TableCell>
+  1168→                          <TableCell className="text-slate-600 dark:text-slate-400">{formatDate(pr.createdAt)}</TableCell>
+  1169→                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+  1170→                            <DropdownMenu>
+  1171→                              <DropdownMenuTrigger asChild>
+  1172→                                <Button variant="ghost" size="icon" className="h-8 w-8">
+  1173→                                  <MoreVertical className="h-4 w-4" />
+  1174→                                </Button>
+  1175→                              </DropdownMenuTrigger>
+  1176→                              <DropdownMenuContent align="end">
+  1177→                                <DropdownMenuItem onClick={() => openPRDetail(pr)}>
+  1178→                                  <Eye className="h-4 w-4 mr-2" /> View Details
+  1179→                                </DropdownMenuItem>
+  1180→                                {pr.status === 'submitted' && (
+  1181→                                  <>
+  1182→                                    <DropdownMenuItem onClick={() => updatePRStatus(pr.id, 'approved')}>
+  1183→                                      <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+  1184→                                    </DropdownMenuItem>
+  1185→                                    <DropdownMenuItem onClick={() => { setSelectedPR(pr); setShowRejectPR(true) }} className="text-red-600">
+  1186→                                      <XCircle className="h-4 w-4 mr-2" /> Reject
+  1187→                                    </DropdownMenuItem>
+  1188→                                  </>
+  1189→                                )}
+  1190→                              </DropdownMenuContent>
+  1191→                            </DropdownMenu>
+  1192→                          </TableCell>
+  1193→                        </TableRow>
+  1194→                      ))
+  1195→                    )}
+  1196→                  </TableBody>
+  1197→                </Table>
+  1198→              </div>
+  1199→            </CardContent>
+  1200→          </Card>
+  1201→        </TabsContent>
+  1202→
+  1203→        {/* ═══════════════════════════════════════════════════════════════════════
+  1204→            GRN TAB
+  1205→        ═══════════════════════════════════════════════════════════════════════ */}
+  1206→        <TabsContent value="grns" className="space-y-4">
+  1207→          {/* Search */}
+  1208→          <div className="flex items-center gap-3">
+  1209→            <div className="relative flex-1 max-w-sm">
+  1210→              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+  1211→              <Input
+  1212→                placeholder="Search GRNs..."
+  1213→                value={grnSearch}
+  1214→                onChange={e => setGrnSearch(e.target.value)}
+  1215→                className="pl-9"
+  1216→              />
+  1217→            </div>
+  1218→          </div>
+  1219→
+  1220→          {/* GRN Table */}
+  1221→          <Card>
+  1222→            <CardContent className="p-0">
+  1223→              <div className="overflow-x-auto">
+  1224→                <Table>
+  1225→                  <TableHeader>
+  1226→                    <TableRow>
+  1227→                      <TableHead>GRN Number</TableHead>
+  1228→                      <TableHead>PO Number</TableHead>
+  1229→                      <TableHead>Vendor</TableHead>
+  1230→                      <TableHead>Received Date</TableHead>
+  1231→                      <TableHead>Invoice No.</TableHead>
+  1232→                      <TableHead>Status</TableHead>
+  1233→                      <TableHead className="text-right">Actions</TableHead>
+  1234→                    </TableRow>
+  1235→                  </TableHeader>
+  1236→                  <TableBody>
+  1237→                    {filteredGrns.length === 0 ? (
+  1238→                      <TableRow>
+  1239→                        <TableCell colSpan={7} className="text-center py-12 text-slate-500">
+  1240→                          <PackageCheck className="h-10 w-10 mx-auto mb-2 opacity-40" />
+  1241→                          <p>No goods received notes found</p>
+  1242→                          <p className="text-xs mt-1">Create a GRN from an approved purchase order</p>
+  1243→                        </TableCell>
+  1244→                      </TableRow>
+  1245→                    ) : (
+  1246→                      filteredGrns.map(grn => (
+  1247→                        <TableRow key={grn.id} className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-900/50" onClick={() => openGRNDetail(grn)}>
+  1248→                          <TableCell className="font-medium text-slate-900 dark:text-slate-100">{grn.grnNumber}</TableCell>
+  1249→                          <TableCell className="text-slate-600 dark:text-slate-400">
+  1250→                            {orders.find(o => o.id === grn.purchaseOrderId)?.poNumber || '—'}
+  1251→                          </TableCell>
+  1252→                          <TableCell className="text-slate-900 dark:text-slate-100">{grn.purchaseOrder.vendor.name}</TableCell>
+  1253→                          <TableCell className="text-slate-600 dark:text-slate-400">{formatDate(grn.receivedDate)}</TableCell>
+  1254→                          <TableCell className="text-slate-600 dark:text-slate-400">{grn.invoiceNumber || '—'}</TableCell>
+  1255→                          <TableCell>
+  1256→                            <StatusBadge config={GRN_STATUS_CONFIG[grn.status]} />
+  1257→                          </TableCell>
+  1258→                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+  1259→                            <DropdownMenu>
+  1260→                              <DropdownMenuTrigger asChild>
+  1261→                                <Button variant="ghost" size="icon" className="h-8 w-8">
+  1262→                                  <MoreVertical className="h-4 w-4" />
+  1263→                                </Button>
+  1264→                              </DropdownMenuTrigger>
+  1265→                              <DropdownMenuContent align="end">
+  1266→                                <DropdownMenuItem onClick={() => openGRNDetail(grn)}>
+  1267→                                  <Eye className="h-4 w-4 mr-2" /> View Details
+  1268→                                </DropdownMenuItem>
+  1269→                                {grn.status === 'pending_inspection' && (
+  1270→                                  <>
+  1271→                                    <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'accepted')}>
+  1272→                                      <CheckCircle2 className="h-4 w-4 mr-2" /> Accept
+  1273→                                    </DropdownMenuItem>
+  1274→                                    <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'partially_accepted')}>
+  1275→                                      <Package className="h-4 w-4 mr-2" /> Partially Accept
+  1276→                                    </DropdownMenuItem>
+  1277→                                    <DropdownMenuItem onClick={() => updateGRNStatus(grn.id, 'rejected')} className="text-red-600">
+  1278→                                      <XCircle className="h-4 w-4 mr-2" /> Reject
+  1279→                                    </DropdownMenuItem>
+  1280→                                  </>
+  1281→                                )}
+  1282→                              </DropdownMenuContent>
+  1283→                            </DropdownMenu>
+  1284→                          </TableCell>
+  1285→                        </TableRow>
+  1286→                      ))
+  1287→                    )}
+  1288→                  </TableBody>
+  1289→                </Table>
+  1290→              </div>
+  1291→            </CardContent>
+  1292→          </Card>
+  1293→        </TabsContent>
+  1294→      </Tabs>
+  1295→
+  1296→      {/* ═══════════════════════════════════════════════════════════════════════
+  1297→          CREATE PO DIALOG
+  1298→      ═══════════════════════════════════════════════════════════════════════ */}
+  1299→      <Dialog open={showCreatePO} onOpenChange={setShowCreatePO}>
+  1300→        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+  1301→          <DialogHeader>
+  1302→            <DialogTitle>Create Purchase Order</DialogTitle>
+  1303→            <DialogDescription>Add vendor and items to create a new purchase order</DialogDescription>
+  1304→          </DialogHeader>
+  1305→
+  1306→          <div className="space-y-6 py-4">
+  1307→            {/* Vendor & Delivery */}
+  1308→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1309→              <div className="space-y-2">
+  1310→                <Label>Vendor *</Label>
+  1311→                <Select value={poVendorId} onValueChange={setPoVendorId}>
+  1312→                  <SelectTrigger>
+  1313→                    <SelectValue placeholder="Select vendor" />
+  1314→                  </SelectTrigger>
+  1315→                  <SelectContent>
+  1316→                    {vendors.map(v => (
+  1317→                      <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+  1318→                    ))}
+  1319→                  </SelectContent>
+  1320→                </Select>
+  1321→              </div>
+  1322→              <div className="space-y-2">
+  1323→                <Label>Expected Delivery</Label>
+  1324→                <Input type="date" value={poExpectedDelivery} onChange={e => setPoExpectedDelivery(e.target.value)} />
+  1325→              </div>
+  1326→            </div>
+  1327→
+  1328→            {/* Items */}
+  1329→            <div className="space-y-3">
+  1330→              <div className="flex items-center justify-between">
+  1331→                <Label className="text-base font-semibold">Items</Label>
+  1332→                <Button type="button" variant="outline" size="sm" onClick={addPOItem} className="gap-1">
+  1333→                  <Plus className="h-3.5 w-3.5" /> Add Item
+  1334→                </Button>
+  1335→              </div>
+  1336→
+  1337→              <div className="space-y-3">
+  1338→                {poItems.map((item, idx) => (
+  1339→                  <div key={idx} className="grid grid-cols-12 gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+  1340→                    {/* Item select or name */}
+  1341→                    <div className="col-span-12 sm:col-span-3 space-y-1">
+  1342→                      <Label className="text-xs">Item</Label>
+  1343→                      <Select value={item.itemId} onValueChange={val => handlePOItemSelect(idx, val)}>
+  1344→                        <SelectTrigger className="h-9 text-sm">
+  1345→                          <SelectValue placeholder="Select or type" />
+  1346→                        </SelectTrigger>
+  1347→                        <SelectContent>
+  1348→                          {inventoryItems.map(inv => (
+  1349→                            <SelectItem key={inv.id} value={inv.id}>{inv.name}</SelectItem>
+  1350→                          ))}
+  1351→                        </SelectContent>
+  1352→                      </Select>
+  1353→                      {!item.itemId && (
+  1354→                        <Input
+  1355→                          placeholder="Item name"
+  1356→                          value={item.itemName}
+  1357→                          onChange={e => updatePOItem(idx, 'itemName', e.target.value)}
+  1358→                          className="h-9 text-sm"
+  1359→                        />
+  1360→                      )}
+  1361→                    </div>
+  1362→
+  1363→                    {/* Quantity */}
+  1364→                    <div className="col-span-4 sm:col-span-2 space-y-1">
+  1365→                      <Label className="text-xs">Qty</Label>
+  1366→                      <Input
+  1367→                        type="number"
+  1368→                        placeholder="0"
+  1369→                        value={item.quantity}
+  1370→                        onChange={e => updatePOItem(idx, 'quantity', e.target.value)}
+  1371→                        className="h-9 text-sm"
+  1372→                        min="0"
+  1373→                      />
+  1374→                    </div>
+  1375→
+  1376→                    {/* Unit */}
+  1377→                    <div className="col-span-4 sm:col-span-1 space-y-1">
+  1378→                      <Label className="text-xs">Unit</Label>
+  1379→                      <Select value={item.unit} onValueChange={val => updatePOItem(idx, 'unit', val)}>
+  1380→                        <SelectTrigger className="h-9 text-sm">
+  1381→                          <SelectValue />
+  1382→                        </SelectTrigger>
+  1383→                        <SelectContent>
+  1384→                          {UNITS.map(u => (
+  1385→                            <SelectItem key={u} value={u}>{u}</SelectItem>
+  1386→                          ))}
+  1387→                        </SelectContent>
+  1388→                      </Select>
+  1389→                    </div>
+  1390→
+  1391→                    {/* Unit Price */}
+  1392→                    <div className="col-span-4 sm:col-span-2 space-y-1">
+  1393→                      <Label className="text-xs">Unit Price</Label>
+  1394→                      <Input
+  1395→                        type="number"
+  1396→                        placeholder="0"
+  1397→                        value={item.unitPrice}
+  1398→                        onChange={e => updatePOItem(idx, 'unitPrice', e.target.value)}
+  1399→                        className="h-9 text-sm"
+  1400→                        min="0"
+  1401→                      />
+  1402→                    </div>
+  1403→
+  1404→                    {/* GST Rate */}
+  1405→                    <div className="col-span-4 sm:col-span-1 space-y-1">
+  1406→                      <Label className="text-xs">GST %</Label>
+  1407→                      <Input
+  1408→                        type="number"
+  1409→                        placeholder="0"
+  1410→                        value={item.gstRate}
+  1411→                        onChange={e => updatePOItem(idx, 'gstRate', e.target.value)}
+  1412→                        className="h-9 text-sm"
+  1413→                        min="0"
+  1414→                      />
+  1415→                    </div>
+  1416→
+  1417→                    {/* Total Price */}
+  1418→                    <div className="col-span-4 sm:col-span-2 space-y-1">
+  1419→                      <Label className="text-xs">Total</Label>
+  1420→                      <div className="h-9 px-3 flex items-center rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-sm font-medium">
+  1421→                        {formatCurrency(item.totalPrice)}
+  1422→                      </div>
+  1423→                    </div>
+  1424→
+  1425→                    {/* Remove */}
+  1426→                    <div className="col-span-4 sm:col-span-1 flex items-end">
+  1427→                      <Button
+  1428→                        type="button"
+  1429→                        variant="ghost"
+  1430→                        size="icon"
+  1431→                        className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50"
+  1432→                        onClick={() => removePOItem(idx)}
+  1433→                        disabled={poItems.length <= 1}
+  1434→                      >
+  1435→                        <Trash2 className="h-4 w-4" />
+  1436→                      </Button>
+  1437→                    </div>
+  1438→                  </div>
+  1439→                ))}
+  1440→              </div>
+  1441→            </div>
+  1442→
+  1443→            {/* Totals */}
+  1444→            <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-2 bg-slate-50 dark:bg-slate-900/50">
+  1445→              <div className="flex justify-between text-sm">
+  1446→                <span className="text-slate-600 dark:text-slate-400">Subtotal</span>
+  1447→                <span className="font-medium">{formatCurrency(poSubtotal)}</span>
+  1448→              </div>
+  1449→              <div className="flex justify-between text-sm">
+  1450→                <span className="text-slate-600 dark:text-slate-400">GST</span>
+  1451→                <span className="font-medium">{formatCurrency(poGstTotal)}</span>
+  1452→              </div>
+  1453→              <div className="flex items-center justify-between text-sm gap-3">
+  1454→                <span className="text-slate-600 dark:text-slate-400">Discount</span>
+  1455→                <Input
+  1456→                  type="number"
+  1457→                  placeholder="0"
+  1458→                  value={poDiscount}
+  1459→                  onChange={e => setPoDiscount(e.target.value)}
+  1460→                  className="h-8 w-32 text-sm text-right"
+  1461→                  min="0"
+  1462→                />
+  1463→              </div>
+  1464→              <Separator />
+  1465→              <div className="flex justify-between text-base font-semibold">
+  1466→                <span>Net Total</span>
+  1467→                <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(poNetTotal)}</span>
+  1468→              </div>
+  1469→            </div>
+  1470→
+  1471→            {/* Notes */}
+  1472→            <div className="space-y-2">
+  1473→              <Label>Notes</Label>
+  1474→              <Textarea
+  1475→                placeholder="Additional notes or terms..."
+  1476→                value={poNotes}
+  1477→                onChange={e => setPoNotes(e.target.value)}
+  1478→                rows={3}
+  1479→              />
+  1480→            </div>
+  1481→          </div>
+  1482→
+  1483→          <DialogFooter>
+  1484→            <Button variant="outline" onClick={() => setShowCreatePO(false)} disabled={actionLoading}>Cancel</Button>
+  1485→            <Button onClick={handleCreatePO} disabled={actionLoading}>
+  1486→              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+  1487→              Create PO
+  1488→            </Button>
+  1489→          </DialogFooter>
+  1490→        </DialogContent>
+  1491→      </Dialog>
+  1492→
+  1493→      {/* ═══════════════════════════════════════════════════════════════════════
+  1494→          PO DETAIL DIALOG
+  1495→      ═══════════════════════════════════════════════════════════════════════ */}
+  1496→      <Dialog open={showPODetail} onOpenChange={setShowPODetail}>
+  1497→        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+  1498→          <DialogHeader>
+  1499→            <DialogTitle className="flex items-center gap-3">
+  1500→              {selectedPO?.poNumber}
+  1501→              {selectedPO && <StatusBadge config={PO_STATUS_CONFIG[selectedPO.status]} />}
+  1502→            </DialogTitle>
+  1503→            <DialogDescription>Purchase order details</DialogDescription>
+  1504→          </DialogHeader>
+  1505→
+  1506→          {selectedPO && (
+  1507→            <div className="space-y-6 py-4">
+  1508→              {/* Info Grid */}
+  1509→              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+  1510→                <div>
+  1511→                  <p className="text-xs text-slate-500 dark:text-slate-400">Vendor</p>
+  1512→                  <p className="font-medium text-slate-900 dark:text-slate-100">{selectedPO.vendor.name}</p>
+  1513→                  {selectedPO.vendor.phone && <p className="text-xs text-slate-500">{selectedPO.vendor.phone}</p>}
+  1514→                </div>
+  1515→                <div>
+  1516→                  <p className="text-xs text-slate-500 dark:text-slate-400">Order Date</p>
+  1517→                  <p className="font-medium text-slate-900 dark:text-slate-100">{formatDate(selectedPO.orderDate)}</p>
+  1518→                </div>
+  1519→                <div>
+  1520→                  <p className="text-xs text-slate-500 dark:text-slate-400">Created By</p>
+  1521→                  <p className="font-medium text-slate-900 dark:text-slate-100">{selectedPO.createdBy.name}</p>
+  1522→                </div>
+  1523→                <div>
+  1524→                  <p className="text-xs text-slate-500 dark:text-slate-400">Payment Status</p>
+  1525→                  <StatusBadge config={PAYMENT_STATUS_CONFIG[selectedPO.paymentStatus]} />
+  1526→                </div>
+  1527→              </div>
+  1528→
+  1529→              {selectedPO.expectedDelivery && (
+  1530→                <div className="grid grid-cols-2 gap-4">
+  1531→                  <div>
+  1532→                    <p className="text-xs text-slate-500 dark:text-slate-400">Expected Delivery</p>
+  1533→                    <p className="font-medium text-slate-900 dark:text-slate-100">{formatDate(selectedPO.expectedDelivery)}</p>
+  1534→                  </div>
+  1535→                </div>
+  1536→              )}
+  1537→
+  1538→              {/* Items Table */}
+  1539→              <div className="space-y-2">
+  1540→                <h4 className="font-semibold text-slate-900 dark:text-slate-100">Items</h4>
+  1541→                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-x-auto">
+  1542→                  <Table>
+  1543→                    <TableHeader>
+  1544→                      <TableRow>
+  1545→                        <TableHead>Item</TableHead>
+  1546→                        <TableHead className="text-right">Qty</TableHead>
+  1547→                        <TableHead>Unit</TableHead>
+  1548→                        <TableHead className="text-right">Unit Price</TableHead>
+  1549→                        <TableHead className="text-right">GST %</TableHead>
+  1550→                        <TableHead className="text-right">Total</TableHead>
+  1551→                        <TableHead className="text-right">Received</TableHead>
+  1552→                        <TableHead>Status</TableHead>
+  1553→                      </TableRow>
+  1554→                    </TableHeader>
+  1555→                    <TableBody>
+  1556→                      {selectedPO.items.map(item => (
+  1557→                        <TableRow key={item.id}>
+  1558→                          <TableCell className="font-medium text-slate-900 dark:text-slate-100">
+  1559→                            {item.itemName}
+  1560→                            {item.item && <p className="text-xs text-slate-500">{item.item.name}</p>}
+  1561→                          </TableCell>
+  1562→                          <TableCell className="text-right">{item.quantity}</TableCell>
+  1563→                          <TableCell>{item.unit}</TableCell>
+  1564→                          <TableCell className="text-right">{formatCurrency(item.unitPrice)}</TableCell>
+  1565→                          <TableCell className="text-right">{item.gstRate}%</TableCell>
+  1566→                          <TableCell className="text-right font-medium">{formatCurrency(item.totalPrice)}</TableCell>
+  1567→                          <TableCell className="text-right">{item.receivedQty}/{item.quantity}</TableCell>
+  1568→                          <TableCell>
+  1569→                            <Badge variant="outline" className="text-xs">
+  1570→                              {item.status === 'pending' ? 'Pending' :
+  1571→                               item.status === 'partially_received' ? 'Partial' :
+  1572→                               item.status === 'received' ? 'Received' :
+  1573→                               item.status === 'returned' ? 'Returned' : item.status}
+  1574→                            </Badge>
+  1575→                          </TableCell>
+  1576→                        </TableRow>
+  1577→                      ))}
+  1578→                    </TableBody>
+  1579→                  </Table>
+  1580→                </div>
+  1581→              </div>
+  1582→
+  1583→              {/* Totals */}
+  1584→              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-4 space-y-2 bg-slate-50 dark:bg-slate-900/50">
+  1585→                <div className="flex justify-between text-sm">
+  1586→                  <span className="text-slate-600 dark:text-slate-400">Subtotal</span>
+  1587→                  <span>{formatCurrency(selectedPO.totalAmount)}</span>
+  1588→                </div>
+  1589→                <div className="flex justify-between text-sm">
+  1590→                  <span className="text-slate-600 dark:text-slate-400">GST</span>
+  1591→                  <span>{formatCurrency(selectedPO.gstAmount)}</span>
+  1592→                </div>
+  1593→                {selectedPO.discount > 0 && (
+  1594→                  <div className="flex justify-between text-sm">
+  1595→                    <span className="text-slate-600 dark:text-slate-400">Discount</span>
+  1596→                    <span>-{formatCurrency(selectedPO.discount)}</span>
+  1597→                  </div>
+  1598→                )}
+  1599→                <Separator />
+  1600→                <div className="flex justify-between text-base font-semibold">
+  1601→                  <span>Net Amount</span>
+  1602→                  <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(selectedPO.netAmount)}</span>
+  1603→                </div>
+  1604→              </div>
+  1605→
+  1606→              {/* GRN History */}
+  1607→              {selectedPO._count.goodsReceivedNotes > 0 && (
+  1608→                <div className="space-y-2">
+  1609→                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">
+  1610→                    GRN History ({selectedPO._count.goodsReceivedNotes})
+  1611→                  </h4>
+  1612→                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900/50">
+  1613→                    <p className="text-sm text-slate-600 dark:text-slate-400">
+  1614→                      {selectedPO._count.goodsReceivedNotes} goods received note(s) have been created for this purchase order.
+  1615→                    </p>
+  1616→                  </div>
+  1617→                </div>
+  1618→              )}
+  1619→
+  1620→              {/* Notes */}
+  1621→              {selectedPO.notes && (
+  1622→                <div className="space-y-1">
+  1623→                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">Notes</h4>
+  1624→                  <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
+  1625→                    {selectedPO.notes}
+  1626→                  </p>
+  1627→                </div>
+  1628→              )}
+  1629→
+  1630→              {/* Actions */}
+  1631→              <div className="flex flex-wrap gap-2 pt-2">
+  1632→                {selectedPO.status === 'draft' && (
+  1633→                  <Button onClick={() => { updatePOStatus(selectedPO.id, 'submitted'); setShowPODetail(false); }} disabled={actionLoading}>
+  1634→                    <ArrowRight className="h-4 w-4 mr-2" /> Submit
+  1635→                  </Button>
+  1636→                )}
+  1637→                {selectedPO.status === 'submitted' && (
+  1638→                  <Button onClick={() => { updatePOStatus(selectedPO.id, 'approved'); setShowPODetail(false); }} disabled={actionLoading}>
+  1639→                    <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+  1640→                  </Button>
+  1641→                )}
+  1642→                {selectedPO.status === 'approved' && (
+  1643→                  <Button onClick={() => {
+  1644→                    resetGRNForm()
+  1645→                    setGrnPurchaseOrderId(selectedPO.id)
+  1646→                    setGrnItems(selectedPO.items.map(item => ({
+  1647→                      poItemId: item.id,
+  1648→                      itemName: item.itemName,
+  1649→                      orderedQty: item.quantity,
+  1650→                      receivedQty: '',
+  1651→                      acceptedQty: '',
+  1652→                      rejectedQty: '',
+  1653→                      unitPrice: item.unitPrice,
+  1654→                      batchNumber: '',
+  1655→                    })))
+  1656→                    setShowPODetail(false)
+  1657→                    setShowCreateGRN(true)
+  1658→                  }} disabled={actionLoading}>
+  1659→                    <PackageCheck className="h-4 w-4 mr-2" /> Create GRN
+  1660→                  </Button>
+  1661→                )}
+  1662→                {selectedPO.paymentStatus === 'unpaid' && selectedPO.status === 'received' && (
+  1663→                  <Button onClick={() => { updatePOStatus(selectedPO.id, selectedPO.status, { paymentStatus: 'paid' }); setShowPODetail(false); }} variant="outline" disabled={actionLoading}>
+  1664→                    <CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Paid
+  1665→                  </Button>
+  1666→                )}
+  1667→              </div>
+  1668→            </div>
+  1669→          )}
+  1670→        </DialogContent>
+  1671→      </Dialog>
+  1672→
+  1673→      {/* ═══════════════════════════════════════════════════════════════════════
+  1674→          CREATE REQUISITION DIALOG
+  1675→      ═══════════════════════════════════════════════════════════════════════ */}
+  1676→      <Dialog open={showCreatePR} onOpenChange={setShowCreatePR}>
+  1677→        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+  1678→          <DialogHeader>
+  1679→            <DialogTitle>Create Purchase Requisition</DialogTitle>
+  1680→            <DialogDescription>Request items for purchase with details and priority</DialogDescription>
+  1681→          </DialogHeader>
+  1682→
+  1683→          <div className="space-y-6 py-4">
+  1684→            {/* Title & Priority */}
+  1685→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1686→              <div className="space-y-2">
+  1687→                <Label>Title *</Label>
+  1688→                <Input
+  1689→                  placeholder="Requisition title"
+  1690→                  value={prTitle}
+  1691→                  onChange={e => setPrTitle(e.target.value)}
+  1692→                />
+  1693→              </div>
+  1694→              <div className="space-y-2">
+  1695→                <Label>Priority</Label>
+  1696→                <Select value={prPriority} onValueChange={val => setPrPriority(val as PRPriority)}>
+  1697→                  <SelectTrigger>
+  1698→                    <SelectValue />
+  1699→                  </SelectTrigger>
+  1700→                  <SelectContent>
+  1701→                    <SelectItem value="low">Low</SelectItem>
+  1702→                    <SelectItem value="normal">Normal</SelectItem>
+  1703→                    <SelectItem value="high">High</SelectItem>
+  1704→                    <SelectItem value="urgent">Urgent</SelectItem>
+  1705→                  </SelectContent>
+  1706→                </Select>
+  1707→              </div>
+  1708→            </div>
+  1709→
+  1710→            {/* Description */}
+  1711→            <div className="space-y-2">
+  1712→              <Label>Description</Label>
+  1713→              <Textarea
+  1714→                placeholder="Describe the requisition..."
+  1715→                value={prDescription}
+  1716→                onChange={e => setPrDescription(e.target.value)}
+  1717→                rows={3}
+  1718→              />
+  1719→            </div>
+  1720→
+  1721→            {/* Required By */}
+  1722→            <div className="space-y-2 max-w-xs">
+  1723→              <Label>Required By</Label>
+  1724→              <Input
+  1725→                type="date"
+  1726→                value={prRequiredBy}
+  1727→                onChange={e => setPrRequiredBy(e.target.value)}
+  1728→              />
+  1729→            </div>
+  1730→
+  1731→            {/* Items */}
+  1732→            <div className="space-y-3">
+  1733→              <div className="flex items-center justify-between">
+  1734→                <Label className="text-base font-semibold">Items</Label>
+  1735→                <Button type="button" variant="outline" size="sm" onClick={addPRItem} className="gap-1">
+  1736→                  <Plus className="h-3.5 w-3.5" /> Add Item
+  1737→                </Button>
+  1738→              </div>
+  1739→
+  1740→              <div className="space-y-3">
+  1741→                {prItems.map((item, idx) => (
+  1742→                  <div key={idx} className="grid grid-cols-12 gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+  1743→                    <div className="col-span-12 sm:col-span-4 space-y-1">
+  1744→                      <Label className="text-xs">Item Name</Label>
+  1745→                      <Input
+  1746→                        placeholder="Item name"
+  1747→                        value={item.itemName}
+  1748→                        onChange={e => updatePRItem(idx, 'itemName', e.target.value)}
+  1749→                        className="h-9 text-sm"
+  1750→                      />
+  1751→                    </div>
+  1752→                    <div className="col-span-6 sm:col-span-2 space-y-1">
+  1753→                      <Label className="text-xs">Qty</Label>
+  1754→                      <Input
+  1755→                        type="number"
+  1756→                        placeholder="0"
+  1757→                        value={item.quantity}
+  1758→                        onChange={e => updatePRItem(idx, 'quantity', e.target.value)}
+  1759→                        className="h-9 text-sm"
+  1760→                        min="0"
+  1761→                      />
+  1762→                    </div>
+  1763→                    <div className="col-span-6 sm:col-span-2 space-y-1">
+  1764→                      <Label className="text-xs">Unit</Label>
+  1765→                      <Select value={item.unit} onValueChange={val => updatePRItem(idx, 'unit', val)}>
+  1766→                        <SelectTrigger className="h-9 text-sm">
+  1767→                          <SelectValue />
+  1768→                        </SelectTrigger>
+  1769→                        <SelectContent>
+  1770→                          {UNITS.map(u => (
+  1771→                            <SelectItem key={u} value={u}>{u}</SelectItem>
+  1772→                          ))}
+  1773→                        </SelectContent>
+  1774→                      </Select>
+  1775→                    </div>
+  1776→                    <div className="col-span-6 sm:col-span-3 space-y-1">
+  1777→                      <Label className="text-xs">Est. Price</Label>
+  1778→                      <Input
+  1779→                        type="number"
+  1780→                        placeholder="0"
+  1781→                        value={item.estimatedPrice}
+  1782→                        onChange={e => updatePRItem(idx, 'estimatedPrice', e.target.value)}
+  1783→                        className="h-9 text-sm"
+  1784→                        min="0"
+  1785→                      />
+  1786→                    </div>
+  1787→                    <div className="col-span-6 sm:col-span-1 flex items-end">
+  1788→                      <Button
+  1789→                        type="button"
+  1790→                        variant="ghost"
+  1791→                        size="icon"
+  1792→                        className="h-9 w-9 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/50"
+  1793→                        onClick={() => removePRItem(idx)}
+  1794→                        disabled={prItems.length <= 1}
+  1795→                      >
+  1796→                        <Trash2 className="h-4 w-4" />
+  1797→                      </Button>
+  1798→                    </div>
+  1799→                  </div>
+  1800→                ))}
+  1801→              </div>
+  1802→            </div>
+  1803→
+  1804→            {/* Notes */}
+  1805→            <div className="space-y-2">
+  1806→              <Label>Notes</Label>
+  1807→              <Textarea
+  1808→                placeholder="Additional notes..."
+  1809→                value={prNotes}
+  1810→                onChange={e => setPrNotes(e.target.value)}
+  1811→                rows={2}
+  1812→              />
+  1813→            </div>
+  1814→          </div>
+  1815→
+  1816→          <DialogFooter>
+  1817→            <Button variant="outline" onClick={() => setShowCreatePR(false)} disabled={actionLoading}>Cancel</Button>
+  1818→            <Button onClick={handleCreatePR} disabled={actionLoading}>
+  1819→              {actionLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+  1820→              Create Requisition
+  1821→            </Button>
+  1822→          </DialogFooter>
+  1823→        </DialogContent>
+  1824→      </Dialog>
+  1825→
+  1826→      {/* ═══════════════════════════════════════════════════════════════════════
+  1827→          PR DETAIL DIALOG
+  1828→      ═══════════════════════════════════════════════════════════════════════ */}
+  1829→      <Dialog open={showPRDetail} onOpenChange={setShowPRDetail}>
+  1830→        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+  1831→          <DialogHeader>
+  1832→            <DialogTitle className="flex items-center gap-3">
+  1833→              {selectedPR?.prNumber}
+  1834→              {selectedPR && <StatusBadge config={PR_STATUS_CONFIG[selectedPR.status]} />}
+  1835→            </DialogTitle>
+  1836→            <DialogDescription>{selectedPR?.title}</DialogDescription>
+  1837→          </DialogHeader>
+  1838→
+  1839→          {selectedPR && (
+  1840→            <div className="space-y-6 py-4">
+  1841→              {/* Info Grid */}
+  1842→              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+  1843→                <div>
+  1844→                  <p className="text-xs text-slate-500 dark:text-slate-400">Requested By</p>
+  1845→                  <p className="font-medium text-slate-900 dark:text-slate-100">{selectedPR.requestedBy.name}</p>
+  1846→                </div>
+  1847→                <div>
+  1848→                  <p className="text-xs text-slate-500 dark:text-slate-400">Priority</p>
+  1849→                  <StatusBadge config={PR_PRIORITY_CONFIG[selectedPR.priority]} />
+  1850→                </div>
+  1851→                <div>
+  1852→                  <p className="text-xs text-slate-500 dark:text-slate-400">Required By</p>
+  1853→                  <p className="font-medium text-slate-900 dark:text-slate-100">{formatDate(selectedPR.requiredBy)}</p>
+  1854→                </div>
+  1855→                {selectedPR.approvedBy && (
+  1856→                  <div>
+  1857→                    <p className="text-xs text-slate-500 dark:text-slate-400">Approved By</p>
+  1858→                    <p className="font-medium text-slate-900 dark:text-slate-100">{selectedPR.approvedBy.name}</p>
+  1859→                  </div>
+  1860→                )}
+  1861→              </div>
+  1862→
+  1863→              {/* Description */}
+  1864→              {selectedPR.description && (
+  1865→                <div className="space-y-1">
+  1866→                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">Description</h4>
+  1867→                  <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
+  1868→                    {selectedPR.description}
+  1869→                  </p>
+  1870→                </div>
+  1871→              )}
+  1872→
+  1873→              {/* Items Table */}
+  1874→              <div className="space-y-2">
+  1875→                <h4 className="font-semibold text-slate-900 dark:text-slate-100">Items</h4>
+  1876→                <div className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-x-auto">
+  1877→                  <Table>
+  1878→                    <TableHeader>
+  1879→                      <TableRow>
+  1880→                        <TableHead>Item</TableHead>
+  1881→                        <TableHead className="text-right">Qty</TableHead>
+  1882→                        <TableHead>Unit</TableHead>
+  1883→                        <TableHead className="text-right">Est. Price</TableHead>
+  1884→                      </TableRow>
+  1885→                    </TableHeader>
+  1886→                    <TableBody>
+  1887→                      {selectedPR.items.map(item => (
+  1888→                        <TableRow key={item.id}>
+  1889→                          <TableCell>
+  1890→                            <p className="font-medium text-slate-900 dark:text-slate-100">{item.itemName}</p>
+  1891→                            {item.description && <p className="text-xs text-slate-500">{item.description}</p>}
+  1892→                          </TableCell>
+  1893→                          <TableCell className="text-right">{item.quantity}</TableCell>
+  1894→                          <TableCell>{item.unit}</TableCell>
+  1895→                          <TableCell className="text-right">{item.estimatedPrice ? formatCurrency(item.estimatedPrice) : '—'}</TableCell>
+  1896→                        </TableRow>
+  1897→                      ))}
+  1898→                    </TableBody>
+  1899→                  </Table>
+  1900→                </div>
+  1901→              </div>
+  1902→
+  1903→              {/* Notes */}
+  1904→              {selectedPR.notes && (
+  1905→                <div className="space-y-1">
+  1906→                  <h4 className="font-semibold text-slate-900 dark:text-slate-100">Notes</h4>
+  1907→                  <p className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
+  1908→                    {selectedPR.notes}
+  1909→                  </p>
+  1910→                </div>
+  1911→              )}
+  1912→
+  1913→              {/* Actions */}
+  1914→              {selectedPR.status === 'submitted' && (
+  1915→                <div className="flex gap-2 pt-2">
+  1916→                  <Button onClick={() => { updatePRStatus(selectedPR.id, 'approved'); setShowPRDetail(false); }} disabled={actionLoading}>
+  1917→                    <CheckCircle2 className="h-4 w-4 mr-2" /> Approve
+  1918→                  </Button>
+  1919→                  <Button variant="destructive" onClick={() => { setShowPRDetail(false); setSelectedPR(selectedPR); setShowRejectPR(true); }} disabled={actionLoading}>
+  1920→                    <XCircle className="h-4 w-4 mr-2" /> Reject
+  1921→                  </Button>
+  1922→                </div>
+  1923→              )}
+  1924→            </div>
+  1925→          )}
+  1926→        </DialogContent>
+  1927→      </Dialog>
+  1928→
+  1929→      {/* ═══════════════════════════════════════════════════════════════════════
+  1930→          REJECT PR CONFIRMATION
+  1931→      ═══════════════════════════════════════════════════════════════════════ */}
+  1932→      <AlertDialog open={showRejectPR} onOpenChange={setShowRejectPR}>
+  1933→        <AlertDialogContent>
+  1934→          <AlertDialogHeader>
+  1935→            <AlertDialogTitle>Reject Requisition</AlertDialogTitle>
+  1936→            <AlertDialogDescription>
+  1937→              Are you sure you want to reject requisition {selectedPR?.prNumber}? This action cannot be undone.
+  1938→            </AlertDialogDescription>
+  1939→          </AlertDialogHeader>
+  1940→          <AlertDialogFooter>
+  1941→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+  1942→            <AlertDialogAction
+  1943→              onClick={() => {
+  1944→                if (selectedPR) {
+  1945→                  updatePRStatus(selectedPR.id, 'rejected')
+  1946→                  setShowRejectPR(false)
+  1947→                }
+  1948→              }}
+  1949→              className="bg-red-600 hover:bg-red-700"
+  1950→            >
+  1951→              Reject
+  1952→            </AlertDialogAction>
+  1953→          </AlertDialogFooter>
+  1954→        </AlertDialogContent>
+  1955→      </AlertDialog>
+  1956→
+  1957→      {/* ═══════════════════════════════════════════════════════════════════════
+  1958→          CREATE GRN DIALOG
+  1959→      ═══════════════════════════════════════════════════════════════════════ */}
+  1960→      <Dialog open={showCreateGRN} onOpenChange={setShowCreateGRN}>
+  1961→        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+  1962→          <DialogHeader>
+  1963→            <DialogTitle>Create Goods Received Note</DialogTitle>
+  1964→            <DialogDescription>Record received items against a purchase order</DialogDescription>
+  1965→          </DialogHeader>
+  1966→
+  1967→          <div className="space-y-6 py-4">
+  1968→            {/* PO Selection & Invoice */}
+  1969→            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1970→              <div className="space-y-2">
+  1971→                <Label>Purchase Order *</Label>
+  1972→                <Select value={grnPurchaseOrderId} onValueChange={handleGRNPOSelect}>
+  1973→                  <SelectTrigger>
+  1974→                    <SelectValue placeholder="Select purchase order" />
+  1975→                  </SelectTrigger>
+  1976→                  <SelectContent>
+  1977→                    {approvedOrders.map(o => (
+  1978→                      <SelectItem key={o.id} value={o.id}>
+  1979→                        {o.poNumber} — {o.vendor.name}
+  1980→                      </SelectItem>
+  1981→                    ))}
+  1982→                  </SelectContent>
+  1983→                </Select>
+  1984→              </div>
+  1985→              <div className="space-y-2">
+  1986→                <Label>Invoice Number</Label>
+  1987→                <Input
+  1988→                  placeholder="Invoice number"
+  1989→                  value={grnInvoiceNumber}
+  1990→                  onChange={e => setGrnInvoiceNumber(e.target.value)}
+  1991→                />
+  1992→              </div>
+  1993→            </div>
+  1994→
+  1995→            {/* PO Info */}
+  1996→            {selectedPOForGRN && (
+  1997→              <div className="rounded-lg border border-slate-200 dark:border-slate-700 p-3 bg-slate-50 dark:bg-slate-900/50 space-y-1">
+  1998→                <div className="flex justify-between text-sm">
+  1999→                  <span className="text-slate-500 dark:text-slate-400">Vendor</span>
+  2000→                  <span className="font-medium text-slate-900 dark:text-slate-100">{selectedPOForGRN.vendor.name}</span>
+
+[showing lines 1-2000 of 2209; use offset=2001 with limit to continue reading]

@@ -190,3 +190,114 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to process mess request' }, { status: 500 })
   }
 }
+
+// PATCH /api/mess - Update attendance, consumption, waste
+export async function PATCH(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    if (data.type === 'attendance') {
+      const existing = await db.messAttendance.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 })
+
+      const updateData: Record<string, unknown> = {}
+      if (data.present !== undefined) updateData.present = data.present
+      if (data.guestCount !== undefined) updateData.guestCount = data.guestCount
+      if (data.notes !== undefined) updateData.notes = data.notes
+
+      const attendance = await db.messAttendance.update({
+        where: { id: data.id },
+        data: updateData,
+        include: {
+          tenant: { select: { name: true } },
+          markedBy: { select: { name: true } },
+        },
+      })
+      return NextResponse.json(attendance)
+    }
+
+    if (data.type === 'consumption') {
+      const existing = await db.consumptionLog.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Consumption log not found' }, { status: 404 })
+
+      const updateData: Record<string, unknown> = {}
+      if (data.issuedQty !== undefined) updateData.issuedQty = data.issuedQty
+      if (data.consumedQty !== undefined) updateData.consumedQty = data.consumedQty
+      if (data.returnedQty !== undefined) updateData.returnedQty = data.returnedQty
+      if (data.wastageQty !== undefined) updateData.wastageQty = data.wastageQty
+      if (data.costPerUnit !== undefined) updateData.costPerUnit = data.costPerUnit
+      if (data.totalCost !== undefined) updateData.totalCost = data.totalCost
+      if (data.notes !== undefined) updateData.notes = data.notes
+
+      const log = await db.consumptionLog.update({
+        where: { id: data.id },
+        data: updateData,
+        include: { item: { select: { name: true, unit: true } } },
+      })
+      return NextResponse.json(log)
+    }
+
+    if (data.type === 'waste') {
+      const existing = await db.wasteRecord.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Waste record not found' }, { status: 404 })
+
+      const updateData: Record<string, unknown> = {}
+      if (data.category !== undefined) updateData.category = data.category
+      if (data.description !== undefined) updateData.description = data.description
+      if (data.quantity !== undefined) updateData.quantity = data.quantity
+      if (data.unit !== undefined) updateData.unit = data.unit
+      if (data.estimatedCost !== undefined) updateData.estimatedCost = data.estimatedCost
+      if (data.disposalMethod !== undefined) updateData.disposalMethod = data.disposalMethod
+      if (data.disposalDate !== undefined) updateData.disposalDate = data.disposalDate ? new Date(data.disposalDate) : null
+      if (data.notes !== undefined) updateData.notes = data.notes
+
+      const record = await db.wasteRecord.update({
+        where: { id: data.id },
+        data: updateData,
+        include: { item: { select: { name: true } } },
+      })
+      return NextResponse.json(record)
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error) {
+    console.error('Mess PATCH error:', error)
+    return NextResponse.json({ error: 'Failed to update mess data' }, { status: 500 })
+  }
+}
+
+// DELETE /api/mess - Delete attendance, consumption, waste
+export async function DELETE(req: NextRequest) {
+  try {
+    const data = await req.json()
+
+    if (data.type === 'attendance') {
+      const existing = await db.messAttendance.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 })
+
+      await db.messAttendance.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Attendance record deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'consumption') {
+      const existing = await db.consumptionLog.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Consumption log not found' }, { status: 404 })
+
+      await db.consumptionLog.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Consumption log deleted successfully', id: data.id })
+    }
+
+    if (data.type === 'waste') {
+      const existing = await db.wasteRecord.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Waste record not found' }, { status: 404 })
+
+      await db.wasteRecord.delete({ where: { id: data.id } })
+      return NextResponse.json({ message: 'Waste record deleted successfully', id: data.id })
+    }
+
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+  } catch (error) {
+    console.error('Mess DELETE error:', error)
+    return NextResponse.json({ error: 'Failed to delete mess data' }, { status: 500 })
+  }
+}

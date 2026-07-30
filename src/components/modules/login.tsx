@@ -17,6 +17,8 @@ import {
   EyeOff,
   Loader2,
   ArrowRight,
+  UserCog,
+  UserCircle,
 } from 'lucide-react'
 
 interface DemoAccount {
@@ -48,6 +50,20 @@ const demoAccounts: DemoAccount[] = [
     role: 'manager',
     label: 'Manager',
     icon: Mail,
+  },
+  {
+    email: 'staff1@hostelpro.com',
+    password: 'staff123',
+    role: 'staff',
+    label: 'Staff',
+    icon: UserCog,
+  },
+  {
+    email: 'tenant1@hostelpro.com',
+    password: 'tenant123',
+    role: 'tenant',
+    label: 'Tenant',
+    icon: UserCircle,
   },
 ]
 
