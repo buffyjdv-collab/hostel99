@@ -34,6 +34,15 @@ model User {
   sentMessages        Communication[]     @relation("MessageSender")
   visitors            Visitor[]           @relation("VisitorHost")
   attendance          Attendance[]
+  prRequested         PurchaseRequisition[] @relation("PRRequestor")
+  prApproved          PurchaseRequisition[] @relation("PRApprover")
+  poCreated           PurchaseOrder[] @relation("POCreator")
+  poApproved          PurchaseOrder[] @relation("POApprover")
+  grnReceived         GoodsReceivedNote[] @relation("GRNReceiver")
+  stockTransactions   StockTransaction[] @relation("StockTransactionUser")
+  kitchenIssued       KitchenIssue[] @relation("KitchenIssuer")
+  attendanceMarked    MessAttendance[] @relation("AttendanceMarker")
+  wasteRecorded       WasteRecord[] @relation("WasteRecorder")
 }
 
 // ─── Property Management ───────────────────────────────────
@@ -58,15 +67,32 @@ model Property {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  buildings  Building[]
-  floors     Floor[]
-  rooms      Room[]
-  leads      Lead[]
-  tenants    Tenant[]
-  expenses   Expense[]
-  staff      Staff[]
-  notices    Notice[]
-  visitors   Visitor[]
+  buildings         Building[]
+  floors            Floor[]
+  rooms             Room[]
+  leads             Lead[]
+  tenants           Tenant[]
+  expenses          Expense[]
+  staff             Staff[]
+  notices           Notice[]
+  visitors          Visitor[]
+  inventoryCategories InventoryCategory[]
+  inventoryItems    InventoryItem[]
+  vendors           Vendor[]
+  vendorQuotations  VendorQuotation[]
+  purchaseRequisitions PurchaseRequisition[]
+  purchaseOrders    PurchaseOrder[]
+  goodsReceivedNotes GoodsReceivedNote[]
+  stockTransactions StockTransaction[]
+  menuPlans         MenuPlan[]
+  recipes           Recipe[]
+  kitchenIssues     KitchenIssue[]
+  messAttendance    MessAttendance[]
+  consumptionLogs   ConsumptionLog[]
+  wasteRecords      WasteRecord[]
+  assets            Asset[]
+  laundryItems      LaundryItem[]
+  housekeepingItems HousekeepingItem[]
 }
 
 model Building {
@@ -123,6 +149,8 @@ model Room {
   beds      Bed[]
   tenants   Tenant[]
   bookings  Booking[]
+  assets    Asset[]
+  laundryItems LaundryItem[]
 }
 
 model Bed {
@@ -213,6 +241,7 @@ model Tenant {
   visitors     Visitor[]
   documents    Document[]
   bookings     Booking[]
+  messAttendance MessAttendance[]
 }
 
 // ─── Booking & Check-in ────────────────────────────────────
@@ -448,4 +477,430 @@ model Subscription {
   autoRenew Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Inventory Management ──────────────────────────────────
+model InventoryCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items InventoryItem[]
+}
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  name         String
+  sku          String?
+  categoryId   String
+  category     InventoryCategory @relation(fields: [categoryId], references: [id])
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id])
+  unit         String   @default("kg") // kg, l, pcs, pack, box, bottle, can, cylinder
+  unitPrice    Float    @default(0)
+  currentStock Float    @default(0)
+  openingStock Float    @default(0)
+  minStock     Float    @default(0)   // low-stock alert threshold
+  maxStock     Float?
+  reorderLevel Float?
+  batchNumber  String?
+  expiryDate   DateTime?
+  storeLocation String?
+  gstRate      Float    @default(0)
+  hsnCode      String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stockTransactions  StockTransaction[]
+  purchaseOrderItems PurchaseOrderItem[]
+  kitchenIssues     KitchenIssue[]
+  recipeItems       RecipeItem[]
+  consumptionLogs   ConsumptionLog[]
+  wasteRecords      WasteRecord[]
+}
+
+model Vendor {
+  id            String   @id @default(cuid())
+  name          String
+  contactPerson String?
+  phone         String
+  email         String?
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  gstNumber     String?
+  panNumber     String?
+  bankName      String?
+  bankAccount   String?
+  ifscCode      String?
+  paymentTerms  String?
+  rating        Int      @default(0) // 1-5
+  status        String   @default("active") // active, inactive, blacklisted
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  quotations     VendorQuotation[]
+}
+
+model VendorQuotation {
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id])
+  itemId      String?
+  itemName    String
+  quantity    Float
+  unitPrice   Float
+  validTill   DateTime?
+  status      String   @default("pending") // pending, accepted, rejected, expired
+  notes       String?
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model PurchaseRequisition {
+  id          String   @id @default(cuid())
+  prNumber    String   @unique
+  title       String
+  description String?
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  requestedById String
+  requestedBy User     @relation("PRRequestor", fields: [requestedById], references: [id])
+  approvedById String?
+  approvedBy  User?    @relation("PRApprover", fields: [approvedById], references: [id])
+  status      String   @default("draft") // draft, submitted, approved, rejected, cancelled, converted
+  priority    String   @default("normal") // low, normal, high, urgent
+  requiredBy  DateTime?
+  approvedAt  DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items PurchaseRequisitionItem[]
+}
+
+model PurchaseRequisitionItem {
+  id             String   @id @default(cuid())
+  requisitionId  String
+  requisition    PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  itemName       String
+  description    String?
+  quantity       Float
+  unit           String
+  estimatedPrice Float?
+  notes          String?
+}
+
+model PurchaseOrder {
+  id              String   @id @default(cuid())
+  poNumber        String   @unique
+  vendorId        String
+  vendor          Vendor   @relation(fields: [vendorId], references: [id])
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  createdById     String
+  createdBy       User     @relation("POCreator", fields: [createdById], references: [id])
+  approvedById    String?
+  approvedBy      User?    @relation("POApprover", fields: [approvedById], references: [id])
+  status          String   @default("draft") // draft, submitted, approved, partially_received, received, cancelled
+  orderDate       DateTime @default(now())
+  expectedDelivery DateTime?
+  totalAmount     Float    @default(0)
+  gstAmount       Float    @default(0)
+  discount        Float    @default(0)
+  netAmount       Float    @default(0)
+  paymentStatus   String   @default("unpaid") // unpaid, partial, paid
+  paymentMode     String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items              PurchaseOrderItem[]
+  goodsReceivedNotes GoodsReceivedNote[]
+}
+
+model PurchaseOrderItem {
+  id          String   @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  itemId      String?
+  item        InventoryItem? @relation(fields: [itemId], references: [id])
+  itemName    String
+  description String?
+  quantity    Float
+  unit        String
+  unitPrice   Float
+  gstRate     Float    @default(0)
+  totalPrice  Float
+  receivedQty Float    @default(0)
+  status      String   @default("pending") // pending, partially_received, received, returned
+}
+
+model GoodsReceivedNote {
+  id              String   @id @default(cuid())
+  grnNumber       String   @unique
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  receivedById    String
+  receivedBy      User     @relation("GRNReceiver", fields: [receivedById], references: [id])
+  receivedDate    DateTime @default(now())
+  invoiceNumber   String?
+  invoiceDate     DateTime?
+  invoiceAmount   Float?
+  status          String   @default("pending_inspection") // pending_inspection, accepted, partially_accepted, rejected
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items GoodsReceivedNoteItem[]
+}
+
+model GoodsReceivedNoteItem {
+  id           String   @id @default(cuid())
+  grnId        String
+  grn          GoodsReceivedNote @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  poItemId     String?
+  itemName     String
+  orderedQty   Float
+  receivedQty  Float
+  acceptedQty  Float
+  rejectedQty  Float    @default(0)
+  unitPrice    Float
+  batchNumber  String?
+  expiryDate   DateTime?
+  notes        String?
+}
+
+model StockTransaction {
+  id            String   @id @default(cuid())
+  itemId        String
+  item          InventoryItem @relation(fields: [itemId], references: [id])
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id])
+  type          String   // purchase, issue, adjustment, transfer_in, transfer_out, return, opening, closing, damage, expiry
+  quantity      Float    // positive for in, negative for out
+  previousStock Float
+  newStock      Float
+  unitPrice     Float?
+  reference     String?  // PO number, GRN number, issue slip number
+  referenceId   String?  // ID of related PO/GRN/Issue
+  batchNumber   String?
+  expiryDate    DateTime?
+  notes         String?
+  performedById String?
+  performedBy   User?    @relation("StockTransactionUser", fields: [performedById], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model MenuPlan {
+  id          String   @id @default(cuid())
+  date        DateTime
+  mealType    String   // breakfast, lunch, snacks, dinner
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  headCount   Int      @default(0)
+  status      String   @default("planned") // planned, preparing, served, completed
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items MenuPlanItem[]
+}
+
+model MenuPlanItem {
+  id         String   @id @default(cuid())
+  menuPlanId String
+  menuPlan   MenuPlan @relation(fields: [menuPlanId], references: [id], onDelete: Cascade)
+  recipeId   String?
+  recipe     Recipe?  @relation(fields: [recipeId], references: [id])
+  dishName   String
+  servings   Int      @default(1)
+  notes      String?
+}
+
+model Recipe {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   @default("veg") // veg, non_veg, vegan
+  mealType    String   @default("lunch") // breakfast, lunch, snacks, dinner
+  baseServings Int     @default(100)
+  instructions String?
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ingredients RecipeItem[]
+  menuItems   MenuPlanItem[]
+}
+
+model RecipeItem {
+  id         String   @id @default(cuid())
+  recipeId   String
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  itemId     String
+  item       InventoryItem @relation(fields: [itemId], references: [id])
+  quantity   Float    // quantity for baseServings
+  unit       String
+  notes      String?
+}
+
+model KitchenIssue {
+  id          String   @id @default(cuid())
+  issueNumber String   @unique
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  quantity    Float
+  unit        String
+  issuedTo    String   // kitchen, staff name
+  purpose     String?  // breakfast, lunch, dinner, snacks, special
+  menuPlanId  String?
+  menuDate    DateTime?
+  issuedById  String
+  issuedBy    User     @relation("KitchenIssuer", fields: [issuedById], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MessAttendance {
+  id          String   @id @default(cuid())
+  date        DateTime
+  mealType    String   // breakfast, lunch, snacks, dinner
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  tenantId    String?
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id])
+  present     Boolean  @default(false)
+  guestCount  Int      @default(0)
+  notes       String?
+  markedById  String?
+  markedBy    User?    @relation("AttendanceMarker", fields: [markedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model ConsumptionLog {
+  id          String   @id @default(cuid())
+  date        DateTime
+  itemId      String
+  item        InventoryItem @relation(fields: [itemId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  mealType    String?  // breakfast, lunch, snacks, dinner
+  issuedQty   Float    @default(0)
+  consumedQty Float    @default(0)
+  returnedQty Float    @default(0)
+  wastageQty  Float    @default(0)
+  unit        String
+  costPerUnit Float    @default(0)
+  totalCost   Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model WasteRecord {
+  id          String   @id @default(cuid())
+  date        DateTime
+  category    String   // food_waste, expired, damaged, spoilage, other
+  itemId      String?
+  item        InventoryItem? @relation(fields: [itemId], references: [id])
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  description String
+  quantity    Float    @default(0)
+  unit        String?
+  estimatedCost Float  @default(0)
+  disposalMethod String? // compost, trash, donation, recycling
+  disposalDate DateTime?
+  recordedById String?
+  recordedBy  User?    @relation("WasteRecorder", fields: [recordedById], references: [id])
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Asset {
+  id              String   @id @default(cuid())
+  name            String
+  assetTag        String?
+  category        String   // furniture, electrical, electronics, appliance, kitchen_equipment, other
+  subCategory     String?  // bed, mattress, chair, table, fan, ac, tv, water_cooler, washing_machine, refrigerator, gas_stove
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  roomId          String?
+  room            Room?    @relation(fields: [roomId], references: [id])
+  purchaseDate    DateTime?
+  purchasePrice   Float?
+  currentValue    Float?
+  depreciationRate Float?
+  vendor          String?
+  warrantyExpiry  DateTime?
+  status          String   @default("active") // active, under_maintenance, disposed, lost
+  condition       String   @default("good") // excellent, good, fair, poor, broken
+  assignedTo      String?
+  lastMaintenance DateTime?
+  nextMaintenance DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model LaundryItem {
+  id              String   @id @default(cuid())
+  name            String   // bedsheets, blankets, pillows, towels, curtains
+  category        String   // bedding, bathroom, curtain, other
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  roomId          String?
+  room            Room?    @relation(fields: [roomId], references: [id])
+  totalQuantity   Int      @default(0)
+  issuedQuantity   Int      @default(0)
+  inLaundry       Int      @default(0)
+  damagedQuantity  Int      @default(0)
+  condition       String   @default("good") // good, fair, poor
+  lastWashDate    DateTime?
+  nextWashDate    DateTime?
+  replacementDate DateTime?
+  status          String   @default("in_use") // in_use, in_laundry, stored, damaged, disposed
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model HousekeepingItem {
+  id              String   @id @default(cuid())
+  name            String   // phenyl, floor_cleaner, soap, detergent, mop, bucket, tissue_roll, garbage_bag
+  category        String   // cleaning, hygiene, tool, other
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id])
+  unit            String   // l, kg, pcs, pack, roll
+  currentStock    Float    @default(0)
+  minStock        Float    @default(0)
+  unitPrice       Float    @default(0)
+  lastRestocked   DateTime?
+  nextRestock     DateTime?
+  isActive        Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }

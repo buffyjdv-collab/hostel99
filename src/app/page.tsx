@@ -15,6 +15,12 @@ import { ReportsPage } from '@/components/modules/reports'
 import { NoticesPage } from '@/components/modules/notices'
 import { VisitorsPage } from '@/components/modules/visitors'
 import { SettingsPage } from '@/components/modules/settings'
+import { InventoryPage } from '@/components/modules/inventory'
+import { VendorsPage } from '@/components/modules/vendors'
+import { PurchasesPage } from '@/components/modules/purchases'
+import { KitchenPage } from '@/components/modules/kitchen'
+import { MessPage } from '@/components/modules/mess'
+import { AssetsPage } from '@/components/modules/assets'
 import { LoginPage } from '@/components/modules/login'
 import { useRef, useEffect } from 'react'
 import { Toaster } from '@/components/ui/toaster'
@@ -61,6 +67,12 @@ export default function Home() {
       case 'notices': return <NoticesPage />
       case 'visitors': return <VisitorsPage />
       case 'settings': return <SettingsPage />
+      case 'inventory': return <InventoryPage />
+      case 'vendors': return <VendorsPage />
+      case 'purchases': return <PurchasesPage />
+      case 'kitchen': return <KitchenPage />
+      case 'mess': return <MessPage />
+      case 'assets': return <AssetsPage />
       default: return <DashboardPage />
     }
   }

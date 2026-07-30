@@ -44,6 +44,7 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts'
+import { format } from 'date-fns'
 import {
   FileText,
   TrendingUp,
@@ -62,11 +63,16 @@ import {
   CreditCard,
   Receipt,
   Loader2,
+  Package,
+  ChefHat,
+  AlertTriangle,
+  Armchair,
+  Trash2,
 } from 'lucide-react'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type ReportType = 'income' | 'expense' | 'profit' | 'collection' | 'due' | 'vacancy' | 'occupancy' | 'tenant_ledger' | 'payment_report'
+type ReportType = 'income' | 'expense' | 'profit' | 'collection' | 'due' | 'vacancy' | 'occupancy' | 'tenant_ledger' | 'payment_report' | 'stock_report' | 'consumption_report' | 'waste_report' | 'kitchen_cost' | 'asset_report' | 'low_stock' | 'expiry_report'
 
 interface Property {
   id: string
@@ -93,6 +99,13 @@ const REPORT_TYPES: ReportTypeInfo[] = [
   { key: 'occupancy', label: 'Occupancy', icon: <Building2 className="h-4 w-4" />, description: 'Occupancy rates', color: 'blue' },
   { key: 'tenant_ledger', label: 'Tenant Ledger', icon: <Users className="h-4 w-4" />, description: 'Tenant transaction history', color: 'indigo' },
   { key: 'payment_report', label: 'Payment Report', icon: <CreditCard className="h-4 w-4" />, description: 'Detailed payment report', color: 'amber' },
+  { key: 'stock_report', label: 'Stock Report', icon: <Package className="h-4 w-4" />, description: 'Current stock levels & values', color: 'emerald' },
+  { key: 'consumption_report', label: 'Consumption', icon: <ChefHat className="h-4 w-4" />, description: 'Item-wise consumption tracking', color: 'orange' },
+  { key: 'waste_report', label: 'Wastage', icon: <Trash2 className="h-4 w-4" />, description: 'Food waste & spoilage analysis', color: 'rose' },
+  { key: 'kitchen_cost', label: 'Kitchen Cost', icon: <ChefHat className="h-4 w-4" />, description: 'Cost per student analysis', color: 'cyan' },
+  { key: 'asset_report', label: 'Assets', icon: <Armchair className="h-4 w-4" />, description: 'Asset inventory & depreciation', color: 'violet' },
+  { key: 'low_stock', label: 'Low Stock', icon: <AlertTriangle className="h-4 w-4" />, description: 'Items below minimum stock', color: 'red' },
+  { key: 'expiry_report', label: 'Expiry', icon: <Calendar className="h-4 w-4" />, description: 'Items nearing expiry', color: 'amber' },
 ]
 
 const MONTHS = [
@@ -149,6 +162,481 @@ function formatCurrency(amount: number) {
 
 function formatDate(date: string | Date) {
   return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+// ── Inventory Report Components ─────────────────────────────────────────────
+
+function StockReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [invData, setInvData] = useState<any>(null)
+  const [invLoading, setInvLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const res = await fetch(`/api/inventory?propertyId=${pid}`)
+        const data = await res.json()
+        setInvData(data)
+      } catch (e) { console.error(e) }
+      finally { setInvLoading(false) }
+    }
+    fetchInventory()
+  }, [selectedPropertyId])
+
+  if (invLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+  if (!invData) return <div className="text-center text-muted-foreground p-12">No data available</div>
+
+  const items = invData.items || []
+  const categories = invData.categories || []
+  const stats = invData.stats || {}
+
+  const categoryData = categories.map((c: any) => {
+    const catItems = items.filter((i: any) => i.categoryId === c.id)
+    return { name: c.name, count: catItems.length, value: catItems.reduce((s: number, i: any) => s + i.currentStock * i.unitPrice, 0) }
+  }).filter((c: any) => c.count > 0)
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Items</p><p className="text-2xl font-bold">{stats.totalItems || 0}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Low Stock</p><p className="text-2xl font-bold text-red-500">{stats.lowStockCount || 0}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Value</p><p className="text-2xl font-bold">{formatCurrency(stats.totalValue || 0)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Expiring Soon</p><p className="text-2xl font-bold text-amber-500">{stats.expiringSoon || 0}</p></CardContent></Card>
+      </div>
+      {categoryData.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle>Stock Value by Category</CardTitle></CardHeader>
+          <CardContent>
+            <ChartContainer config={{ value: { label: 'Value', color: '#10b981' } }} className="h-[300px]">
+              <BarChart data={categoryData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                <ChartTooltip content={<ChartTooltipContent />} />
+                <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      )}
+      <Card>
+        <CardHeader><CardTitle>Current Stock Levels</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Category</TableHead><TableHead>Unit</TableHead><TableHead>Current Stock</TableHead><TableHead>Min Stock</TableHead><TableHead>Unit Price</TableHead><TableHead>Value</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {items.map((item: any) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell><Badge variant="outline">{item.category?.name || '-'}</Badge></TableCell>
+                    <TableCell>{item.unit}</TableCell>
+                    <TableCell className={item.currentStock <= item.minStock ? 'text-red-500 font-bold' : ''}>{item.currentStock}</TableCell>
+                    <TableCell>{item.minStock}</TableCell>
+                    <TableCell>{formatCurrency(item.unitPrice)}</TableCell>
+                    <TableCell>{formatCurrency(item.currentStock * item.unitPrice)}</TableCell>
+                    <TableCell><Badge variant={item.currentStock <= item.minStock ? 'destructive' : 'secondary'}>{item.currentStock <= item.minStock ? 'Low' : 'OK'}</Badge></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ConsumptionReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [messData, setMessData] = useState<any>(null)
+  const [messLoading, setMessLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchMess = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const res = await fetch(`/api/mess?propertyId=${pid}&type=consumption&days=30`)
+        const data = await res.json()
+        setMessData(data)
+      } catch (e) { console.error(e) }
+      finally { setMessLoading(false) }
+    }
+    fetchMess()
+  }, [selectedPropertyId])
+
+  if (messLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+
+  const logs = messData?.consumption || []
+  const totalIssued = logs.reduce((s: number, l: any) => s + l.issuedQty, 0)
+  const totalConsumed = logs.reduce((s: number, l: any) => s + l.consumedQty, 0)
+  const totalWastage = logs.reduce((s: number, l: any) => s + l.wastageQty, 0)
+  const totalCost = logs.reduce((s: number, l: any) => s + l.totalCost, 0)
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Issued</p><p className="text-2xl font-bold">{totalIssued.toFixed(1)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Consumed</p><p className="text-2xl font-bold text-emerald-600">{totalConsumed.toFixed(1)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Wastage</p><p className="text-2xl font-bold text-red-500">{totalWastage.toFixed(1)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Cost</p><p className="text-2xl font-bold">{formatCurrency(totalCost)}</p></CardContent></Card>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>Consumption Log</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Item</TableHead><TableHead>Meal</TableHead><TableHead>Issued</TableHead><TableHead>Consumed</TableHead><TableHead>Returned</TableHead><TableHead>Wastage</TableHead><TableHead>Cost</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {logs.map((log: any) => (
+                  <TableRow key={log.id}>
+                    <TableCell>{format(new Date(log.date), 'dd MMM')}</TableCell>
+                    <TableCell className="font-medium">{log.item?.name || '-'}</TableCell>
+                    <TableCell><Badge variant="outline">{log.mealType || '-'}</Badge></TableCell>
+                    <TableCell>{log.issuedQty} {log.unit}</TableCell>
+                    <TableCell>{log.consumedQty} {log.unit}</TableCell>
+                    <TableCell>{log.returnedQty} {log.unit}</TableCell>
+                    <TableCell className="text-red-500">{log.wastageQty} {log.unit}</TableCell>
+                    <TableCell>{formatCurrency(log.totalCost)}</TableCell>
+                  </TableRow>
+                ))}
+                {logs.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No consumption data available</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function WasteReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [messData, setMessData] = useState<any>(null)
+  const [messLoading, setMessLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchMess = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const res = await fetch(`/api/mess?propertyId=${pid}&type=waste&days=30`)
+        const data = await res.json()
+        setMessData(data)
+      } catch (e) { console.error(e) }
+      finally { setMessLoading(false) }
+    }
+    fetchMess()
+  }, [selectedPropertyId])
+
+  if (messLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+
+  const waste = messData?.waste || []
+  const wasteStats = messData?.wasteStats || {}
+  const wasteByCategory = waste.reduce((acc: any, w: any) => {
+    acc[w.category] = (acc[w.category] || 0) + w.estimatedCost
+    return acc
+  }, {})
+  const pieData = Object.entries(wasteByCategory).map(([k, v]) => ({ name: k.replace('_', ' '), value: v as number }))
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Waste</p><p className="text-2xl font-bold">{formatCurrency(wasteStats.totalWaste || 0)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Food Waste</p><p className="text-2xl font-bold text-orange-500">{formatCurrency(wasteStats.foodWaste || 0)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Expired</p><p className="text-2xl font-bold text-amber-500">{formatCurrency(wasteStats.expired || 0)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Damaged</p><p className="text-2xl font-bold text-red-500">{formatCurrency(wasteStats.damaged || 0)}</p></CardContent></Card>
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {pieData.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle>Waste by Category</CardTitle></CardHeader>
+            <CardContent>
+              <ChartContainer config={{ value: { label: 'Cost', color: '#ef4444' } }} className="h-[300px]">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                    {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
+        <Card>
+          <CardHeader><CardTitle>Waste Records</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Category</TableHead><TableHead>Description</TableHead><TableHead>Qty</TableHead><TableHead>Cost</TableHead><TableHead>Disposal</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {waste.map((w: any) => (
+                    <TableRow key={w.id}>
+                      <TableCell>{format(new Date(w.date), 'dd MMM')}</TableCell>
+                      <TableCell><Badge variant="outline" className="capitalize">{w.category.replace('_', ' ')}</Badge></TableCell>
+                      <TableCell>{w.description}</TableCell>
+                      <TableCell>{w.quantity} {w.unit || ''}</TableCell>
+                      <TableCell className="text-red-500">{formatCurrency(w.estimatedCost)}</TableCell>
+                      <TableCell>{w.disposalMethod || '-'}</TableCell>
+                    </TableRow>
+                  ))}
+                  {waste.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No waste records</TableCell></TableRow>}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function KitchenCostReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [invData, setInvData] = useState<any>(null)
+  const [kitchenData, setKitchenData] = useState<any>(null)
+  const [dataLoading, setDataLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const [invRes, kitchenRes] = await Promise.all([
+          fetch(`/api/inventory?propertyId=${pid}`),
+          fetch(`/api/kitchen?propertyId=${pid}&type=issues`),
+        ])
+        setInvData(await invRes.json())
+        setKitchenData(await kitchenRes.json())
+      } catch (e) { console.error(e) }
+      finally { setDataLoading(false) }
+    }
+    fetchData()
+  }, [selectedPropertyId])
+
+  if (dataLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+
+  const totalStockValue = invData?.stats?.totalValue || 0
+  const issues = kitchenData?.issues || []
+  const totalIssuedCost = issues.reduce((s: number, i: any) => s + (i.quantity * (i.item?.unitPrice || 0)), 0)
+  const tenants = 80 // approximate
+  const costPerStudent = tenants > 0 ? totalIssuedCost / tenants : 0
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Stock Value</p><p className="text-2xl font-bold">{formatCurrency(totalStockValue)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Issued Cost</p><p className="text-2xl font-bold text-orange-500">{formatCurrency(totalIssuedCost)}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Est. Residents</p><p className="text-2xl font-bold">{tenants}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Cost per Student</p><p className="text-2xl font-bold text-emerald-600">{formatCurrency(costPerStudent)}</p></CardContent></Card>
+      </div>
+      <Card>
+        <CardHeader><CardTitle>Recent Kitchen Issues</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Issue #</TableHead><TableHead>Item</TableHead><TableHead>Qty</TableHead><TableHead>Purpose</TableHead><TableHead>Date</TableHead><TableHead>Est. Cost</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {issues.slice(0, 20).map((issue: any) => (
+                  <TableRow key={issue.id}>
+                    <TableCell className="font-mono text-sm">{issue.issueNumber}</TableCell>
+                    <TableCell className="font-medium">{issue.item?.name || '-'}</TableCell>
+                    <TableCell>{issue.quantity} {issue.unit}</TableCell>
+                    <TableCell><Badge variant="outline" className="capitalize">{issue.purpose || '-'}</Badge></TableCell>
+                    <TableCell>{format(new Date(issue.createdAt), 'dd MMM yyyy')}</TableCell>
+                    <TableCell>{formatCurrency(issue.quantity * (issue.item?.unitPrice || 0))}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function AssetReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [assetData, setAssetData] = useState<any>(null)
+  const [assetLoading, setAssetLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchAssets = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const res = await fetch(`/api/assets?propertyId=${pid}&type=assets`)
+        const data = await res.json()
+        setAssetData(data)
+      } catch (e) { console.error(e) }
+      finally { setAssetLoading(false) }
+    }
+    fetchAssets()
+  }, [selectedPropertyId])
+
+  if (assetLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+
+  const assets = assetData?.assets || []
+  const stats = assetData?.assetStats || {}
+  const byCategory = stats.byCategory || {}
+  const catData = Object.entries(byCategory).map(([k, v]) => ({ name: k.replace('_', ' '), count: v as number }))
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Assets</p><p className="text-2xl font-bold">{stats.total || 0}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Active</p><p className="text-2xl font-bold text-emerald-600">{stats.active || 0}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Under Maintenance</p><p className="text-2xl font-bold text-amber-500">{stats.underMaintenance || 0}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Total Value</p><p className="text-2xl font-bold">{formatCurrency(stats.totalValue || 0)}</p></CardContent></Card>
+      </div>
+      <div className="grid gap-6 md:grid-cols-2">
+        {catData.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle>Assets by Category</CardTitle></CardHeader>
+            <CardContent>
+              <ChartContainer config={{ count: { label: 'Count', color: '#8b5cf6' } }} className="h-[300px]">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Pie data={catData} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                    {catData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+            </CardContent>
+          </Card>
+        )}
+        <Card>
+          <CardHeader><CardTitle>Asset List</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Category</TableHead><TableHead>Room</TableHead><TableHead>Value</TableHead><TableHead>Condition</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  {assets.map((a: any) => (
+                    <TableRow key={a.id}>
+                      <TableCell className="font-medium">{a.name}</TableCell>
+                      <TableCell><Badge variant="outline" className="capitalize">{a.category.replace('_', ' ')}</Badge></TableCell>
+                      <TableCell>{a.room?.name || '-'}</TableCell>
+                      <TableCell>{formatCurrency(a.currentValue || a.purchasePrice || 0)}</TableCell>
+                      <TableCell><Badge variant={a.condition === 'broken' ? 'destructive' : a.condition === 'poor' ? 'secondary' : 'outline'} className="capitalize">{a.condition}</Badge></TableCell>
+                      <TableCell><Badge variant={a.status === 'active' ? 'default' : 'secondary'} className="capitalize">{a.status.replace('_', ' ')}</Badge></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function LowStockReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [invData, setInvData] = useState<any>(null)
+  const [invLoading, setInvLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const res = await fetch(`/api/inventory?propertyId=${pid}&lowStock=true`)
+        const data = await res.json()
+        setInvData(data)
+      } catch (e) { console.error(e) }
+      finally { setInvLoading(false) }
+    }
+    fetchInventory()
+  }, [selectedPropertyId])
+
+  if (invLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+
+  const lowStockItems = (invData?.items || []).filter((i: any) => i.currentStock <= i.minStock)
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><AlertTriangle className="h-5 w-5 text-red-500" /> Low Stock Alert - {lowStockItems.length} Items</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Category</TableHead><TableHead>Current Stock</TableHead><TableHead>Min Stock</TableHead><TableHead>Shortage</TableHead><TableHead>Unit</TableHead><TableHead>Reorder Qty</TableHead><TableHead>Est. Cost</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {lowStockItems.map((item: any) => {
+                  const shortage = item.minStock - item.currentStock
+                  const reorderQty = (item.maxStock || item.minStock * 2) - item.currentStock
+                  return (
+                    <TableRow key={item.id} className="bg-red-50/50">
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell><Badge variant="outline">{item.category?.name || '-'}</Badge></TableCell>
+                      <TableCell className="text-red-600 font-bold">{item.currentStock}</TableCell>
+                      <TableCell>{item.minStock}</TableCell>
+                      <TableCell className="text-red-500">{shortage > 0 ? shortage.toFixed(1) : '0'}</TableCell>
+                      <TableCell>{item.unit}</TableCell>
+                      <TableCell>{reorderQty > 0 ? reorderQty.toFixed(1) : '-'}</TableCell>
+                      <TableCell>{reorderQty > 0 ? formatCurrency(reorderQty * item.unitPrice) : '-'}</TableCell>
+                    </TableRow>
+                  )
+                })}
+                {lowStockItems.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">All items are above minimum stock levels</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function ExpiryReport({ selectedPropertyId }: { selectedPropertyId: string }) {
+  const [invData, setInvData] = useState<any>(null)
+  const [invLoading, setInvLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        const pid = selectedPropertyId || ''
+        const res = await fetch(`/api/inventory?propertyId=${pid}`)
+        const data = await res.json()
+        setInvData(data)
+      } catch (e) { console.error(e) }
+      finally { setInvLoading(false) }
+    }
+    fetchInventory()
+  }, [selectedPropertyId])
+
+  if (invLoading) return <div className="flex items-center justify-center p-12"><Loader2 className="h-8 w-8 animate-spin text-emerald-500" /></div>
+
+  const now = new Date()
+  const items = (invData?.items || []).filter((i: any) => i.expiryDate).map((i: any) => ({
+    ...i,
+    daysUntilExpiry: Math.ceil((new Date(i.expiryDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+  })).sort((a: any, b: any) => a.daysUntilExpiry - b.daysUntilExpiry)
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader><CardTitle>Items with Expiry Dates</CardTitle></CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader><TableRow><TableHead>Item</TableHead><TableHead>Category</TableHead><TableHead>Batch</TableHead><TableHead>Current Stock</TableHead><TableHead>Expiry Date</TableHead><TableHead>Days Left</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {items.map((item: any) => (
+                  <TableRow key={item.id} className={item.daysUntilExpiry <= 0 ? 'bg-red-50/50' : item.daysUntilExpiry <= 7 ? 'bg-amber-50/50' : ''}>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell><Badge variant="outline">{item.category?.name || '-'}</Badge></TableCell>
+                    <TableCell>{item.batchNumber || '-'}</TableCell>
+                    <TableCell>{item.currentStock} {item.unit}</TableCell>
+                    <TableCell>{format(new Date(item.expiryDate), 'dd MMM yyyy')}</TableCell>
+                    <TableCell className={item.daysUntilExpiry <= 0 ? 'text-red-600 font-bold' : item.daysUntilExpiry <= 7 ? 'text-amber-600 font-semibold' : ''}>{item.daysUntilExpiry} days</TableCell>
+                    <TableCell><Badge variant={item.daysUntilExpiry <= 0 ? 'destructive' : item.daysUntilExpiry <= 7 ? 'secondary' : 'outline'}>{item.daysUntilExpiry <= 0 ? 'Expired' : item.daysUntilExpiry <= 7 ? 'Expiring Soon' : 'OK'}</Badge></TableCell>
+                  </TableRow>
+                ))}
+                {items.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">No items with expiry dates</TableCell></TableRow>}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -989,6 +1477,13 @@ export function ReportsPage() {
       case 'occupancy': return renderOccupancyReport()
       case 'tenant_ledger': return renderTenantLedger()
       case 'payment_report': return renderPaymentReport()
+      case 'stock_report': return <StockReport selectedPropertyId={selectedPropertyId} />
+      case 'consumption_report': return <ConsumptionReport selectedPropertyId={selectedPropertyId} />
+      case 'waste_report': return <WasteReport selectedPropertyId={selectedPropertyId} />
+      case 'kitchen_cost': return <KitchenCostReport selectedPropertyId={selectedPropertyId} />
+      case 'asset_report': return <AssetReport selectedPropertyId={selectedPropertyId} />
+      case 'low_stock': return <LowStockReport selectedPropertyId={selectedPropertyId} />
+      case 'expiry_report': return <ExpiryReport selectedPropertyId={selectedPropertyId} />
       default: return null
     }
   }
@@ -1001,7 +1496,7 @@ export function ReportsPage() {
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-4 w-96" />
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-          {Array.from({ length: 9 }).map((_, i) => (
+          {Array.from({ length: 17 }).map((_, i) => (
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>

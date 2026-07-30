@@ -20,6 +20,12 @@ import {
   Shield,
   Home,
   Settings,
+  Package,
+  Truck,
+  ShoppingCart,
+  ChefHat,
+  UtensilsCrossed,
+  Armchair,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -31,20 +37,29 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 
-const navItems: { page: Page; label: string; icon: React.ElementType; badge?: string; roles?: string[] }[] = [
-  { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { page: 'properties', label: 'Properties', icon: Building2, roles: ['super_admin', 'owner', 'manager'] },
-  { page: 'rooms', label: 'Rooms & Beds', icon: DoorOpen },
-  { page: 'leads', label: 'Lead CRM', icon: Users, roles: ['super_admin', 'owner', 'manager'] },
-  { page: 'tenants', label: 'Tenants', icon: UserCheck },
-  { page: 'payments', label: 'Payments', icon: IndianRupee, badge: 'Funds' },
-  { page: 'complaints', label: 'Complaints', icon: MessageSquareWarning },
-  { page: 'staff', label: 'Staff', icon: UserCog, roles: ['super_admin', 'owner', 'manager'] },
-  { page: 'expenses', label: 'Accounting', icon: Receipt, roles: ['super_admin', 'owner', 'manager'] },
-  { page: 'reports', label: 'Reports', icon: BarChart3 },
-  { page: 'notices', label: 'Communication', icon: Megaphone },
-  { page: 'visitors', label: 'Visitors', icon: LogIn },
-  { page: 'settings', label: 'Settings', icon: Settings, roles: ['super_admin', 'owner'] },
+const navItems: { page: Page; label: string; icon: React.ElementType; badge?: string; roles?: string[]; section?: string }[] = [
+  { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
+  { page: 'properties', label: 'Properties', icon: Building2, roles: ['super_admin', 'owner', 'manager'], section: 'main' },
+  { page: 'rooms', label: 'Rooms & Beds', icon: DoorOpen, section: 'main' },
+  { page: 'leads', label: 'Lead CRM', icon: Users, roles: ['super_admin', 'owner', 'manager'], section: 'main' },
+  { page: 'tenants', label: 'Tenants', icon: UserCheck, section: 'main' },
+  { page: 'payments', label: 'Payments', icon: IndianRupee, badge: 'Funds', section: 'main' },
+  { page: 'complaints', label: 'Complaints', icon: MessageSquareWarning, section: 'main' },
+  { page: 'staff', label: 'Staff', icon: UserCog, roles: ['super_admin', 'owner', 'manager'], section: 'main' },
+  { page: 'expenses', label: 'Accounting', icon: Receipt, roles: ['super_admin', 'owner', 'manager'], section: 'main' },
+
+  // Inventory Section
+  { page: 'inventory', label: 'Inventory', icon: Package, section: 'inventory' },
+  { page: 'vendors', label: 'Vendors', icon: Truck, roles: ['super_admin', 'owner', 'manager'], section: 'inventory' },
+  { page: 'purchases', label: 'Purchases', icon: ShoppingCart, roles: ['super_admin', 'owner', 'manager'], section: 'inventory' },
+  { page: 'kitchen', label: 'Kitchen & Menu', icon: ChefHat, section: 'inventory' },
+  { page: 'mess', label: 'Mess & Dining', icon: UtensilsCrossed, section: 'inventory' },
+  { page: 'assets', label: 'Assets & Laundry', icon: Armchair, section: 'inventory' },
+
+  { page: 'reports', label: 'Reports', icon: BarChart3, section: 'main' },
+  { page: 'notices', label: 'Communication', icon: Megaphone, section: 'main' },
+  { page: 'visitors', label: 'Visitors', icon: LogIn, section: 'main' },
+  { page: 'settings', label: 'Settings', icon: Settings, roles: ['super_admin', 'owner'], section: 'main' },
 ]
 
 export function Sidebar() {
@@ -52,6 +67,40 @@ export function Sidebar() {
   const role = currentUser?.role || 'manager'
 
   const filteredItems = navItems.filter(item => !item.roles || item.roles.includes(role))
+
+  // Group items by section
+  const mainItems = filteredItems.filter(item => item.section === 'main')
+  const inventoryItems = filteredItems.filter(item => item.section === 'inventory')
+
+  const renderNavButton = (item: typeof navItems[0]) => {
+    const isActive = currentPage === item.page
+    const Icon = item.icon
+    return (
+      <button
+        key={item.page}
+        onClick={() => setCurrentPage(item.page)}
+        className={cn(
+          'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
+          isActive
+            ? 'bg-emerald-500/20 text-emerald-400 shadow-sm shadow-emerald-500/10'
+            : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+          sidebarCollapsed && 'justify-center px-2'
+        )}
+      >
+        <Icon className={cn('shrink-0', isActive ? 'w-5 h-5' : 'w-4 h-4')} />
+        {!sidebarCollapsed && (
+          <>
+            <span className="truncate">{item.label}</span>
+            {item.badge && (
+              <Badge variant="secondary" className="ml-auto text-[10px] bg-emerald-500/20 text-emerald-400 border-0 px-1.5 py-0">
+                {item.badge}
+              </Badge>
+            )}
+          </>
+        )}
+      </button>
+    )
+  }
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -74,35 +123,8 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-          {filteredItems.map((item) => {
-            const isActive = currentPage === item.page
-            const Icon = item.icon
-            const navBtn = (
-              <button
-                key={item.page}
-                onClick={() => setCurrentPage(item.page)}
-                className={cn(
-                  'flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200',
-                  isActive
-                    ? 'bg-emerald-500/20 text-emerald-400 shadow-sm shadow-emerald-500/10'
-                    : 'text-slate-300 hover:bg-slate-800 hover:text-white',
-                  sidebarCollapsed && 'justify-center px-2'
-                )}
-              >
-                <Icon className={cn('shrink-0', isActive ? 'w-5 h-5' : 'w-4 h-4')} />
-                {!sidebarCollapsed && (
-                  <>
-                    <span className="truncate">{item.label}</span>
-                    {item.badge && (
-                      <Badge variant="secondary" className="ml-auto text-[10px] bg-emerald-500/20 text-emerald-400 border-0 px-1.5 py-0">
-                        {item.badge}
-                      </Badge>
-                    )}
-                  </>
-                )}
-              </button>
-            )
-
+          {mainItems.map((item) => {
+            const navBtn = renderNavButton(item)
             if (sidebarCollapsed) {
               return (
                 <Tooltip key={item.page}>
@@ -115,6 +137,37 @@ export function Sidebar() {
             }
             return navBtn
           })}
+
+          {/* Inventory Section */}
+          {inventoryItems.length > 0 && (
+            <>
+              {!sidebarCollapsed ? (
+                <div className="pt-4 pb-2">
+                  <div className="flex items-center gap-2 px-3">
+                    <div className="h-px flex-1 bg-slate-700/50" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Inventory</span>
+                    <div className="h-px flex-1 bg-slate-700/50" />
+                  </div>
+                </div>
+              ) : (
+                <div className="my-2 mx-2 h-px bg-slate-700/50" />
+              )}
+              {inventoryItems.map((item) => {
+                const navBtn = renderNavButton(item)
+                if (sidebarCollapsed) {
+                  return (
+                    <Tooltip key={item.page}>
+                      <TooltipTrigger asChild>{navBtn}</TooltipTrigger>
+                      <TooltipContent side="right" className="bg-slate-800 text-white border-slate-700">
+                        {item.label}
+                      </TooltipContent>
+                    </Tooltip>
+                  )
+                }
+                return navBtn
+              })}
+            </>
+          )}
         </nav>
 
         {/* User Info */}
