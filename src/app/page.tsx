@@ -1,6 +1,9 @@
 'use client'
 
 import { Sidebar } from '@/components/layout/sidebar'
+import { MobileDrawer } from '@/components/layout/mobile-drawer'
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav'
+import { MobileHeader } from '@/components/layout/mobile-header'
 import { useAppStore } from '@/lib/store'
 import { DashboardPage } from '@/components/modules/dashboard'
 import { PropertiesPage } from '@/components/modules/properties'
@@ -25,17 +28,19 @@ import { LoginPage } from '@/components/modules/login'
 import { UsersPage } from '@/components/modules/users'
 import { MyProfilePage } from '@/components/modules/my-profile'
 import { RoleManagementPage } from '@/components/modules/role-management'
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { Toaster } from '@/components/ui/toaster'
+import { useIsMobile } from '@/hooks/use-mobile'
 
 export default function Home() {
   const { currentPage, currentUser, setCurrentUser } = useAppStore()
   const initialized = useRef(false)
+  const isMobile = useIsMobile()
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
     if (initialized.current) return
     initialized.current = true
-    // Restore user from localStorage on mount
     const saved = localStorage.getItem('hostelpro_user')
     if (saved) {
       try {
@@ -83,6 +88,32 @@ export default function Home() {
     }
   }
 
+  // ─── Mobile Layout ─────────────────────────────────────────────────────
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-[100dvh] bg-slate-50 overflow-hidden">
+        {/* Top Header */}
+        <MobileHeader onMenuOpen={() => setDrawerOpen(true)} />
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto overscroll-y-contain pb-20">
+          <div className="px-4 py-4 max-w-lg mx-auto">
+            {renderPage()}
+          </div>
+        </main>
+
+        {/* Bottom Navigation */}
+        <MobileBottomNav onMenuOpen={() => setDrawerOpen(true)} />
+
+        {/* Slide-out Drawer */}
+        <MobileDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+
+        <Toaster />
+      </div>
+    )
+  }
+
+  // ─── Desktop Layout ────────────────────────────────────────────────────
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
       <Sidebar />
