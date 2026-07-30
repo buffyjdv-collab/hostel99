@@ -4,11 +4,20 @@ const prisma = new PrismaClient();
 async function seed() {
   console.log('Starting database seed...');
 
-  // Clear existing data
+  // Clear existing data (order matters for foreign key constraints)
   const models = [
     'activityLog', 'salaryPayment', 'attendance', 'document', 'visitor',
     'communication', 'notice', 'expense', 'complaint', 'payment',
-    'booking', 'lead', 'bed', 'tenant', 'room', 'floor', 'building',
+    'booking', 'lead', 'bed', 'tenant',
+    'wasteRecord', 'consumptionLog', 'messAttendance', 'kitchenIssue',
+    'menuPlanItem', 'menuPlan', 'recipeItem', 'recipe',
+    'goodsReceivedNoteItem', 'goodsReceivedNote',
+    'purchaseOrderItem', 'purchaseOrder',
+    'purchaseRequisitionItem', 'purchaseRequisition',
+    'vendorQuotation', 'vendor',
+    'stockTransaction', 'inventoryItem', 'inventoryCategory',
+    'housekeepingItem', 'laundryItem', 'asset',
+    'room', 'floor', 'building',
     'property', 'subscription', 'staff', 'user'
   ];
 
