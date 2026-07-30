@@ -1,0 +1,451 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User & Auth ───────────────────────────────────────────
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String
+  phone         String?
+  password      String
+  role          String   @default("manager") // super_admin, owner, manager, staff, tenant
+  avatar        String?
+  isActive      Boolean  @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  ownedProperties     Property[]      @relation("PropertyOwner")
+  staffProfile        Staff?
+  tenantProfile       Tenant?
+  ledActivities       ActivityLog[]
+  createdLeads        Lead[]              @relation("LeadCreator")
+  assignedLeads       Lead[]              @relation("LeadAssignee")
+  complaints          Complaint[]         @relation("ComplaintCreator")
+  assignedComplaints  Complaint[]         @relation("ComplaintAssignee")
+  expenses            Expense[]           @relation("ExpenseCreator")
+  notices             Notice[]            @relation("NoticeCreator")
+  sentMessages        Communication[]     @relation("MessageSender")
+  visitors            Visitor[]           @relation("VisitorHost")
+  attendance          Attendance[]
+}
+
+// ─── Property Management ───────────────────────────────────
+model Property {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   @default("pg") // pg, hostel, co_living, apartment
+  address     String
+  city        String
+  state       String?
+  pincode     String?
+  landmark    String?
+  description String?
+  totalRooms  Int      @default(0)
+  totalBeds   Int      @default(0)
+  occupancy   Int      @default(0)
+  amenities   String?
+  images      String?
+  isActive    Boolean  @default(true)
+  ownerId     String
+  owner       User     @relation("PropertyOwner", fields: [ownerId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  buildings  Building[]
+  floors     Floor[]
+  rooms      Room[]
+  leads      Lead[]
+  tenants    Tenant[]
+  expenses   Expense[]
+  staff      Staff[]
+  notices    Notice[]
+  visitors   Visitor[]
+}
+
+model Building {
+  id          String   @id @default(cuid())
+  name        String
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  wings       String?
+  totalFloors Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  floors Floor[]
+  rooms  Room[]
+}
+
+model Floor {
+  id         String   @id @default(cuid())
+  name       String
+  number     Int
+  buildingId String
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  wing       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  rooms Room[]
+}
+
+model Room {
+  id           String   @id @default(cuid())
+  name         String
+  number       String
+  floorId      String
+  floor        Floor    @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  buildingId   String
+  building     Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  propertyId   String
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  sharingType  String   @default("single") // single, double, triple, four_sharing
+  roomType     String   @default("non_ac") // ac, non_ac, deluxe, premium
+  totalBeds    Int      @default(1)
+  occupiedBeds Int      @default(0)
+  rent         Float    @default(0)
+  deposit      Float    @default(0)
+  amenities    String?
+  status       String   @default("available") // available, occupied, maintenance, blocked
+  images       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  beds      Bed[]
+  tenants   Tenant[]
+  bookings  Booking[]
+}
+
+model Bed {
+  id         String   @id @default(cuid())
+  name       String
+  number     Int
+  roomId     String
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  status     String   @default("available") // available, occupied, blocked, maintenance
+  tenantId   String?  @unique
+  tenant     Tenant?  @relation("BedTenant")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── Lead CRM ──────────────────────────────────────────────
+model Lead {
+  id             String   @id @default(cuid())
+  name           String
+  email          String?
+  phone          String
+  source         String   @default("website") // website, whatsapp, referral, walk_in, google, social_media
+  status         String   @default("lead") // lead, inquiry, site_visit, negotiation, token, booking, move_in, lost
+  stage          Int      @default(1)
+  propertyId     String
+  property       Property @relation(fields: [propertyId], references: [id])
+  roomPreference String?
+  budget         Float?
+  visitDate      DateTime?
+  visitNotes     String?
+  followUpDate   DateTime?
+  followUpNotes  String?
+  tokenAmount    Float?
+  notes          String?
+  lostReason     String?
+  assignedToId   String?
+  assignedTo     User?    @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  createdById    String
+  createdBy      User     @relation("LeadCreator", fields: [createdById], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+// ─── Tenant Management ─────────────────────────────────────
+model Tenant {
+  id               String   @id @default(cuid())
+  userId           String?  @unique
+  user             User?    @relation(fields: [userId], references: [id])
+  name             String
+  email            String?
+  phone            String
+  emergencyContact String?
+  emergencyPhone   String?
+  fatherName       String?
+  motherName       String?
+  aadhaarNumber    String?
+  panNumber        String?
+  passportNumber   String?
+  dateOfBirth      DateTime?
+  gender           String?
+  occupation       String?
+  company          String?
+  permanentAddress String?
+  kycStatus        String   @default("pending") // pending, verified, rejected
+  policeVerified   Boolean  @default(false)
+  agreementStatus  String   @default("pending") // pending, signed, expired
+  agreementStart   DateTime?
+  agreementEnd     DateTime?
+  propertyId       String
+  property         Property @relation(fields: [propertyId], references: [id])
+  roomId           String?
+  room             Room?    @relation(fields: [roomId], references: [id])
+  bedId            String?  @unique
+  bed              Bed?     @relation("BedTenant", fields: [bedId], references: [id])
+  checkInDate      DateTime?
+  checkOutDate     DateTime?
+  status           String   @default("active") // active, inactive, notice_period, moved_out
+  rentAmount       Float    @default(0)
+  depositAmount    Float    @default(0)
+  depositStatus    String   @default("pending") // pending, paid, refunded, partially_refunded
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payments     Payment[]
+  complaints   Complaint[]
+  visitors     Visitor[]
+  documents    Document[]
+  bookings     Booking[]
+}
+
+// ─── Booking & Check-in ────────────────────────────────────
+model Booking {
+  id           String   @id @default(cuid())
+  leadId       String?
+  lead         Lead?    @relation(fields: [leadId], references: [id])
+  tenantId     String?
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id])
+  roomId       String
+  room         Room     @relation(fields: [roomId], references: [id])
+  propertyId   String
+  checkInDate  DateTime
+  checkOutDate DateTime?
+  status       String   @default("confirmed") // confirmed, checked_in, checked_out, cancelled
+  bookingType  String   @default("new") // new, renewal, transfer
+  tokenAmount  Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── Rent & Payment ────────────────────────────────────────
+model Payment {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  propertyId     String
+  amount         Float
+  rentAmount     Float    @default(0)
+  electricity    Float    @default(0)
+  water          Float    @default(0)
+  wifi           Float    @default(0)
+  food           Float    @default(0)
+  laundry        Float    @default(0)
+  parking        Float    @default(0)
+  otherCharges   Float    @default(0)
+  lateFine       Float    @default(0)
+  discount       Float    @default(0)
+  advanceAdjust  Float    @default(0)
+  paymentMethod  String   @default("upi") // upi, bank_transfer, card, wallet, cash, qr
+  paymentType    String   @default("rent") // rent, deposit, token, other
+  status         String   @default("pending") // pending, paid, failed, overdue
+  dueDate        DateTime
+  paidDate       DateTime?
+  receiptNumber  String?
+  utrNumber      String?
+  notes          String?
+  month          Int
+  year           Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// ─── Complaint Management ──────────────────────────────────
+model Complaint {
+  id           String   @id @default(cuid())
+  title        String
+  description  String
+  category     String   @default("maintenance") // maintenance, cleanliness, noise, food, staff, other
+  priority     String   @default("medium") // low, medium, high, urgent
+  status       String   @default("open") // open, assigned, in_progress, resolved, closed
+  rating       Int?
+  resolution   String?
+  propertyId   String
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  assignedToId String?
+  assignedTo   User?    @relation("ComplaintAssignee", fields: [assignedToId], references: [id])
+  createdById  String
+  createdBy    User     @relation("ComplaintCreator", fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  activities ActivityLog[]
+}
+
+// ─── Staff Management ──────────────────────────────────────
+model Staff {
+  id            String   @id @default(cuid())
+  userId        String?  @unique
+  user          User?    @relation(fields: [userId], references: [id])
+  name          String
+  phone         String
+  role          String   @default("caretaker") // caretaker, housekeeping, maintenance, security, cook, manager
+  propertyId    String
+  property      Property @relation(fields: [propertyId], references: [id])
+  salary        Float    @default(0)
+  joinDate      DateTime?
+  status        String   @default("active") // active, inactive, on_leave
+  aadhaarNumber String?
+  address       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  attendance     Attendance[]
+  salaryPayments SalaryPayment[]
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  date      DateTime
+  checkIn   DateTime?
+  checkOut  DateTime?
+  status    String   @default("present") // present, absent, half_day, leave
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SalaryPayment {
+  id        String   @id @default(cuid())
+  staffId   String
+  staff     Staff    @relation(fields: [staffId], references: [id], onDelete: Cascade)
+  amount    Float
+  month     Int
+  year      Int
+  status    String   @default("paid") // paid, pending, processing
+  paidDate  DateTime?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Accounting ────────────────────────────────────────────
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   @default("maintenance") // maintenance, utilities, salary, supplies, food, marketing, other
+  description String
+  amount      Float
+  date        DateTime
+  vendor      String?
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  createdById String
+  createdBy   User     @relation("ExpenseCreator", fields: [createdById], references: [id])
+  receipt     String?
+  status      String   @default("approved") // pending, approved, rejected
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Communication ─────────────────────────────────────────
+model Notice {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        String   @default("general") // general, urgent, maintenance, event, payment
+  propertyId  String
+  property    Property @relation(fields: [propertyId], references: [id])
+  createdById String
+  createdBy   User     @relation("NoticeCreator", fields: [createdById], references: [id])
+  isActive    Boolean  @default(true)
+  expiryDate  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Communication {
+  id            String   @id @default(cuid())
+  type          String   @default("whatsapp") // whatsapp, sms, email, push, announcement
+  message       String
+  recipientType String   @default("all") // all, tenants, staff, specific
+  recipientId   String?
+  propertyId    String?
+  senderId      String
+  sender        User     @relation("MessageSender", fields: [senderId], references: [id])
+  status        String   @default("sent") // sent, delivered, failed, read
+  sentAt        DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ─── Visitor Management ────────────────────────────────────
+model Visitor {
+  id         String   @id @default(cuid())
+  name       String
+  phone      String?
+  purpose    String
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+  hostId     String?
+  host       User?    @relation("VisitorHost", fields: [hostId], references: [id])
+  propertyId String
+  property   Property @relation(fields: [propertyId], references: [id])
+  checkIn    DateTime
+  checkOut   DateTime?
+  status     String   @default("checked_in") // checked_in, checked_out
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── Documents ─────────────────────────────────────────────
+model Document {
+  id         String   @id @default(cuid())
+  name       String
+  type       String   @default("identity") // identity, agreement, receipt, photo, other
+  fileUrl    String
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+  propertyId String?
+  uploadedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// ─── Activity Log ──────────────────────────────────────────
+model ActivityLog {
+  id          String   @id @default(cuid())
+  action      String
+  details     String?
+  entityType  String
+  entityId    String?
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  complaintId String?
+  complaint   Complaint? @relation(fields: [complaintId], references: [id])
+  createdAt   DateTime @default(now())
+}
+
+// ─── Subscription ──────────────────────────────────────────
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      String   @default("basic") // basic, premium, gold, white_label
+  status    String   @default("active") // active, expired, cancelled, trial
+  startDate DateTime
+  endDate   DateTime?
+  amount    Float    @default(0)
+  autoRenew Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

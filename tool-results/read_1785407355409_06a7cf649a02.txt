@@ -1,0 +1,1236 @@
+     1→'use client'
+     2→
+     3→import { useEffect, useState, useMemo, useCallback } from 'react'
+     4→import { useAppStore } from '@/lib/store'
+     5→import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
+     6→import { Badge } from '@/components/ui/badge'
+     7→import { Button } from '@/components/ui/button'
+     8→import { Input } from '@/components/ui/input'
+     9→import { Label } from '@/components/ui/label'
+    10→import { Textarea } from '@/components/ui/textarea'
+    11→import { Skeleton } from '@/components/ui/skeleton'
+    12→import { ScrollArea } from '@/components/ui/scroll-area'
+    13→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+    14→import {
+    15→  Dialog,
+    16→  DialogContent,
+    17→  DialogDescription,
+    18→  DialogFooter,
+    19→  DialogHeader,
+    20→  DialogTitle,
+    21→} from '@/components/ui/dialog'
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→} from '@/components/ui/select'
+    29→import {
+    30→  Table,
+    31→  TableBody,
+    32→  TableCell,
+    33→  TableHead,
+    34→  TableHeader,
+    35→  TableRow,
+    36→} from '@/components/ui/table'
+    37→import {
+    38→  DropdownMenu,
+    39→  DropdownMenuContent,
+    40→  DropdownMenuItem,
+    41→  DropdownMenuTrigger,
+    42→} from '@/components/ui/dropdown-menu'
+    43→import {
+    44→  ChartContainer,
+    45→  ChartTooltip,
+    46→  ChartTooltipContent,
+    47→  ChartLegend,
+    48→  ChartLegendContent,
+    49→  type ChartConfig,
+    50→} from '@/components/ui/chart'
+    51→import {
+    52→  AreaChart,
+    53→  Area,
+    54→  PieChart,
+    55→  Pie,
+    56→  Cell,
+    57→  BarChart,
+    58→  Bar,
+    59→  XAxis,
+    60→  YAxis,
+    61→  CartesianGrid,
+    62→} from 'recharts'
+    63→import {
+    64→  IndianRupee,
+    65→  TrendingUp,
+    66→  TrendingDown,
+    67→  Plus,
+    68→  Search,
+    69→  Eye,
+    70→  MoreVertical,
+    71→  Loader2,
+    72→  Building2,
+    73→  Receipt,
+    74→  CreditCard,
+    75→  Wallet,
+    76→  ArrowUpDown,
+    77→  Filter,
+    78→  FileText,
+    79→  CheckCircle2,
+    80→  XCircle,
+    81→  Clock,
+    82→  AlertTriangle,
+    83→  ArrowUpRight,
+    84→  ArrowDownRight,
+    85→  DollarSign,
+    86→  PieChart as PieChartIcon,
+    87→  BarChart3,
+    88→} from 'lucide-react'
+    89→
+    90→// ── Types ────────────────────────────────────────────────────────────────────
+    91→
+    92→type ExpenseCategory = 'maintenance' | 'utilities' | 'salary' | 'supplies' | 'food' | 'marketing' | 'other'
+    93→type ExpenseStatus = 'pending' | 'approved' | 'rejected'
+    94→type IncomeSource = 'rent' | 'deposit' | 'other'
+    95→
+    96→interface ExpenseData {
+    97→  id: string
+    98→  category: ExpenseCategory
+    99→  description: string
+   100→  amount: number
+   101→  date: string
+   102→  vendor?: string | null
+   103→  propertyId: string
+   104→  property: { id: string; name: string; address?: string }
+   105→  createdById: string
+   106→  createdBy?: { id: string; name: string; email: string } | null
+   107→  receipt?: string | null
+   108→  status: ExpenseStatus
+   109→  createdAt: string
+   110→  updatedAt: string
+   111→}
+   112→
+   113→interface IncomeData {
+   114→  id: string
+   115→  date: string
+   116→  source: IncomeSource
+   117→  tenantName: string
+   118→  amount: number
+   119→  propertyId: string
+   120→  property: { id: string; name: string }
+   121→  paymentMethod: string
+   122→  status: string
+   123→}
+   124→
+   125→interface PropertyInfo {
+   126→  id: string
+   127→  name: string
+   128→}
+   129→
+   130→interface ExpenseFormData {
+   131→  category: ExpenseCategory
+   132→  description: string
+   133→  amount: string
+   134→  date: string
+   135→  vendor: string
+   136→  propertyId: string
+   137→  receipt: string
+   138→  status: ExpenseStatus
+   139→}
+   140→
+   141→// ── Constants ────────────────────────────────────────────────────────────────
+   142→
+   143→const CATEGORY_CONFIG: Record<ExpenseCategory, { label: string; bgClass: string; textClass: string; color: string }> = {
+   144→  maintenance: { label: 'Maintenance', bgClass: 'bg-orange-100 dark:bg-orange-950/50', textClass: 'text-orange-700 dark:text-orange-300', color: '#f97316' },
+   145→  utilities: { label: 'Utilities', bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300', color: '#3b82f6' },
+   146→  salary: { label: 'Salary', bgClass: 'bg-purple-100 dark:bg-purple-950/50', textClass: 'text-purple-700 dark:text-purple-300', color: '#8b5cf6' },
+   147→  supplies: { label: 'Supplies', bgClass: 'bg-teal-100 dark:bg-teal-950/50', textClass: 'text-teal-700 dark:text-teal-300', color: '#14b8a6' },
+   148→  food: { label: 'Food', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', color: '#10b981' },
+   149→  marketing: { label: 'Marketing', bgClass: 'bg-pink-100 dark:bg-pink-950/50', textClass: 'text-pink-700 dark:text-pink-300', color: '#ec4899' },
+   150→  other: { label: 'Other', bgClass: 'bg-gray-100 dark:bg-gray-950/50', textClass: 'text-gray-700 dark:text-gray-300', color: '#6b7280' },
+   151→}
+   152→
+   153→const EXPENSE_STATUS_CONFIG: Record<ExpenseStatus, { label: string; bgClass: string; textClass: string; dotClass: string }> = {
+   154→  pending: { label: 'Pending', bgClass: 'bg-amber-100 dark:bg-amber-950/50', textClass: 'text-amber-700 dark:text-amber-300', dotClass: 'bg-amber-500' },
+   155→  approved: { label: 'Approved', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300', dotClass: 'bg-emerald-500' },
+   156→  rejected: { label: 'Rejected', bgClass: 'bg-red-100 dark:bg-red-950/50', textClass: 'text-red-700 dark:text-red-300', dotClass: 'bg-red-500' },
+   157→}
+   158→
+   159→const INCOME_SOURCE_CONFIG: Record<IncomeSource, { label: string; bgClass: string; textClass: string }> = {
+   160→  rent: { label: 'Rent', bgClass: 'bg-emerald-100 dark:bg-emerald-950/50', textClass: 'text-emerald-700 dark:text-emerald-300' },
+   161→  deposit: { label: 'Deposit', bgClass: 'bg-blue-100 dark:bg-blue-950/50', textClass: 'text-blue-700 dark:text-blue-300' },
+   162→  other: { label: 'Other', bgClass: 'bg-gray-100 dark:bg-gray-950/50', textClass: 'text-gray-700 dark:text-gray-300' },
+   163→}
+   164→
+   165→const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+   166→
+   167→const TREND_CHART_CONFIG: ChartConfig = {
+   168→  income: { label: 'Income', color: '#10b981' },
+   169→  expenses: { label: 'Expenses', color: '#ef4444' },
+   170→}
+   171→
+   172→const CATEGORY_PIE_CONFIG: ChartConfig = {
+   173→  maintenance: { label: 'Maintenance', color: '#f97316' },
+   174→  utilities: { label: 'Utilities', color: '#3b82f6' },
+   175→  salary: { label: 'Salary', color: '#8b5cf6' },
+   176→  supplies: { label: 'Supplies', color: '#14b8a6' },
+   177→  food: { label: 'Food', color: '#10b981' },
+   178→  marketing: { label: 'Marketing', color: '#ec4899' },
+   179→  other: { label: 'Other', color: '#6b7280' },
+   180→}
+   181→
+   182→const CASH_FLOW_CONFIG: ChartConfig = {
+   183→  inflow: { label: 'Inflow', color: '#10b981' },
+   184→  outflow: { label: 'Outflow', color: '#ef4444' },
+   185→}
+   186→
+   187→const EMPTY_FORM: ExpenseFormData = {
+   188→  category: 'maintenance',
+   189→  description: '',
+   190→  amount: '',
+   191→  date: new Date().toISOString().split('T')[0],
+   192→  vendor: '',
+   193→  propertyId: '',
+   194→  receipt: '',
+   195→  status: 'approved',
+   196→}
+   197→
+   198→// ── Helpers ──────────────────────────────────────────────────────────────────
+   199→
+   200→function formatCurrency(amount: number): string {
+   201→  return new Intl.NumberFormat('en-IN', {
+   202→    style: 'currency',
+   203→    currency: 'INR',
+   204→    minimumFractionDigits: 0,
+   205→    maximumFractionDigits: 0,
+   206→  }).format(amount)
+   207→}
+   208→
+   209→function formatDate(dateStr?: string | null): string {
+   210→  if (!dateStr) return '—'
+   211→  return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+   212→}
+   213→
+   214→// ── Skeleton Loaders ─────────────────────────────────────────────────────────
+   215→
+   216→function StatsCardSkeleton() {
+   217→  return (
+   218→    <Card>
+   219→      <CardContent className="p-6">
+   220→        <div className="flex items-center justify-between">
+   221→          <div className="space-y-2">
+   222→            <Skeleton className="h-4 w-24" />
+   223→            <Skeleton className="h-8 w-16" />
+   224→          </div>
+   225→          <Skeleton className="h-10 w-10 rounded-lg" />
+   226→        </div>
+   227→      </CardContent>
+   228→    </Card>
+   229→  )
+   230→}
+   231→
+   232→function ChartSkeleton() {
+   233→  return (
+   234→    <Card>
+   235→      <CardContent className="p-6">
+   236→        <Skeleton className="h-4 w-32 mb-4" />
+   237→        <Skeleton className="h-64 w-full" />
+   238→      </CardContent>
+   239→    </Card>
+   240→  )
+   241→}
+   242→
+   243→function TableSkeleton() {
+   244→  return (
+   245→    <div className="space-y-3">
+   246→      <Skeleton className="h-10 w-full rounded" />
+   247→      {Array.from({ length: 5 }).map((_, i) => (
+   248→        <Skeleton key={i} className="h-12 w-full rounded" />
+   249→      ))}
+   250→    </div>
+   251→  )
+   252→}
+   253→
+   254→// ── Stats Card ───────────────────────────────────────────────────────────────
+   255→
+   256→interface StatsCardProps {
+   257→  title: string
+   258→  value: string
+   259→  icon: React.ElementType
+   260→  iconBg?: string
+   261→  iconColor?: string
+   262→  subtitle?: string
+   263→  trend?: { value: number; isPositive: boolean }
+   264→}
+   265→
+   266→function StatsCard({ title, value, icon: Icon, iconBg = 'bg-emerald-50 dark:bg-emerald-950/50', iconColor = 'text-emerald-600 dark:text-emerald-400', subtitle, trend }: StatsCardProps) {
+   267→  return (
+   268→    <Card className="hover:shadow-md transition-shadow">
+   269→      <CardContent className="p-6">
+   270→        <div className="flex items-center justify-between">
+   271→          <div className="space-y-1">
+   272→            <p className="text-sm text-muted-foreground font-medium">{title}</p>
+   273→            <p className="text-2xl font-bold tracking-tight">{value}</p>
+   274→            <div className="flex items-center gap-1">
+   275→              {trend && (
+   276→                <span className={`text-xs font-medium flex items-center gap-0.5 ${trend.isPositive ? 'text-emerald-600' : 'text-red-600'}`}>
+   277→                  {trend.isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+   278→                  {Math.abs(trend.value)}%
+   279→                </span>
+   280→              )}
+   281→              {subtitle && <span className="text-xs text-muted-foreground">{subtitle}</span>}
+   282→            </div>
+   283→          </div>
+   284→          <div className={`flex items-center justify-center w-10 h-10 rounded-lg ${iconBg}`}>
+   285→            <Icon className={`w-5 h-5 ${iconColor}`} />
+   286→          </div>
+   287→        </div>
+   288→      </CardContent>
+   289→    </Card>
+   290→  )
+   291→}
+   292→
+   293→// ── Add Expense Dialog ───────────────────────────────────────────────────────
+   294→
+   295→function AddExpenseDialog({
+   296→  open,
+   297→  onClose,
+   298→  properties,
+   299→  onSubmit,
+   300→  submitting,
+   301→  userId,
+   302→}: {
+   303→  open: boolean
+   304→  onClose: () => void
+   305→  properties: PropertyInfo[]
+   306→  onSubmit: (data: ExpenseFormData) => Promise<void>
+   307→  submitting: boolean
+   308→  userId: string | undefined
+   309→}) {
+   310→  const [form, setForm] = useState<ExpenseFormData>(EMPTY_FORM)
+   311→
+   312→  const handleSubmit = async () => {
+   313→    await onSubmit(form)
+   314→    setForm(EMPTY_FORM)
+   315→  }
+   316→
+   317→  return (
+   318→    <Dialog open={open} onOpenChange={onClose}>
+   319→      <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+   320→        <DialogHeader>
+   321→          <DialogTitle className="flex items-center gap-2">
+   322→            <Plus className="h-5 w-5 text-emerald-600" />
+   323→            Add Expense
+   324→          </DialogTitle>
+   325→          <DialogDescription>Record a new expense entry</DialogDescription>
+   326→        </DialogHeader>
+   327→
+   328→        <div className="space-y-6 py-2">
+   329→          {/* Expense Details */}
+   330→          <div>
+   331→            <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+   332→              <Receipt className="h-4 w-4 text-emerald-600" />
+   333→              Expense Details
+   334→            </h3>
+   335→            <div className="grid grid-cols-2 gap-4">
+   336→              <div className="space-y-2">
+   337→                <Label htmlFor="expense-category">Category *</Label>
+   338→                <Select value={form.category} onValueChange={v => setForm(f => ({ ...f, category: v as ExpenseCategory }))}>
+   339→                  <SelectTrigger id="expense-category">
+   340→                    <SelectValue placeholder="Select category" />
+   341→                  </SelectTrigger>
+   342→                  <SelectContent>
+   343→                    {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+   344→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   345→                    ))}
+   346→                  </SelectContent>
+   347→                </Select>
+   348→              </div>
+   349→              <div className="space-y-2">
+   350→                <Label htmlFor="expense-amount">Amount *</Label>
+   351→                <Input
+   352→                  id="expense-amount"
+   353→                  type="number"
+   354→                  placeholder="Enter amount"
+   355→                  value={form.amount}
+   356→                  onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+   357→                />
+   358→              </div>
+   359→              <div className="col-span-2 space-y-2">
+   360→                <Label htmlFor="expense-description">Description *</Label>
+   361→                <Textarea
+   362→                  id="expense-description"
+   363→                  placeholder="Enter expense description"
+   364→                  value={form.description}
+   365→                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+   366→                />
+   367→              </div>
+   368→              <div className="space-y-2">
+   369→                <Label htmlFor="expense-date">Date</Label>
+   370→                <Input
+   371→                  id="expense-date"
+   372→                  type="date"
+   373→                  value={form.date}
+   374→                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+   375→                />
+   376→              </div>
+   377→              <div className="space-y-2">
+   378→                <Label htmlFor="expense-vendor">Vendor</Label>
+   379→                <Input
+   380→                  id="expense-vendor"
+   381→                  placeholder="Vendor name"
+   382→                  value={form.vendor}
+   383→                  onChange={e => setForm(f => ({ ...f, vendor: e.target.value }))}
+   384→                />
+   385→              </div>
+   386→              <div className="space-y-2">
+   387→                <Label htmlFor="expense-property">Property *</Label>
+   388→                <Select value={form.propertyId} onValueChange={v => setForm(f => ({ ...f, propertyId: v }))}>
+   389→                  <SelectTrigger id="expense-property">
+   390→                    <SelectValue placeholder="Select property" />
+   391→                  </SelectTrigger>
+   392→                  <SelectContent>
+   393→                    {properties.map(p => (
+   394→                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   395→                    ))}
+   396→                  </SelectContent>
+   397→                </Select>
+   398→              </div>
+   399→              <div className="space-y-2">
+   400→                <Label htmlFor="expense-status">Status</Label>
+   401→                <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as ExpenseStatus }))}>
+   402→                  <SelectTrigger id="expense-status">
+   403→                    <SelectValue placeholder="Select status" />
+   404→                  </SelectTrigger>
+   405→                  <SelectContent>
+   406→                    {Object.entries(EXPENSE_STATUS_CONFIG).map(([key, cfg]) => (
+   407→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   408→                    ))}
+   409→                  </SelectContent>
+   410→                </Select>
+   411→              </div>
+   412→              <div className="col-span-2 space-y-2">
+   413→                <Label htmlFor="expense-receipt">Receipt URL</Label>
+   414→                <Input
+   415→                  id="expense-receipt"
+   416→                  placeholder="Receipt file URL or reference"
+   417→                  value={form.receipt}
+   418→                  onChange={e => setForm(f => ({ ...f, receipt: e.target.value }))}
+   419→                />
+   420→              </div>
+   421→            </div>
+   422→          </div>
+   423→        </div>
+   424→
+   425→        <DialogFooter>
+   426→          <Button variant="outline" onClick={onClose}>Cancel</Button>
+   427→          <Button
+   428→            onClick={handleSubmit}
+   429→            disabled={submitting || !form.description || !form.amount || !form.propertyId}
+   430→            className="bg-emerald-600 hover:bg-emerald-700"
+   431→          >
+   432→            {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+   433→            Add Expense
+   434→          </Button>
+   435→        </DialogFooter>
+   436→      </DialogContent>
+   437→    </Dialog>
+   438→  )
+   439→}
+   440→
+   441→// ── Expense Detail Dialog ────────────────────────────────────────────────────
+   442→
+   443→function ExpenseDetailDialog({
+   444→  expense,
+   445→  open,
+   446→  onClose,
+   447→}: {
+   448→  expense: ExpenseData | null
+   449→  open: boolean
+   450→  onClose: () => void
+   451→}) {
+   452→  if (!expense) return null
+   453→
+   454→  const catCfg = CATEGORY_CONFIG[expense.category]
+   455→  const statusCfg = EXPENSE_STATUS_CONFIG[expense.status]
+   456→
+   457→  return (
+   458→    <Dialog open={open} onOpenChange={onClose}>
+   459→      <DialogContent className="max-w-lg">
+   460→        <DialogHeader>
+   461→          <DialogTitle className="flex items-center gap-2">
+   462→            <Receipt className="h-5 w-5 text-emerald-600" />
+   463→            Expense Details
+   464→          </DialogTitle>
+   465→          <DialogDescription>{expense.description}</DialogDescription>
+   466→        </DialogHeader>
+   467→
+   468→        <div className="space-y-4">
+   469→          <div className="grid grid-cols-2 gap-4">
+   470→            <Card>
+   471→              <CardContent className="p-4 space-y-2 text-sm">
+   472→                <div className="flex justify-between">
+   473→                  <span className="text-slate-500">Category</span>
+   474→                  <Badge variant="secondary" className={`${catCfg.bgClass} ${catCfg.textClass} text-xs`}>
+   475→                    {catCfg.label}
+   476→                  </Badge>
+   477→                </div>
+   478→                <div className="flex justify-between">
+   479→                  <span className="text-slate-500">Amount</span>
+   480→                  <span className="font-bold text-lg">{formatCurrency(expense.amount)}</span>
+   481→                </div>
+   482→                <div className="flex justify-between">
+   483→                  <span className="text-slate-500">Date</span>
+   484→                  <span className="font-medium">{formatDate(expense.date)}</span>
+   485→                </div>
+   486→                <div className="flex justify-between">
+   487→                  <span className="text-slate-500">Status</span>
+   488→                  <Badge variant="secondary" className={`${statusCfg.bgClass} ${statusCfg.textClass} text-xs`}>
+   489→                    <div className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClass} mr-1`} />
+   490→                    {statusCfg.label}
+   491→                  </Badge>
+   492→                </div>
+   493→              </CardContent>
+   494→            </Card>
+   495→            <Card>
+   496→              <CardContent className="p-4 space-y-2 text-sm">
+   497→                <div className="flex justify-between">
+   498→                  <span className="text-slate-500">Property</span>
+   499→                  <span className="font-medium">{expense.property?.name}</span>
+   500→                </div>
+   501→                {expense.vendor && (
+   502→                  <div className="flex justify-between">
+   503→                    <span className="text-slate-500">Vendor</span>
+   504→                    <span className="font-medium">{expense.vendor}</span>
+   505→                  </div>
+   506→                )}
+   507→                {expense.createdBy && (
+   508→                  <div className="flex justify-between">
+   509→                    <span className="text-slate-500">Created By</span>
+   510→                    <span className="font-medium">{expense.createdBy.name}</span>
+   511→                  </div>
+   512→                )}
+   513→                {expense.receipt && (
+   514→                  <div className="flex justify-between">
+   515→                    <span className="text-slate-500">Receipt</span>
+   516→                    <a href={expense.receipt} target="_blank" rel="noopener noreferrer" className="text-emerald-600 hover:underline text-xs">View Receipt</a>
+   517→                  </div>
+   518→                )}
+   519→              </CardContent>
+   520→            </Card>
+   521→          </div>
+   522→        </div>
+   523→      </DialogContent>
+   524→    </Dialog>
+   525→  )
+   526→}
+   527→
+   528→// ── Main Component ───────────────────────────────────────────────────────────
+   529→
+   530→export function ExpensesPage() {
+   531→  const { currentUser } = useAppStore()
+   532→
+   533→  // Data
+   534→  const [expenses, setExpenses] = useState<ExpenseData[]>([])
+   535→  const [incomeData, setIncomeData] = useState<IncomeData[]>([])
+   536→  const [properties, setProperties] = useState<PropertyInfo[]>([])
+   537→  const [loading, setLoading] = useState(true)
+   538→
+   539→  // UI State
+   540→  const [activeTab, setActiveTab] = useState<string>('expenses')
+   541→  const [searchQuery, setSearchQuery] = useState('')
+   542→  const [categoryFilter, setCategoryFilter] = useState<string>('all')
+   543→  const [propertyFilter, setPropertyFilter] = useState<string>('all')
+   544→  const [statusFilter, setStatusFilter] = useState<string>('all')
+   545→  const [incomeSourceFilter, setIncomeSourceFilter] = useState<string>('all')
+   546→  const [dateFrom, setDateFrom] = useState('')
+   547→  const [dateTo, setDateTo] = useState('')
+   548→
+   549→  // Dialogs
+   550→  const [showAddDialog, setShowAddDialog] = useState(false)
+   551→  const [showDetailDialog, setShowDetailDialog] = useState(false)
+   552→  const [selectedExpense, setSelectedExpense] = useState<ExpenseData | null>(null)
+   553→  const [submitting, setSubmitting] = useState(false)
+   554→
+   555→  // ── Data Fetching ──────────────────────────────────────────────────────────
+   556→
+   557→  const fetchExpenses = async () => {
+   558→    try {
+   559→      const params = new URLSearchParams()
+   560→      if (categoryFilter !== 'all') params.set('category', categoryFilter)
+   561→      if (propertyFilter !== 'all') params.set('propertyId', propertyFilter)
+   562→      if (dateFrom) params.set('startDate', dateFrom)
+   563→      if (dateTo) params.set('endDate', dateTo)
+   564→
+   565→      const res = await fetch(`/api/expenses?${params.toString()}`)
+   566→      if (res.ok) {
+   567→        const data = await res.json()
+   568→        setExpenses(data)
+   569→      }
+   570→    } catch (err) {
+   571→      console.error('Failed to fetch expenses:', err)
+   572→    }
+   573→  }
+   574→
+   575→  const fetchProperties = async () => {
+   576→    try {
+   577→      const res = await fetch('/api/properties')
+   578→      if (res.ok) {
+   579→        const data = await res.json()
+   580→        setProperties(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
+   581→      }
+   582→    } catch (err) {
+   583→      console.error('Failed to fetch properties:', err)
+   584→    }
+   585→  }
+   586→
+   587→  useEffect(() => {
+   588→    const loadData = async () => {
+   589→      setLoading(true)
+   590→      await Promise.all([fetchExpenses(), fetchProperties()])
+   591→      setLoading(false)
+   592→    }
+   593→    loadData()
+   594→  }, [])
+   595→
+   596→  useEffect(() => {
+   597→    if (!loading) {
+   598→      fetchExpenses()
+   599→    }
+   600→    // eslint-disable-next-line react-hooks/exhaustive-deps
+   601→  }, [categoryFilter, propertyFilter, dateFrom, dateTo])
+   602→
+   603→  // ── Generate Mock Income Data ──────────────────────────────────────────────
+   604→  // In a real app, this would come from /api/payments or /api/income
+   605→
+   606→  const incomeRecords = useMemo<IncomeData[]>(() => {
+   607→    const sources: IncomeSource[] = ['rent', 'deposit', 'other']
+   608→    const methods = ['upi', 'bank_transfer', 'cash', 'card']
+   609→    const records: IncomeData[] = []
+   610→
+   611→    expenses.forEach((_, idx) => {
+   612→      const prop = properties[Math.floor(Math.random() * properties.length)] || properties[0]
+   613→      if (prop) {
+   614→        records.push({
+   615→          id: `inc-${idx}`,
+   616→          date: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString(),
+   617→          source: sources[Math.floor(Math.random() * sources.length)],
+   618→          tenantName: `Tenant ${idx + 1}`,
+   619→          amount: Math.floor(5000 + Math.random() * 15000),
+   620→          propertyId: prop.id,
+   621→          property: { id: prop.id, name: prop.name },
+   622→          paymentMethod: methods[Math.floor(Math.random() * methods.length)],
+   623→          status: Math.random() > 0.2 ? 'completed' : 'pending',
+   624→        })
+   625→      }
+   626→    })
+   627→
+   628→    return records
+   629→  }, [expenses, properties])
+   630→
+   631→  // ── Computed Values ────────────────────────────────────────────────────────
+   632→
+   633→  const stats = useMemo(() => {
+   634→    const now = new Date()
+   635→    const thisMonth = now.getMonth()
+   636→    const thisYear = now.getFullYear()
+   637→
+   638→    const thisMonthExpenses = expenses.filter(e => {
+   639→      const d = new Date(e.date)
+   640→      return d.getMonth() === thisMonth && d.getFullYear() === thisYear
+   641→    })
+   642→    const totalExpenses = thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0)
+   643→
+   644→    const thisMonthIncome = incomeRecords.filter(i => {
+   645→      const d = new Date(i.date)
+   646→      return d.getMonth() === thisMonth && d.getFullYear() === thisYear
+   647→    })
+   648→    const totalIncome = thisMonthIncome.reduce((sum, i) => sum + i.amount, 0)
+   649→
+   650→    const netProfit = totalIncome - totalExpenses
+   651→    const outstandingDues = incomeRecords.filter(i => i.status === 'pending').reduce((sum, i) => sum + i.amount, 0)
+   652→
+   653→    return { totalIncome, totalExpenses, netProfit, outstandingDues }
+   654→  }, [expenses, incomeRecords])
+   655→
+   656→  const filteredExpenses = useMemo(() => {
+   657→    return expenses.filter(e => {
+   658→      const matchesSearch = e.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+   659→        (e.vendor || '').toLowerCase().includes(searchQuery.toLowerCase())
+   660→      const matchesCategory = categoryFilter === 'all' || e.category === categoryFilter
+   661→      const matchesProperty = propertyFilter === 'all' || e.propertyId === propertyFilter
+   662→      const matchesStatus = statusFilter === 'all' || e.status === statusFilter
+   663→      return matchesSearch && matchesCategory && matchesProperty && matchesStatus
+   664→    })
+   665→  }, [expenses, searchQuery, categoryFilter, propertyFilter, statusFilter])
+   666→
+   667→  const filteredIncome = useMemo(() => {
+   668→    return incomeRecords.filter(i => {
+   669→      const matchesSearch = i.tenantName.toLowerCase().includes(searchQuery.toLowerCase())
+   670→      const matchesSource = incomeSourceFilter === 'all' || i.source === incomeSourceFilter
+   671→      const matchesProperty = propertyFilter === 'all' || i.propertyId === propertyFilter
+   672→      return matchesSearch && matchesSource && matchesProperty
+   673→    })
+   674→  }, [incomeRecords, searchQuery, incomeSourceFilter, propertyFilter])
+   675→
+   676→  // ── Chart Data ─────────────────────────────────────────────────────────────
+   677→
+   678→  const trendData = useMemo(() => {
+   679→    const now = new Date()
+   680→    return Array.from({ length: 6 }).map((_, i) => {
+   681→      const month = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+   682→      const monthExpenses = expenses
+   683→        .filter(e => { const d = new Date(e.date); return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear() })
+   684→        .reduce((sum, e) => sum + e.amount, 0)
+   685→      const monthIncome = incomeRecords
+   686→        .filter(inc => { const d = new Date(inc.date); return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear() })
+   687→        .reduce((sum, inc) => sum + inc.amount, 0)
+   688→      return {
+   689→        month: MONTH_SHORT[month.getMonth()],
+   690→        income: monthIncome,
+   691→        expenses: monthExpenses,
+   692→      }
+   693→    })
+   694→  }, [expenses, incomeRecords])
+   695→
+   696→  const categoryBreakdownData = useMemo(() => {
+   697→    const categoryTotals: Record<string, number> = {}
+   698→    expenses.forEach(e => {
+   699→      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount
+   700→    })
+   701→    return Object.entries(categoryTotals).map(([key, value]) => ({
+   702→      category: CATEGORY_CONFIG[key as ExpenseCategory]?.label || key,
+   703→      value,
+   704→      fill: CATEGORY_CONFIG[key as ExpenseCategory]?.color || '#6b7280',
+   705→    }))
+   706→  }, [expenses])
+   707→
+   708→  const cashFlowData = useMemo(() => {
+   709→    const now = new Date()
+   710→    return Array.from({ length: 6 }).map((_, i) => {
+   711→      const month = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1)
+   712→      const outflow = expenses
+   713→        .filter(e => { const d = new Date(e.date); return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear() })
+   714→        .reduce((sum, e) => sum + e.amount, 0)
+   715→      const inflow = incomeRecords
+   716→        .filter(inc => { const d = new Date(inc.date); return d.getMonth() === month.getMonth() && d.getFullYear() === month.getFullYear() })
+   717→        .reduce((sum, inc) => sum + inc.amount, 0)
+   718→      return {
+   719→        month: MONTH_SHORT[month.getMonth()],
+   720→        inflow,
+   721→        outflow,
+   722→      }
+   723→    })
+   724→  }, [expenses, incomeRecords])
+   725→
+   726→  const propertySummary = useMemo(() => {
+   727→    return properties.map(p => {
+   728→      const propExpenses = expenses.filter(e => e.propertyId === p.id).reduce((sum, e) => sum + e.amount, 0)
+   729→      const propIncome = incomeRecords.filter(i => i.propertyId === p.id).reduce((sum, i) => sum + i.amount, 0)
+   730→      return {
+   731→        id: p.id,
+   732→        name: p.name,
+   733→        income: propIncome,
+   734→        expenses: propExpenses,
+   735→        profit: propIncome - propExpenses,
+   736→      }
+   737→    })
+   738→  }, [properties, expenses, incomeRecords])
+   739→
+   740→  // ── Handlers ───────────────────────────────────────────────────────────────
+   741→
+   742→  const handleAddExpense = async (formData: ExpenseFormData) => {
+   743→    setSubmitting(true)
+   744→    try {
+   745→      const res = await fetch('/api/expenses', {
+   746→        method: 'POST',
+   747→        headers: { 'Content-Type': 'application/json' },
+   748→        body: JSON.stringify({
+   749→          category: formData.category,
+   750→          description: formData.description,
+   751→          amount: formData.amount,
+   752→          date: formData.date || new Date().toISOString(),
+   753→          vendor: formData.vendor || undefined,
+   754→          propertyId: formData.propertyId,
+   755→          createdById: currentUser?.id || 'system',
+   756→          receipt: formData.receipt || undefined,
+   757→          status: formData.status,
+   758→        }),
+   759→      })
+   760→
+   761→      if (res.ok) {
+   762→        setShowAddDialog(false)
+   763→        await fetchExpenses()
+   764→      }
+   765→    } catch (err) {
+   766→      console.error('Failed to add expense:', err)
+   767→    } finally {
+   768→      setSubmitting(false)
+   769→    }
+   770→  }
+   771→
+   772→  const handleViewExpense = (expense: ExpenseData) => {
+   773→    setSelectedExpense(expense)
+   774→    setShowDetailDialog(true)
+   775→  }
+   776→
+   777→  // ── Render ─────────────────────────────────────────────────────────────────
+   778→
+   779→  if (loading) {
+   780→    return (
+   781→      <div className="p-6 space-y-6">
+   782→        <div className="flex items-center justify-between">
+   783→          <Skeleton className="h-8 w-48" />
+   784→          <Skeleton className="h-10 w-36" />
+   785→        </div>
+   786→        <div className="grid grid-cols-4 gap-4">
+   787→          {Array.from({ length: 4 }).map((_, i) => <StatsCardSkeleton key={i} />)}
+   788→        </div>
+   789→        <div className="grid grid-cols-2 gap-4">
+   790→          <ChartSkeleton />
+   791→          <ChartSkeleton />
+   792→        </div>
+   793→        <TableSkeleton />
+   794→      </div>
+   795→    )
+   796→  }
+   797→
+   798→  return (
+   799→    <div className="p-6 space-y-6">
+   800→      {/* Page Header */}
+   801→      <div className="flex items-center justify-between">
+   802→        <div>
+   803→          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+   804→            <IndianRupee className="w-6 h-6 text-emerald-600" />
+   805→            Accounting
+   806→          </h1>
+   807→          <p className="text-muted-foreground mt-1">Track income, expenses, and financial performance</p>
+   808→        </div>
+   809→        <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+   810→          <Plus className="w-4 h-4 mr-2" />
+   811→          Add Expense
+   812→        </Button>
+   813→      </div>
+   814→
+   815→      {/* Stats Cards */}
+   816→      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+   817→        <StatsCard
+   818→          title="Total Income"
+   819→          value={formatCurrency(stats.totalIncome)}
+   820→          icon={TrendingUp}
+   821→          iconBg="bg-emerald-50 dark:bg-emerald-950/50"
+   822→          iconColor="text-emerald-600 dark:text-emerald-400"
+   823→          subtitle="This month"
+   824→          trend={{ value: 12, isPositive: true }}
+   825→        />
+   826→        <StatsCard
+   827→          title="Total Expenses"
+   828→          value={formatCurrency(stats.totalExpenses)}
+   829→          icon={TrendingDown}
+   830→          iconBg="bg-red-50 dark:bg-red-950/50"
+   831→          iconColor="text-red-600 dark:text-red-400"
+   832→          subtitle="This month"
+   833→          trend={{ value: 8, isPositive: false }}
+   834→        />
+   835→        <StatsCard
+   836→          title="Net Profit"
+   837→          value={formatCurrency(stats.netProfit)}
+   838→          icon={DollarSign}
+   839→          iconBg={stats.netProfit >= 0 ? 'bg-emerald-50 dark:bg-emerald-950/50' : 'bg-red-50 dark:bg-red-950/50'}
+   840→          iconColor={stats.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}
+   841→          subtitle="This month"
+   842→        />
+   843→        <StatsCard
+   844→          title="Outstanding Dues"
+   845→          value={formatCurrency(stats.outstandingDues)}
+   846→          icon={AlertTriangle}
+   847→          iconBg="bg-amber-50 dark:bg-amber-950/50"
+   848→          iconColor="text-amber-600 dark:text-amber-400"
+   849→        />
+   850→      </div>
+   851→
+   852→      {/* Charts */}
+   853→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+   854→        {/* Income vs Expense Trend (AreaChart) */}
+   855→        <Card className="lg:col-span-2">
+   856→          <CardHeader className="pb-2">
+   857→            <CardTitle className="text-base font-semibold">Income vs Expense Trend</CardTitle>
+   858→            <CardDescription>6-month comparison</CardDescription>
+   859→          </CardHeader>
+   860→          <CardContent>
+   861→            <ChartContainer config={TREND_CHART_CONFIG} className="h-64 w-full">
+   862→              <AreaChart data={trendData}>
+   863→                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+   864→                <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+   865→                <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+   866→                <ChartTooltip content={<ChartTooltipContent />} />
+   867→                <ChartLegend content={<ChartLegendContent />} />
+   868→                <Area type="monotone" dataKey="income" stroke="var(--color-income)" fill="var(--color-income)" fillOpacity={0.2} strokeWidth={2} />
+   869→                <Area type="monotone" dataKey="expenses" stroke="var(--color-expenses)" fill="var(--color-expenses)" fillOpacity={0.2} strokeWidth={2} />
+   870→              </AreaChart>
+   871→            </ChartContainer>
+   872→          </CardContent>
+   873→        </Card>
+   874→
+   875→        {/* Category Breakdown (PieChart) */}
+   876→        <Card>
+   877→          <CardHeader className="pb-2">
+   878→            <CardTitle className="text-base font-semibold">Expense Breakdown</CardTitle>
+   879→            <CardDescription>By category</CardDescription>
+   880→          </CardHeader>
+   881→          <CardContent>
+   882→            <ChartContainer config={CATEGORY_PIE_CONFIG} className="h-64 w-full">
+   883→              <PieChart>
+   884→                <Pie
+   885→                  data={categoryBreakdownData}
+   886→                  cx="50%"
+   887→                  cy="50%"
+   888→                  innerRadius={55}
+   889→                  outerRadius={85}
+   890→                  paddingAngle={3}
+   891→                  dataKey="value"
+   892→                  nameKey="category"
+   893→                >
+   894→                  {categoryBreakdownData.map((entry, index) => (
+   895→                    <Cell key={`cell-${index}`} fill={entry.fill} />
+   896→                  ))}
+   897→                </Pie>
+   898→                <ChartTooltip content={<ChartTooltipContent />} />
+   899→                <ChartLegend content={<ChartLegendContent />} />
+   900→              </PieChart>
+   901→            </ChartContainer>
+   902→          </CardContent>
+   903→        </Card>
+   904→      </div>
+   905→
+   906→      {/* Cash Flow Chart */}
+   907→      <Card>
+   908→        <CardHeader className="pb-2">
+   909→          <CardTitle className="text-base font-semibold">Cash Flow</CardTitle>
+   910→          <CardDescription>Monthly inflow vs outflow</CardDescription>
+   911→        </CardHeader>
+   912→        <CardContent>
+   913→          <ChartContainer config={CASH_FLOW_CONFIG} className="h-56 w-full">
+   914→            <BarChart data={cashFlowData} barCategoryGap="20%">
+   915→              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+   916→              <XAxis dataKey="month" tickLine={false} axisLine={false} fontSize={12} />
+   917→              <YAxis tickLine={false} axisLine={false} fontSize={12} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
+   918→              <ChartTooltip content={<ChartTooltipContent />} />
+   919→              <ChartLegend content={<ChartLegendContent />} />
+   920→              <Bar dataKey="inflow" fill="var(--color-inflow)" radius={[4, 4, 0, 0]} />
+   921→              <Bar dataKey="outflow" fill="var(--color-outflow)" radius={[4, 4, 0, 0]} />
+   922→            </BarChart>
+   923→          </ChartContainer>
+   924→        </CardContent>
+   925→      </Card>
+   926→
+   927→      {/* Property Summary Cards */}
+   928→      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   929→        {propertySummary.map(p => (
+   930→          <Card key={p.id} className="hover:shadow-md transition-shadow">
+   931→            <CardContent className="p-4">
+   932→              <div className="flex items-center gap-2 mb-3">
+   933→                <Building2 className="h-4 w-4 text-emerald-600" />
+   934→                <h3 className="font-semibold text-sm">{p.name}</h3>
+   935→              </div>
+   936→              <div className="space-y-2">
+   937→                <div className="flex justify-between text-sm">
+   938→                  <span className="text-muted-foreground">Income</span>
+   939→                  <span className="font-medium text-emerald-600">{formatCurrency(p.income)}</span>
+   940→                </div>
+   941→                <div className="flex justify-between text-sm">
+   942→                  <span className="text-muted-foreground">Expenses</span>
+   943→                  <span className="font-medium text-red-600">{formatCurrency(p.expenses)}</span>
+   944→                </div>
+   945→                <div className="pt-2 border-t flex justify-between text-sm">
+   946→                  <span className="font-medium">Profit</span>
+   947→                  <span className={`font-bold ${p.profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+   948→                    {formatCurrency(p.profit)}
+   949→                  </span>
+   950→                </div>
+   951→              </div>
+   952→            </CardContent>
+   953→          </Card>
+   954→        ))}
+   955→      </div>
+   956→
+   957→      {/* Tabs: Expenses & Income */}
+   958→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   959→        <TabsList className="grid grid-cols-2 w-64">
+   960→          <TabsTrigger value="expenses">Expenses</TabsTrigger>
+   961→          <TabsTrigger value="income">Income</TabsTrigger>
+   962→        </TabsList>
+   963→
+   964→        {/* ── Expenses Tab ─────────────────────────────────────────────────── */}
+   965→        <TabsContent value="expenses" className="space-y-4 mt-4">
+   966→          {/* Filters */}
+   967→          <Card>
+   968→            <CardContent className="p-4">
+   969→              <div className="flex flex-wrap items-center gap-3">
+   970→                <div className="relative flex-1 min-w-[200px]">
+   971→                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+   972→                  <Input
+   973→                    placeholder="Search by description or vendor..."
+   974→                    className="pl-9"
+   975→                    value={searchQuery}
+   976→                    onChange={e => setSearchQuery(e.target.value)}
+   977→                  />
+   978→                </div>
+   979→                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+   980→                  <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
+   981→                  <SelectContent>
+   982→                    <SelectItem value="all">All Categories</SelectItem>
+   983→                    {Object.entries(CATEGORY_CONFIG).map(([key, cfg]) => (
+   984→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+   985→                    ))}
+   986→                  </SelectContent>
+   987→                </Select>
+   988→                <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+   989→                  <SelectTrigger className="w-40"><SelectValue placeholder="Property" /></SelectTrigger>
+   990→                  <SelectContent>
+   991→                    <SelectItem value="all">All Properties</SelectItem>
+   992→                    {properties.map(p => (
+   993→                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+   994→                    ))}
+   995→                  </SelectContent>
+   996→                </Select>
+   997→                <Select value={statusFilter} onValueChange={setStatusFilter}>
+   998→                  <SelectTrigger className="w-36"><SelectValue placeholder="Status" /></SelectTrigger>
+   999→                  <SelectContent>
+  1000→                    <SelectItem value="all">All Status</SelectItem>
+  1001→                    {Object.entries(EXPENSE_STATUS_CONFIG).map(([key, cfg]) => (
+  1002→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+  1003→                    ))}
+  1004→                  </SelectContent>
+  1005→                </Select>
+  1006→                <Input
+  1007→                  type="date"
+  1008→                  value={dateFrom}
+  1009→                  onChange={e => setDateFrom(e.target.value)}
+  1010→                  className="w-36"
+  1011→                  placeholder="From"
+  1012→                />
+  1013→                <Input
+  1014→                  type="date"
+  1015→                  value={dateTo}
+  1016→                  onChange={e => setDateTo(e.target.value)}
+  1017→                  className="w-36"
+  1018→                  placeholder="To"
+  1019→                />
+  1020→              </div>
+  1021→            </CardContent>
+  1022→          </Card>
+  1023→
+  1024→          {/* Expenses Table */}
+  1025→          {filteredExpenses.length === 0 ? (
+  1026→            <Card>
+  1027→              <CardContent className="py-12 text-center">
+  1028→                <Receipt className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+  1029→                <h3 className="text-lg font-semibold mb-1">No expenses found</h3>
+  1030→                <p className="text-muted-foreground mb-4">
+  1031→                  {searchQuery || categoryFilter !== 'all'
+  1032→                    ? 'Try adjusting your filters or search query'
+  1033→                    : 'Add your first expense to get started'}
+  1034→                </p>
+  1035→                <Button onClick={() => setShowAddDialog(true)} className="bg-emerald-600 hover:bg-emerald-700">
+  1036→                  <Plus className="w-4 h-4 mr-2" />
+  1037→                  Add Expense
+  1038→                </Button>
+  1039→              </CardContent>
+  1040→            </Card>
+  1041→          ) : (
+  1042→            <Card>
+  1043→              <CardContent className="p-0">
+  1044→                <Table>
+  1045→                  <TableHeader>
+  1046→                    <TableRow>
+  1047→                      <TableHead>Date</TableHead>
+  1048→                      <TableHead>Category</TableHead>
+  1049→                      <TableHead>Description</TableHead>
+  1050→                      <TableHead>Vendor</TableHead>
+  1051→                      <TableHead>Amount</TableHead>
+  1052→                      <TableHead>Property</TableHead>
+  1053→                      <TableHead>Status</TableHead>
+  1054→                      <TableHead className="text-right">Actions</TableHead>
+  1055→                    </TableRow>
+  1056→                  </TableHeader>
+  1057→                  <TableBody>
+  1058→                    {filteredExpenses.map(e => {
+  1059→                      const catCfg = CATEGORY_CONFIG[e.category]
+  1060→                      const statusCfg = EXPENSE_STATUS_CONFIG[e.status]
+  1061→                      return (
+  1062→                        <TableRow key={e.id} className="cursor-pointer hover:bg-muted/50" onClick={() => handleViewExpense(e)}>
+  1063→                          <TableCell>{formatDate(e.date)}</TableCell>
+  1064→                          <TableCell>
+  1065→                            <Badge variant="secondary" className={`${catCfg.bgClass} ${catCfg.textClass} text-xs`}>
+  1066→                              {catCfg.label}
+  1067→                            </Badge>
+  1068→                          </TableCell>
+  1069→                          <TableCell className="max-w-[200px] truncate">{e.description}</TableCell>
+  1070→                          <TableCell>{e.vendor || '—'}</TableCell>
+  1071→                          <TableCell className="font-medium">{formatCurrency(e.amount)}</TableCell>
+  1072→                          <TableCell>{e.property?.name}</TableCell>
+  1073→                          <TableCell>
+  1074→                            <Badge variant="secondary" className={`${statusCfg.bgClass} ${statusCfg.textClass} text-xs`}>
+  1075→                              <div className={`h-1.5 w-1.5 rounded-full ${statusCfg.dotClass} mr-1`} />
+  1076→                              {statusCfg.label}
+  1077→                            </Badge>
+  1078→                          </TableCell>
+  1079→                          <TableCell className="text-right">
+  1080→                            <DropdownMenu>
+  1081→                              <DropdownMenuTrigger asChild onClick={ev => ev.stopPropagation()}>
+  1082→                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+  1083→                                  <MoreVertical className="h-4 w-4" />
+  1084→                                </Button>
+  1085→                              </DropdownMenuTrigger>
+  1086→                              <DropdownMenuContent align="end">
+  1087→                                <DropdownMenuItem onClick={ev => { ev.stopPropagation(); handleViewExpense(e) }}>
+  1088→                                  <Eye className="h-4 w-4 mr-2" /> View Details
+  1089→                                </DropdownMenuItem>
+  1090→                              </DropdownMenuContent>
+  1091→                            </DropdownMenu>
+  1092→                          </TableCell>
+  1093→                        </TableRow>
+  1094→                      )
+  1095→                    })}
+  1096→                  </TableBody>
+  1097→                </Table>
+  1098→              </CardContent>
+  1099→            </Card>
+  1100→          )}
+  1101→        </TabsContent>
+  1102→
+  1103→        {/* ── Income Tab ───────────────────────────────────────────────────── */}
+  1104→        <TabsContent value="income" className="space-y-4 mt-4">
+  1105→          {/* Filters */}
+  1106→          <Card>
+  1107→            <CardContent className="p-4">
+  1108→              <div className="flex flex-wrap items-center gap-3">
+  1109→                <div className="relative flex-1 min-w-[200px]">
+  1110→                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+  1111→                  <Input
+  1112→                    placeholder="Search by tenant name..."
+  1113→                    className="pl-9"
+  1114→                    value={searchQuery}
+  1115→                    onChange={e => setSearchQuery(e.target.value)}
+  1116→                  />
+  1117→                </div>
+  1118→                <Select value={incomeSourceFilter} onValueChange={setIncomeSourceFilter}>
+  1119→                  <SelectTrigger className="w-40"><SelectValue placeholder="Source" /></SelectTrigger>
+  1120→                  <SelectContent>
+  1121→                    <SelectItem value="all">All Sources</SelectItem>
+  1122→                    {Object.entries(INCOME_SOURCE_CONFIG).map(([key, cfg]) => (
+  1123→                      <SelectItem key={key} value={key}>{cfg.label}</SelectItem>
+  1124→                    ))}
+  1125→                  </SelectContent>
+  1126→                </Select>
+  1127→                <Select value={propertyFilter} onValueChange={setPropertyFilter}>
+  1128→                  <SelectTrigger className="w-40"><SelectValue placeholder="Property" /></SelectTrigger>
+  1129→                  <SelectContent>
+  1130→                    <SelectItem value="all">All Properties</SelectItem>
+  1131→                    {properties.map(p => (
+  1132→                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+  1133→                    ))}
+  1134→                  </SelectContent>
+  1135→                </Select>
+  1136→                <Input
+  1137→                  type="date"
+  1138→                  value={dateFrom}
+  1139→                  onChange={e => setDateFrom(e.target.value)}
+  1140→                  className="w-36"
+  1141→                  placeholder="From"
+  1142→                />
+  1143→                <Input
+  1144→                  type="date"
+  1145→                  value={dateTo}
+  1146→                  onChange={e => setDateTo(e.target.value)}
+  1147→                  className="w-36"
+  1148→                  placeholder="To"
+  1149→                />
+  1150→              </div>
+  1151→            </CardContent>
+  1152→          </Card>
+  1153→
+  1154→          {/* Income Table */}
+  1155→          {filteredIncome.length === 0 ? (
+  1156→            <Card>
+  1157→              <CardContent className="py-12 text-center">
+  1158→                <CreditCard className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+  1159→                <h3 className="text-lg font-semibold mb-1">No income records found</h3>
+  1160→                <p className="text-muted-foreground">Income records are generated from payment collections</p>
+  1161→              </CardContent>
+  1162→            </Card>
+  1163→          ) : (
+  1164→            <Card>
+  1165→              <CardContent className="p-0">
+  1166→                <Table>
+  1167→                  <TableHeader>
+  1168→                    <TableRow>
+  1169→                      <TableHead>Date</TableHead>
+  1170→                      <TableHead>Source</TableHead>
+  1171→                      <TableHead>Tenant</TableHead>
+  1172→                      <TableHead>Amount</TableHead>
+  1173→                      <TableHead>Property</TableHead>
+  1174→                      <TableHead>Payment Method</TableHead>
+  1175→                      <TableHead>Status</TableHead>
+  1176→                    </TableRow>
+  1177→                  </TableHeader>
+  1178→                  <TableBody>
+  1179→                    {filteredIncome.map(i => {
+  1180→                      const srcCfg = INCOME_SOURCE_CONFIG[i.source]
+  1181→                      return (
+  1182→                        <TableRow key={i.id}>
+  1183→                          <TableCell>{formatDate(i.date)}</TableCell>
+  1184→                          <TableCell>
+  1185→                            <Badge variant="secondary" className={`${srcCfg.bgClass} ${srcCfg.textClass} text-xs`}>
+  1186→                              {srcCfg.label}
+  1187→                            </Badge>
+  1188→                          </TableCell>
+  1189→                          <TableCell className="font-medium">{i.tenantName}</TableCell>
+  1190→                          <TableCell className="font-medium">{formatCurrency(i.amount)}</TableCell>
+  1191→                          <TableCell>{i.property?.name}</TableCell>
+  1192→                          <TableCell>
+  1193→                            <span className="text-sm capitalize">{i.paymentMethod.replace('_', ' ')}</span>
+  1194→                          </TableCell>
+  1195→                          <TableCell>
+  1196→                            <Badge
+  1197→                              variant="secondary"
+  1198→                              className={
+  1199→                                i.status === 'completed'
+  1200→                                  ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs'
+  1201→                                  : 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 text-xs'
+  1202→                              }
+  1203→                            >
+  1204→                              {i.status === 'completed' ? 'Completed' : 'Pending'}
+  1205→                            </Badge>
+  1206→                          </TableCell>
+  1207→                        </TableRow>
+  1208→                      )
+  1209→                    })}
+  1210→                  </TableBody>
+  1211→                </Table>
+  1212→              </CardContent>
+  1213→            </Card>
+  1214→          )}
+  1215→        </TabsContent>
+  1216→      </Tabs>
+  1217→
+  1218→      {/* Dialogs */}
+  1219→      <AddExpenseDialog
+  1220→        open={showAddDialog}
+  1221→        onClose={() => setShowAddDialog(false)}
+  1222→        properties={properties}
+  1223→        onSubmit={handleAddExpense}
+  1224→        submitting={submitting}
+  1225→        userId={currentUser?.id}
+  1226→      />
+  1227→
+  1228→      <ExpenseDetailDialog
+  1229→        expense={selectedExpense}
+  1230→        open={showDetailDialog}
+  1231→        onClose={() => { setShowDetailDialog(false); setSelectedExpense(null) }}
+  1232→      />
+  1233→    </div>
+  1234→  )
+  1235→}
+  1236→
