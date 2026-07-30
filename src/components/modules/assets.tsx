@@ -1131,9 +1131,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Total Assets</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                       {assetsLoading ? <Skeleton className="h-7 w-12" /> : assetStats.total}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1146,9 +1146,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Active</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                       {assetsLoading ? <Skeleton className="h-7 w-12" /> : assetStats.active}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1161,9 +1161,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Under Maintenance</p>
-                    <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+                    <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                       {assetsLoading ? <Skeleton className="h-7 w-12" /> : assetStats.underMaintenance}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1176,9 +1176,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                    <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                       {assetsLoading ? <Skeleton className="h-7 w-20" /> : formatCurrency(assetStats.totalValue)}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1357,9 +1357,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Total Items</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                       {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.totalItems}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1372,9 +1372,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">In Use</p>
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                    <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                       {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.inUse}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1387,9 +1387,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">In Laundry</p>
-                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                       {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.inLaundry}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1402,9 +1402,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Damaged</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                       {laundryLoading ? <Skeleton className="h-7 w-12" /> : laundryStats.damaged}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1550,9 +1550,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Total Items</p>
-                    <p className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                       {housekeepingLoading ? <Skeleton className="h-7 w-12" /> : housekeepingStats.totalItems}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1565,9 +1565,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Low Stock</p>
-                    <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
                       {housekeepingLoading ? <Skeleton className="h-7 w-12" /> : housekeepingStats.lowStock}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -1580,9 +1580,9 @@ export function AssetsPage() {
                   </div>
                   <div>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-                    <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                    <div className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                       {housekeepingLoading ? <Skeleton className="h-7 w-20" /> : formatCurrency(housekeepingStats.totalValue)}
-                    </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>
