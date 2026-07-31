@@ -1,15 +1,27 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
     const category = searchParams.get('category')
     const startDate = searchParams.get('startDate')
     const endDate = searchParams.get('endDate')
     const propertyId = searchParams.get('propertyId')
 
-    const where: Record<string, unknown> = {}
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'expenses', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: Record<string, unknown> = { ...access.whereClause }
 
     if (category) where.category = category
     if (propertyId) where.propertyId = propertyId
@@ -50,7 +62,18 @@ export async function POST(request: Request) {
       createdById,
       receipt,
       status,
+      userId,
+      role,
     } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'expenses', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!description || !amount || !propertyId || !createdById) {
       return NextResponse.json(
@@ -87,7 +110,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, category, description, amount, date, vendor, receipt, status } = body
+    const { id, category, description, amount, date, vendor, receipt, status, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Expense id is required' }, { status: 400 })
@@ -96,6 +123,11 @@ export async function PATCH(request: Request) {
     const existingExpense = await db.expense.findUnique({ where: { id } })
     if (!existingExpense) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'expenses', 'update', existingExpense.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -126,7 +158,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Expense id is required' }, { status: 400 })
@@ -135,6 +171,11 @@ export async function DELETE(request: Request) {
     const existingExpense = await db.expense.findUnique({ where: { id } })
     if (!existingExpense) {
       return NextResponse.json({ error: 'Expense not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'expenses', 'delete', existingExpense.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     await db.expense.delete({ where: { id } })

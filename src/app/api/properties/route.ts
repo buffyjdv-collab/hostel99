@@ -1,30 +1,30 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess, buildUserContext, buildPropertyWhere, checkPermission } from '@/lib/auth-helpers'
 
-// GET /api/properties - List properties
-// Query params: ownerId, type, city, assignedUserId (for multi-tenant scoping)
+// GET /api/properties - List properties (scoped to user's access)
+// Query params: userId, role, ownerId, type, city, assignedUserId
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId') || ''
+    const role = searchParams.get('role') || ''
     const ownerId = searchParams.get('ownerId')
     const type = searchParams.get('type')
     const city = searchParams.get('city')
-    const assignedUserId = searchParams.get('assignedUserId')
 
-    const where: any = {}
+    // Validate read access
+    const access = await validateAccess(userId, role, 'properties', 'read')
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    // Property model uses `id` not `propertyId`, so rebuild the where clause
+    const propertyWhere = buildPropertyWhere(access.userCtx)
+    const where: any = { ...propertyWhere }
     if (ownerId) where.ownerId = ownerId
     if (type) where.type = type
     if (city) { where.city = { contains: city, mode: 'insensitive' } }
-
-    // If filtering by assigned user, get their property IDs from HostelAssignment
-    if (assignedUserId) {
-      const assignments = await db.hostelAssignment.findMany({
-        where: { userId: assignedUserId, isActive: true },
-        select: { propertyId: true },
-      })
-      const propertyIds = assignments.map(a => a.propertyId)
-      where.id = { in: propertyIds }
-    }
 
     const properties = await db.property.findMany({
       where,
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/properties - Create property
+// POST /api/properties - Create property (super_admin only)
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -55,7 +55,15 @@ export async function POST(request: Request) {
       totalRooms, totalBeds, amenities, ownerId, contactPhone, contactEmail,
       // Support creating owner user inline
       createOwner, ownerName, ownerEmail, ownerPhone, ownerPassword,
+      // Auth context
+      userId, role,
     } = body
+
+    // Validate create access
+    const access = await validateAccess(userId, role, 'properties', 'create')
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!name || !address || !city) {
       return NextResponse.json(
@@ -137,7 +145,13 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, ...data } = body
+    const { id, userId, role, ...data } = body
+
+    // Validate update access
+    const access = await validateAccess(userId, role, 'properties', 'update')
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Property id is required' }, { status: 400 })
@@ -146,6 +160,11 @@ export async function PATCH(request: Request) {
     const existing = await db.property.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Property not found' }, { status: 404 })
+    }
+
+    // Check if user has access to this specific property
+    if (!access.userCtx.isSuperAdmin && !access.userCtx.propertyIds.includes(id)) {
+      return NextResponse.json({ error: 'You do not have access to this property' }, { status: 403 })
     }
 
     const updateData: any = {}
@@ -185,11 +204,17 @@ export async function PATCH(request: Request) {
   }
 }
 
-// DELETE /api/properties - Delete/deactivate property
+// DELETE /api/properties - Delete/deactivate property (super_admin only)
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    // Validate delete access
+    const access = await validateAccess(userId, role, 'properties', 'delete')
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Property id is required' }, { status: 400 })
@@ -198,6 +223,11 @@ export async function DELETE(request: Request) {
     const existing = await db.property.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Property not found' }, { status: 404 })
+    }
+
+    // Check if user has access to this specific property
+    if (!access.userCtx.isSuperAdmin && !access.userCtx.propertyIds.includes(id)) {
+      return NextResponse.json({ error: 'You do not have access to this property' }, { status: 403 })
     }
 
     // Soft delete - deactivate all assignments

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -212,9 +213,9 @@ export function VisitorsPage() {
     setLoading(true)
     try {
       const [visitorsRes, propsRes, tenantsRes] = await Promise.all([
-        fetch('/api/visitors' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-        fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-        fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+        fetch('/api/visitors?' + buildAuthQuery()),
+        fetch('/api/properties?' + buildAuthQuery()),
+        fetch('/api/tenants?' + buildAuthQuery()),
       ])
       if (visitorsRes.ok) {
         const data = await visitorsRes.json()
@@ -282,14 +283,14 @@ export function VisitorsPage() {
       const res = await fetch('/api/visitors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           name: visitorForm.name,
           phone: visitorForm.phone || undefined,
           purpose: visitorForm.purpose,
           tenantId: visitorForm.tenantId || undefined,
           propertyId: visitorForm.propertyId,
           hostId: currentUser?.id,
-        }),
+        })),
       })
       if (res.ok) {
         const newVisitor = await res.json()
@@ -306,7 +307,7 @@ export function VisitorsPage() {
       const res = await fetch('/api/visitors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'checkout', visitorId }),
+        body: JSON.stringify(buildAuthBody({ action: 'checkout', visitorId })),
       })
       if (res.ok) {
         const updated = await res.json()
@@ -344,14 +345,14 @@ export function VisitorsPage() {
       const res = await fetch('/api/visitors', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedVisitor.id,
           name: editFormData.name.trim(),
           phone: editFormData.phone.trim() || undefined,
           purpose: editFormData.purpose.trim(),
           hostName: editFormData.hostName.trim() || undefined,
           status: editFormData.status,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -384,7 +385,7 @@ export function VisitorsPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/visitors/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/visitors/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
         setVisitors((prev) => prev.filter((v) => v.id !== deleteTarget.id))

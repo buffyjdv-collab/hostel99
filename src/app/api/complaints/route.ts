@@ -1,17 +1,35 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
     const status = searchParams.get('status')
     const propertyId = searchParams.get('propertyId')
     const tenantId = searchParams.get('tenantId')
 
-    const where: Record<string, unknown> = {}
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'complaints', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: Record<string, unknown> = { ...access.whereClause }
     if (status) where.status = status
     if (propertyId) where.propertyId = propertyId
-    if (tenantId) where.tenantId = tenantId
+
+    // Tenants can only see their own complaints
+    if (role === 'tenant') {
+      where.tenantId = userId
+    } else if (tenantId) {
+      where.tenantId = tenantId
+    }
 
     const complaints = await db.complaint.findMany({
       where,
@@ -53,7 +71,18 @@ export async function POST(request: Request) {
       tenantId,
       assignedToId,
       createdById,
+      userId,
+      role,
     } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'complaints', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!title || !description || !propertyId || !tenantId || !createdById) {
       return NextResponse.json(
@@ -62,6 +91,9 @@ export async function POST(request: Request) {
       )
     }
 
+    // Tenants can only create complaints for themselves
+    const effectiveTenantId = role === 'tenant' ? userId : tenantId
+
     const complaint = await db.complaint.create({
       data: {
         title,
@@ -69,7 +101,7 @@ export async function POST(request: Request) {
         category: category || 'maintenance',
         priority: priority || 'medium',
         propertyId,
-        tenantId,
+        tenantId: effectiveTenantId,
         assignedToId,
         createdById,
       },
@@ -90,7 +122,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, status, assignedToId, priority, resolution, rating } = body
+    const { id, status, assignedToId, priority, resolution, rating, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Complaint id is required' }, { status: 400 })
@@ -99,6 +135,16 @@ export async function PATCH(request: Request) {
     const existingComplaint = await db.complaint.findUnique({ where: { id } })
     if (!existingComplaint) {
       return NextResponse.json({ error: 'Complaint not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'complaints', 'update', existingComplaint.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    // Tenants can only update their own complaints
+    if (role === 'tenant' && existingComplaint.tenantId !== userId) {
+      return NextResponse.json({ error: 'You can only update your own complaints' }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -128,7 +174,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Complaint id is required' }, { status: 400 })
@@ -137,6 +187,11 @@ export async function DELETE(request: Request) {
     const existingComplaint = await db.complaint.findUnique({ where: { id } })
     if (!existingComplaint) {
       return NextResponse.json({ error: 'Complaint not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'complaints', 'delete', existingComplaint.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     // Delete related activity logs first

@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/inventory - List all inventory items with categories
 export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    const role = req.nextUrl.searchParams.get('role')
     const propertyId = req.nextUrl.searchParams.get('propertyId')
     const categorySlug = req.nextUrl.searchParams.get('category')
     const categoryId = req.nextUrl.searchParams.get('categoryId')
@@ -11,10 +14,19 @@ export async function GET(req: NextRequest) {
     const search = req.nextUrl.searchParams.get('search')
     const transactionsFor = req.nextUrl.searchParams.get('transactions')
 
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'inventory', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     // If requesting transactions for a specific item
     if (transactionsFor) {
       const txns = await db.stockTransaction.findMany({
-        where: { itemId: transactionsFor },
+        where: { itemId: transactionsFor, ...access.whereClause },
         include: { performedBy: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
         take: 50,
@@ -22,7 +34,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ transactions: txns })
     }
 
-    const where: any = {}
+    const where: any = { ...access.whereClause }
     if (propertyId) where.propertyId = propertyId
     if (search) where.name = { contains: search }
     if (categoryId) where.categoryId = categoryId
@@ -47,7 +59,7 @@ export async function GET(req: NextRequest) {
     }
 
     const categories = await db.inventoryCategory.findMany({
-      where: propertyId ? { propertyId } : {},
+      where: propertyId ? { propertyId, ...access.whereClause } : access.whereClause,
       include: { _count: { select: { items: true } } },
       orderBy: { name: 'asc' },
     })
@@ -73,6 +85,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'inventory', 'create', data.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     const item = await db.inventoryItem.create({
       data: {
         name: data.name,
@@ -123,10 +146,20 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (data.action === 'adjust') {
       const item = await db.inventoryItem.findUnique({ where: { id: data.itemId } })
       if (!item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'inventory', 'update', item.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       const previousStock = item.currentStock
       const newStock = previousStock + data.quantity
@@ -155,11 +188,26 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (data.action === 'transfer') {
+      const access = await validateAccess(userId, role, 'inventory', 'update')
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const fromItem = await db.inventoryItem.findUnique({ where: { id: data.fromItemId } })
       if (!fromItem) return NextResponse.json({ error: 'Source item not found' }, { status: 404 })
 
       const toItem = await db.inventoryItem.findUnique({ where: { id: data.toItemId } })
       if (!toItem) return NextResponse.json({ error: 'Target item not found' }, { status: 404 })
+
+      // Verify access to both properties
+      const fromAccess = await validateAccess(userId, role, 'inventory', 'update', fromItem.propertyId)
+      if (!fromAccess.allowed) {
+        return NextResponse.json({ error: fromAccess.error }, { status: 403 })
+      }
+      const toAccess = await validateAccess(userId, role, 'inventory', 'update', toItem.propertyId)
+      if (!toAccess.allowed) {
+        return NextResponse.json({ error: toAccess.error }, { status: 403 })
+      }
 
       const qty = data.quantity
       const fromPrev = fromItem.currentStock
@@ -196,7 +244,11 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json()
-    const { id } = data
+    const { id, userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Item id is required' }, { status: 400 })
@@ -205,6 +257,11 @@ export async function DELETE(req: NextRequest) {
     const existingItem = await db.inventoryItem.findUnique({ where: { id } })
     if (!existingItem) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'inventory', 'delete', existingItem.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     // Delete related records first, then the item

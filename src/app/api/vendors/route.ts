@@ -1,11 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/vendors
 export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    const role = req.nextUrl.searchParams.get('role')
     const propertyId = req.nextUrl.searchParams.get('propertyId')
-    const where: any = {}
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'vendors', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: any = { ...access.whereClause }
     if (propertyId) where.propertyId = propertyId
 
     const vendors = await db.vendor.findMany({
@@ -34,6 +47,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'vendors', 'create', data.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     const vendor = await db.vendor.create({
       data: {
         name: data.name,
@@ -66,6 +90,22 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const existingVendor = await db.vendor.findUnique({ where: { id: data.id } })
+    if (!existingVendor) {
+      return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'vendors', 'update', existingVendor.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     const vendor = await db.vendor.update({
       where: { id: data.id },
       data: {
@@ -98,7 +138,11 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json()
-    const { id } = data
+    const { id, userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Vendor id is required' }, { status: 400 })
@@ -110,6 +154,11 @@ export async function DELETE(req: NextRequest) {
     })
     if (!existingVendor) {
       return NextResponse.json({ error: 'Vendor not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'vendors', 'delete', existingVendor.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     // Check for existing purchase orders

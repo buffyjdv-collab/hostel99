@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -318,7 +319,7 @@ export function KitchenPage() {
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       params.set('type', 'all')
 
-      const res = await fetch(`/api/kitchen?${params.toString()}`)
+      const res = await fetch('/api/kitchen?' + buildAuthQuery())
       if (res.ok) {
         const json = await res.json()
         setData(json)
@@ -335,7 +336,7 @@ export function KitchenPage() {
     try {
       const params = new URLSearchParams()
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/inventory?${params.toString()}`)
+      const res = await fetch('/api/inventory?' + buildAuthQuery())
       if (res.ok) {
         const json = await res.json()
         setInventoryItems(json.items || [])
@@ -365,7 +366,7 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'issue',
           itemId: issueForm.itemId,
           quantity: parseFloat(issueForm.quantity),
@@ -374,7 +375,7 @@ export function KitchenPage() {
           notes: issueForm.notes || null,
           propertyId: selectedPropertyId,
           userId: currentUser?.id,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Item issued to kitchen successfully' })
@@ -405,7 +406,7 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'recipe',
           name: recipeForm.name,
           category: recipeForm.category,
@@ -418,7 +419,7 @@ export function KitchenPage() {
             quantity: parseFloat(ing.quantity),
             unit: ing.unit,
           })),
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Recipe created successfully' })
@@ -448,7 +449,7 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'menu',
           date: menuForm.date,
           mealType: menuForm.mealType,
@@ -460,7 +461,7 @@ export function KitchenPage() {
             dishName: item.dishName,
             servings: parseInt(item.servings) || 1,
           })),
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Menu plan created successfully' })
@@ -487,13 +488,13 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'serve_menu',
           menuPlanId: servingMenu.id,
           headCount: servingMenu.headCount,
           propertyId: selectedPropertyId,
           userId: currentUser?.id,
-        }),
+        })),
       })
       if (res.ok) {
         const result = await res.json()
@@ -536,14 +537,14 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'issue',
           id: editingIssue.id,
           quantity: parseFloat(editIssueForm.quantity),
           issuedTo: editIssueForm.issuedTo || undefined,
           purpose: editIssueForm.purpose || null,
           notes: editIssueForm.notes || null,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Kitchen issue updated successfully' })
@@ -591,7 +592,7 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'recipe',
           id: editingRecipe.id,
           name: editRecipeForm.name,
@@ -604,7 +605,7 @@ export function KitchenPage() {
             quantity: parseFloat(ing.quantity),
             unit: ing.unit,
           })),
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Recipe updated successfully' })
@@ -647,7 +648,7 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'menu',
           id: editingMenu.id,
           date: editMenuForm.date,
@@ -659,7 +660,7 @@ export function KitchenPage() {
             dishName: item.dishName,
             servings: parseInt(item.servings) || 1,
           })),
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Menu plan updated successfully' })
@@ -691,10 +692,10 @@ export function KitchenPage() {
       const res = await fetch('/api/kitchen', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: deleteTarget.type,
           id: deleteTarget.id,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })

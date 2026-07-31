@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -576,9 +577,9 @@ export function LeadsPage() {
       setLoading(true)
       try {
         const [leadsRes, propsRes, staffRes] = await Promise.all([
-          fetch('/api/leads' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-          fetch('/api/staff' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/leads?' + buildAuthQuery()),
+          fetch('/api/properties?' + buildAuthQuery()),
+          fetch('/api/staff?' + buildAuthQuery()),
         ])
         if (leadsRes.ok) {
           const data = await leadsRes.json()
@@ -685,7 +686,7 @@ export function LeadsPage() {
       const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           name: form.name,
           email: form.email || undefined,
           phone: form.phone,
@@ -697,7 +698,7 @@ export function LeadsPage() {
           followUpDate: form.followUpDate || undefined,
           assignedToId: form.assignedToId || undefined,
           createdById: currentUser?.id,
-        }),
+        })),
       })
       if (res.ok) {
         const newLead = await res.json()
@@ -734,7 +735,7 @@ export function LeadsPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/leads/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/leads/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
         setLeads((prev) => prev.filter((l) => l.id !== deleteTarget.id))
@@ -757,7 +758,7 @@ export function LeadsPage() {
       const res = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, status: newStage, stage: stageIdx + 1 }),
+        body: JSON.stringify(buildAuthBody({ id: leadId, status: newStage, stage: stageIdx + 1 })),
       })
       if (res.ok) {
         const updated = await res.json()
@@ -798,7 +799,7 @@ export function LeadsPage() {
       const res = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedLead.id,
           name: editFormData.name.trim(),
           email: editFormData.email.trim() || undefined,
@@ -806,7 +807,7 @@ export function LeadsPage() {
           source: editFormData.source,
           status: editFormData.status,
           notes: editFormData.notes.trim() || undefined,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Lead updated successfully' })
@@ -814,7 +815,7 @@ export function LeadsPage() {
         setSelectedLead(null)
         // Refresh data
         try {
-          const leadsRes = await fetch('/api/leads' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+          const leadsRes = await fetch('/api/leads?' + buildAuthQuery())
           if (leadsRes.ok) {
             const data = await leadsRes.json()
             setLeads(data.leads || data || [])

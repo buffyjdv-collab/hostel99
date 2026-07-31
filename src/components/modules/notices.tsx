@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -210,8 +211,8 @@ export function NoticesPage() {
     setLoading(true)
     try {
       const [noticesRes, propsRes] = await Promise.all([
-        fetch('/api/notices' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-        fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+        fetch('/api/notices?' + buildAuthQuery()),
+        fetch('/api/properties?' + buildAuthQuery()),
       ])
       if (noticesRes.ok) {
         const noticesData = await noticesRes.json()
@@ -258,14 +259,14 @@ export function NoticesPage() {
       const res = await fetch('/api/notices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           title: noticeForm.title,
           content: noticeForm.content,
           type: noticeForm.type,
           propertyId: noticeForm.propertyId,
           createdById: currentUser.id,
           expiryDate: noticeForm.expiryDate || undefined,
-        }),
+        })),
       })
       if (res.ok) {
         const newNotice = await res.json()
@@ -284,13 +285,13 @@ export function NoticesPage() {
       const res = await fetch('/api/notices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           title: `Message: ${messageForm.type}`,
           content: messageForm.message,
           type: 'general',
           propertyId: messageForm.propertyId || properties[0]?.id,
           createdById: currentUser.id,
-        }),
+        })),
       })
       if (res.ok) {
         setSendMessageOpen(false)
@@ -320,7 +321,7 @@ export function NoticesPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/notices/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/notices/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `Notice has been deleted` })
         setNotices((prev) => prev.filter((n) => n.id !== deleteTarget.id))
@@ -364,14 +365,14 @@ export function NoticesPage() {
       const res = await fetch('/api/notices', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedNotice.id,
           title: editFormData.title.trim(),
           content: editFormData.content.trim(),
           type: editFormData.type,
           priority: editFormData.priority,
           isActive: editFormData.isActive,
-        }),
+        })),
       })
 
       if (res.ok) {

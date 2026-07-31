@@ -1,12 +1,24 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
     const propertyId = searchParams.get('propertyId')
 
-    const where: Record<string, unknown> = { isActive: true }
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'notices', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: Record<string, unknown> = { isActive: true, ...access.whereClause }
     if (propertyId) where.propertyId = propertyId
 
     const notices = await db.notice.findMany({
@@ -28,7 +40,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { title, content, type, propertyId, createdById, isActive, expiryDate } = body
+    const { title, content, type, propertyId, createdById, isActive, expiryDate, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'notices', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!title || !content || !propertyId || !createdById) {
       return NextResponse.json(
@@ -63,7 +84,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, title, content, type, propertyId, createdById, isActive, expiryDate } = body
+    const { id, title, content, type, propertyId, createdById, isActive, expiryDate, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Notice id is required' }, { status: 400 })
@@ -72,6 +97,11 @@ export async function PATCH(request: Request) {
     const existingNotice = await db.notice.findUnique({ where: { id } })
     if (!existingNotice) {
       return NextResponse.json({ error: 'Notice not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'notices', 'update', existingNotice.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -102,7 +132,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Notice id is required' }, { status: 400 })
@@ -111,6 +145,11 @@ export async function DELETE(request: Request) {
     const existingNotice = await db.notice.findUnique({ where: { id } })
     if (!existingNotice) {
       return NextResponse.json({ error: 'Notice not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'notices', 'delete', existingNotice.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     // Soft delete by setting isActive to false

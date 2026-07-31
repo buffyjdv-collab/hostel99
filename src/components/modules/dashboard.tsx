@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useAppStore, type Page } from '@/lib/store'
+import { buildAuthQuery } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -359,17 +360,17 @@ export function DashboardPage() {
       try {
         if (currentUser?.role === 'tenant') {
           // Step 1: Fetch tenant profile by userId
-          const tenantRes = await fetch('/api/tenants?userId=' + currentUser.id + (currentHostelId ? `&propertyId=${currentHostelId}` : ''))
+          const tenantRes = await fetch('/api/tenants?' + buildAuthQuery({ userId: currentUser.id }))
           const tenantList = tenantRes.ok ? await tenantRes.json() : []
           const tenant = Array.isArray(tenantList) && tenantList.length > 0 ? tenantList[0] : null
 
           // Step 2: Fetch tenant-specific data using tenantId
           const tenantId = tenant?.id || currentUser.id
           const [payRes, compRes, noticeRes, visitorRes] = await Promise.all([
-            fetch('/api/payments?tenantId=' + tenantId + (currentHostelId ? `&propertyId=${currentHostelId}` : '')),
-            fetch('/api/complaints?tenantId=' + tenantId + (currentHostelId ? `&propertyId=${currentHostelId}` : '')),
-            fetch('/api/notices' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-            fetch('/api/visitors?tenantId=' + tenantId + (currentHostelId ? `&propertyId=${currentHostelId}` : '')),
+            fetch('/api/payments?' + buildAuthQuery({ tenantId: String(tenantId) })),
+            fetch('/api/complaints?' + buildAuthQuery({ tenantId: String(tenantId) })),
+            fetch('/api/notices' + (buildAuthQuery() ? `?${buildAuthQuery()}` : '')),
+            fetch('/api/visitors?' + buildAuthQuery({ tenantId: String(tenantId) })),
           ])
           const payData = payRes.ok ? await payRes.json() : []
           const compData = compRes.ok ? await compRes.json() : []
@@ -383,7 +384,8 @@ export function DashboardPage() {
             visitors: Array.isArray(visitorData) ? visitorData : [],
           })
         } else {
-          const res = await fetch('/api/dashboard' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+          const authQs = buildAuthQuery()
+          const res = await fetch('/api/dashboard' + (authQs ? `?${authQs}` : ''))
           if (res.ok) {
             const json = await res.json()
             setData(json)

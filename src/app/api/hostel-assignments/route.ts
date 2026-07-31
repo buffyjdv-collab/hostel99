@@ -1,20 +1,31 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/hostel-assignments - List hostel assignments
 // Query params: userId, propertyId, role
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const authUserId = searchParams.get('userId')
+    const authRole = searchParams.get('role')
+    const filterUserId = searchParams.get('filterUserId')
     const propertyId = searchParams.get('propertyId')
-    const role = searchParams.get('role')
+    const filterRole = searchParams.get('filterRole')
 
-    const where: any = {}
-    if (userId) where.userId = userId
+    if (!authUserId || !authRole) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(authUserId, authRole, 'hostels', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: any = { ...access.whereClause, isActive: true }
+    if (filterUserId) where.userId = filterUserId
     if (propertyId) where.propertyId = propertyId
-    if (role) where.role = role
-    where.isActive = true
+    if (filterRole) where.role = filterRole
 
     const assignments = await db.hostelAssignment.findMany({
       where,
@@ -40,7 +51,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { userId, propertyId, role } = body
+    const { userId, propertyId, role, authUserId, authRole } = body
+
+    if (!authUserId || !authRole) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(authUserId, authRole, 'hostels', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!userId || !propertyId || !role) {
       return NextResponse.json(
@@ -104,7 +124,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, role, isActive } = body
+    const { id, role, isActive, userId, authRole } = body
+
+    if (!userId || !authRole) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Assignment id is required' }, { status: 400 })
@@ -113,6 +137,11 @@ export async function PATCH(request: Request) {
     const existing = await db.hostelAssignment.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, authRole, 'hostels', 'update', existing.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     const updateData: any = {}
@@ -145,7 +174,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, authRole } = body
+
+    if (!userId || !authRole) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Assignment id is required' }, { status: 400 })
@@ -154,6 +187,11 @@ export async function DELETE(request: Request) {
     const existing = await db.hostelAssignment.findUnique({ where: { id } })
     if (!existing) {
       return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, authRole, 'hostels', 'delete', existing.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     await db.hostelAssignment.delete({ where: { id } })

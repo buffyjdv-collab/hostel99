@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -342,7 +343,7 @@ export function MessPage() {
         params.set('days', String(wasteDays))
       }
 
-      const res = await fetch(`/api/mess?${params.toString()}`)
+      const res = await fetch('/api/mess?' + buildAuthQuery())
       if (!res.ok) throw new Error('Failed to fetch mess data')
       const data = await res.json()
       setMessData(prev => ({ ...prev, ...data }))
@@ -358,7 +359,7 @@ export function MessPage() {
     try {
       const params = new URLSearchParams()
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/tenants?${params.toString()}`)
+      const res = await fetch('/api/tenants?' + buildAuthQuery())
       if (!res.ok) throw new Error('Failed to fetch tenants')
       const data = await res.json()
       const tenantList = Array.isArray(data) ? data : []
@@ -382,7 +383,7 @@ export function MessPage() {
     try {
       const params = new URLSearchParams()
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/inventory?${params.toString()}`)
+      const res = await fetch('/api/inventory?' + buildAuthQuery())
       if (!res.ok) throw new Error('Failed to fetch inventory')
       const data = await res.json()
       setInventoryItems(Array.isArray(data.items) ? data.items : [])
@@ -494,7 +495,7 @@ export function MessPage() {
       const res = await fetch('/api/mess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'attendance',
           propertyId: selectedPropertyId,
           date: format(attendanceDate, 'yyyy-MM-dd'),
@@ -506,7 +507,7 @@ export function MessPage() {
             guestCount: r.guestCount,
             notes: r.notes,
           })),
-        }),
+        })),
       })
       if (!res.ok) throw new Error('Failed to mark attendance')
       const data = await res.json()
@@ -536,7 +537,7 @@ export function MessPage() {
       const res = await fetch('/api/mess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'consumption',
           propertyId: selectedPropertyId,
           date: consumptionForm.date,
@@ -551,7 +552,7 @@ export function MessPage() {
           totalCost,
           notes: consumptionForm.notes,
           userId: currentUser?.id,
-        }),
+        })),
       })
       if (!res.ok) throw new Error('Failed to add consumption log')
       toast({ title: 'Success', description: 'Consumption log added successfully' })
@@ -585,7 +586,7 @@ export function MessPage() {
       const res = await fetch('/api/mess', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'waste',
           propertyId: selectedPropertyId,
           date: wasteForm.date,
@@ -598,7 +599,7 @@ export function MessPage() {
           disposalMethod: wasteForm.disposalMethod,
           notes: wasteForm.notes,
           userId: currentUser?.id,
-        }),
+        })),
       })
       if (!res.ok) throw new Error('Failed to add waste record')
       toast({ title: 'Success', description: 'Waste record added successfully' })
@@ -674,7 +675,7 @@ export function MessPage() {
       const res = await fetch('/api/mess', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'consumption',
           id: editConsumptionForm.id,
           issuedQty: editConsumptionForm.issuedQty,
@@ -682,7 +683,7 @@ export function MessPage() {
           returnedQty: editConsumptionForm.returnedQty,
           wastageQty: editConsumptionForm.wastageQty,
           notes: editConsumptionForm.notes || undefined,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Consumption log updated successfully' })
@@ -711,7 +712,7 @@ export function MessPage() {
       const res = await fetch('/api/mess', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'waste',
           id: editWasteForm.id,
           category: editWasteForm.category,
@@ -721,7 +722,7 @@ export function MessPage() {
           estimatedCost: editWasteForm.estimatedCost,
           disposalMethod: editWasteForm.disposalMethod,
           notes: editWasteForm.notes || undefined,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Waste record updated successfully' })
@@ -751,10 +752,10 @@ export function MessPage() {
       const res = await fetch('/api/mess', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: deleteTarget.type,
           id: deleteTarget.id,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })

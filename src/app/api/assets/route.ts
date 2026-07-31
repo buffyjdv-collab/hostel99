@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/assets - Assets, laundry, housekeeping
 export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    const role = req.nextUrl.searchParams.get('role')
     const propertyId = req.nextUrl.searchParams.get('propertyId')
     const type = req.nextUrl.searchParams.get('type') || 'all'
-    const where: any = {}
-    if (propertyId) where.propertyId = propertyId
 
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'assets', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const scopedWhere = propertyId ? { propertyId } : access.whereClause
     const result: any = {}
 
     if (type === 'all' || type === 'assets') {
       result.assets = await db.asset.findMany({
-        where: propertyId ? { propertyId } : {},
+        where: scopedWhere,
         include: {
           property: { select: { name: true } },
           room: { select: { name: true, number: true } },
@@ -40,7 +51,7 @@ export async function GET(req: NextRequest) {
 
     if (type === 'all' || type === 'laundry') {
       result.laundry = await db.laundryItem.findMany({
-        where: propertyId ? { propertyId } : {},
+        where: scopedWhere,
         include: {
           property: { select: { name: true } },
           room: { select: { name: true, number: true } },
@@ -58,7 +69,7 @@ export async function GET(req: NextRequest) {
 
     if (type === 'all' || type === 'housekeeping') {
       result.housekeeping = await db.housekeepingItem.findMany({
-        where: propertyId ? { propertyId, isActive: true } : { isActive: true },
+        where: { ...scopedWhere, isActive: true },
         include: { property: { select: { name: true } } },
         orderBy: { name: 'asc' },
       })
@@ -81,6 +92,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'assets', 'create', data.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (data.type === 'asset') {
       const asset = await db.asset.create({
@@ -153,8 +174,21 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (data.type === 'asset') {
+      const existing = await db.asset.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'assets', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const asset = await db.asset.update({
         where: { id: data.id },
         data: {
@@ -176,6 +210,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (data.type === 'laundry') {
+      const existing = await db.laundryItem.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Laundry item not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'assets', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const item = await db.laundryItem.update({
         where: { id: data.id },
         data: {
@@ -194,6 +236,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (data.type === 'housekeeping') {
+      const existing = await db.housekeepingItem.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Housekeeping item not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'assets', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const item = await db.housekeepingItem.update({
         where: { id: data.id },
         data: {
@@ -220,10 +270,20 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json()
+    const { userId, role } = data
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (data.type === 'asset') {
       const existing = await db.asset.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'assets', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       await db.asset.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Asset deleted successfully', id: data.id })
@@ -233,6 +293,11 @@ export async function DELETE(req: NextRequest) {
       const existing = await db.laundryItem.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Laundry item not found' }, { status: 404 })
 
+      const access = await validateAccess(userId, role, 'assets', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       await db.laundryItem.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Laundry item deleted successfully', id: data.id })
     }
@@ -240,6 +305,11 @@ export async function DELETE(req: NextRequest) {
     if (data.type === 'housekeeping') {
       const existing = await db.housekeepingItem.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Housekeeping item not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'assets', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       await db.housekeepingItem.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Housekeeping item deleted successfully', id: data.id })

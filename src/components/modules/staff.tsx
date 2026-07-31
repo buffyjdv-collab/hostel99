@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -911,7 +912,7 @@ export function StaffPage() {
 
   const fetchStaff = async () => {
     try {
-      const res = await fetch('/api/staff' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      const res = await fetch('/api/staff?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setStaff(data)
@@ -924,9 +925,11 @@ export function StaffPage() {
   const fetchProperties = async () => {
     try {
       // For non-super_admin, scope to user's assigned properties
-      let url = '/api/properties'
+      let url = '/api/properties?'
       if (currentHostelId) {
-        url += `?assignedUserId=${currentUser?.id}`
+        url += buildAuthQuery({ assignedUserId: currentUser?.id || '' })
+      } else {
+        url += buildAuthQuery()
       }
       const res = await fetch(url)
       if (res.ok) {
@@ -976,7 +979,7 @@ export function StaffPage() {
       const res = await fetch('/api/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           name: formData.name,
           phone: formData.phone,
           role: formData.role,
@@ -989,7 +992,7 @@ export function StaffPage() {
           // Create user account + hostel assignment automatically
           createUser: !!formData.email,
           email: formData.email || undefined,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -1049,7 +1052,7 @@ export function StaffPage() {
       const res = await fetch('/api/staff', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedStaff.id,
           name: editFormData.name.trim(),
           email: editFormData.email.trim() || undefined,
@@ -1057,7 +1060,7 @@ export function StaffPage() {
           role: editFormData.role,
           department: editFormData.department.trim() || undefined,
           status: editFormData.status,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -1090,7 +1093,7 @@ export function StaffPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/staff/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/staff/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
         setStaff((prev) => prev.filter((s) => s.id !== deleteTarget.id))

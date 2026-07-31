@@ -1,9 +1,24 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'leads', 'read')
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     const leads = await db.lead.findMany({
+      where: access.whereClause,
       include: {
         property: { select: { id: true, name: true, address: true } },
         assignedTo: { select: { id: true, name: true, email: true } },
@@ -15,6 +30,7 @@ export async function GET() {
     // Get stage counts
     const stageCounts = await db.lead.groupBy({
       by: ['status'],
+      where: access.whereClause,
       _count: { status: true },
     })
 
@@ -52,7 +68,18 @@ export async function POST(request: Request) {
       notes,
       assignedToId,
       createdById,
+      userId,
+      role,
     } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'leads', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!name || !phone || !propertyId || !createdById) {
       return NextResponse.json(
@@ -98,7 +125,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, status, stage, lostReason, assignedToId, followUpDate, followUpNotes, notes } = body
+    const { id, status, stage, lostReason, assignedToId, followUpDate, followUpNotes, notes, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Lead id is required' }, { status: 400 })
@@ -107,6 +138,11 @@ export async function PATCH(request: Request) {
     const existingLead = await db.lead.findUnique({ where: { id } })
     if (!existingLead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'leads', 'update', existingLead.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -138,7 +174,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Lead id is required' }, { status: 400 })
@@ -150,6 +190,11 @@ export async function DELETE(request: Request) {
     })
     if (!existingLead) {
       return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'leads', 'delete', existingLead.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     // Check for active bookings

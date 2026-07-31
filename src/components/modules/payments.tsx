@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -768,13 +769,12 @@ export function PaymentsPage() {
 
   const fetchPayments = useCallback(async () => {
     try {
-      const params = new URLSearchParams()
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (monthFilter !== 'all') params.set('month', monthFilter)
-      if (yearFilter !== 'all') params.set('year', yearFilter)
-      if (propertyFilter !== 'all') params.set('propertyId', propertyFilter)
-      if (currentHostelId && !params.has('propertyId')) params.set('propertyId', currentHostelId)
-      const res = await fetch(`/api/payments?${params.toString()}`)
+      const extraParams: Record<string, string> = {}
+      if (statusFilter !== 'all') extraParams.status = statusFilter
+      if (monthFilter !== 'all') extraParams.month = monthFilter
+      if (yearFilter !== 'all') extraParams.year = yearFilter
+      if (propertyFilter !== 'all') extraParams.propertyId = propertyFilter
+      const res = await fetch('/api/payments?' + buildAuthQuery(extraParams))
       if (res.ok) {
         const data = await res.json()
         setPayments(data)
@@ -792,8 +792,8 @@ export function PaymentsPage() {
     async function fetchSupport() {
       try {
         const [propRes, tenantRes] = await Promise.all([
-          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-          fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/properties?' + buildAuthQuery()),
+          fetch('/api/tenants?' + buildAuthQuery()),
         ])
         if (propRes.ok) setProperties(await propRes.json())
         if (tenantRes.ok) {
@@ -886,7 +886,7 @@ export function PaymentsPage() {
       const res = await fetch('/api/payments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           tenantId: formData.tenantId,
           propertyId: formData.propertyId,
           amount: total,
@@ -908,7 +908,7 @@ export function PaymentsPage() {
           year: formData.year,
           status: 'pending',
           dueDate: new Date(parseInt(formData.year), parseInt(formData.month), 5).toISOString(),
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -929,11 +929,11 @@ export function PaymentsPage() {
       const res = await fetch('/api/payments', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedPayment.id,
           status: 'paid',
           paidDate: new Date().toISOString(),
-        }),
+        })),
       })
       if (res.ok) {
         setShowMarkPaidDialog(false)
@@ -959,7 +959,7 @@ export function PaymentsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this payment?')) return
     try {
-      const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/payments/${id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         setPayments((prev) => prev.filter((p) => p.id !== id))
       }

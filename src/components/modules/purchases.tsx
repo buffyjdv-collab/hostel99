@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -416,7 +417,7 @@ export function PurchasesPage() {
     try {
       const params = new URLSearchParams({ type: 'orders' })
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/purchases?${params}`)
+      const res = await fetch('/api/purchases?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setOrders(data.orders || [])
@@ -431,7 +432,7 @@ export function PurchasesPage() {
     try {
       const params = new URLSearchParams({ type: 'requisitions' })
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/purchases?${params}`)
+      const res = await fetch('/api/purchases?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setRequisitions(data.requisitions || [])
@@ -445,7 +446,7 @@ export function PurchasesPage() {
     try {
       const params = new URLSearchParams({ type: 'grns' })
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/purchases?${params}`)
+      const res = await fetch('/api/purchases?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setGrns(data.grns || [])
@@ -459,7 +460,7 @@ export function PurchasesPage() {
     try {
       const params = new URLSearchParams()
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/vendors?${params}`)
+      const res = await fetch('/api/vendors?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setVendors((data.vendors || []).map((v: any) => ({ id: v.id, name: v.name, phone: v.phone })))
@@ -473,7 +474,7 @@ export function PurchasesPage() {
     try {
       const params = new URLSearchParams()
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/inventory?${params}`)
+      const res = await fetch('/api/inventory?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setInventoryItems((data.items || []).map((i: any) => ({ id: i.id, name: i.name, unit: i.unit, unitPrice: i.unitPrice })))
@@ -640,7 +641,7 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'order',
           vendorId: poVendorId,
           propertyId: selectedPropertyId,
@@ -657,7 +658,7 @@ export function PurchasesPage() {
           discount: parseFloat(poDiscount) || 0,
           expectedDelivery: poExpectedDelivery || null,
           notes: poNotes,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Purchase order created successfully' })
@@ -700,7 +701,7 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'requisition',
           title: prTitle,
           description: prDescription,
@@ -716,7 +717,7 @@ export function PurchasesPage() {
             unit: i.unit,
             estimatedPrice: parseFloat(i.estimatedPrice) || null,
           })),
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Requisition created successfully' })
@@ -760,7 +761,7 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'grn',
           purchaseOrderId: grnPurchaseOrderId,
           propertyId: selectedPropertyId,
@@ -777,7 +778,7 @@ export function PurchasesPage() {
             unitPrice: i.unitPrice,
             batchNumber: i.batchNumber || null,
           })),
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Goods Received Note created successfully' })
@@ -811,12 +812,12 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: poId,
           status,
           approvedById: status === 'approved' ? currentUser?.id : undefined,
           ...extra,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `PO status updated to ${PO_STATUS_CONFIG[status].label}` })
@@ -839,12 +840,12 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'requisition',
           id: prId,
           status,
           approvedById: status === 'approved' ? currentUser?.id : undefined,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `Requisition ${status === 'approved' ? 'approved' : 'rejected'}` })
@@ -867,11 +868,11 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'grn',
           id: grnId,
           status,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `GRN status updated to ${GRN_STATUS_CONFIG[status].label}` })
@@ -926,12 +927,12 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: editingPO.id,
           status: editPOStatus,
           paymentStatus: editPOPaymentStatus,
           paymentMode: editPOPaymentMode || null,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Purchase order updated successfully' })
@@ -966,11 +967,11 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'requisition',
           id: editingPR.id,
           status: editPRStatus,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Requisition updated successfully' })
@@ -1004,11 +1005,11 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: 'grn',
           id: editingGRN.id,
           status: editGRNStatus,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'GRN updated successfully' })
@@ -1041,10 +1042,10 @@ export function PurchasesPage() {
       const res = await fetch('/api/purchases', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           type: deleteTarget.type,
           id: deleteTarget.id,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })

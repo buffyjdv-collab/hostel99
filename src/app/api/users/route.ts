@@ -1,24 +1,52 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/users - List users
 // Query params: role, propertyId (for scoping), assignedUserId
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
     const role = searchParams.get('role')
+    const filterRole = searchParams.get('role')
     const propertyId = searchParams.get('propertyId')
 
+    // Note: 'role' is used both for auth and as a filter param.
+    // We need to differentiate: the auth role is the first 'role' param,
+    // but if someone passes role=manager as a filter, we handle it.
+    // Re-read with explicit auth params.
+    const authUserId = searchParams.get('userId')
+    const authRole = searchParams.get('authRole') || searchParams.get('role')
+
+    if (!authUserId || !authRole) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(authUserId, authRole, 'users', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     const where: any = {}
-    if (role) where.role = role
+    const roleFilter = searchParams.get('filterRole')
+    if (roleFilter) where.role = roleFilter
 
     // If propertyId is provided, get users assigned to that property
     if (propertyId) {
       const assignments = await db.hostelAssignment.findMany({
-        where: { propertyId, isActive: true },
+        where: { propertyId, isActive: true, ...access.whereClause },
         select: { userId: true },
       })
       const userIds = assignments.map(a => a.userId)
+      where.id = { in: userIds }
+    } else if (!access.userCtx.isSuperAdmin) {
+      // Non-super-admin: only see users assigned to their accessible properties
+      const assignments = await db.hostelAssignment.findMany({
+        where: { propertyId: { in: access.userCtx.propertyIds }, isActive: true },
+        select: { userId: true },
+      })
+      const userIds = [...new Set(assignments.map(a => a.userId))]
       where.id = { in: userIds }
     }
 
@@ -57,7 +85,16 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { name, email, phone, password, role, propertyId, assignRole } = body
+    const { name, email, phone, password, role, propertyId, assignRole, userId, authRole } = body
+
+    if (!userId || !authRole) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, authRole, 'users', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!name || !email) {
       return NextResponse.json(

@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -74,6 +75,9 @@ const roleColors: Record<string, string> = {
 
 export function HostelsPage() {
   const { currentUser, currentHostelId, setCurrentHostelId } = useAppStore()
+  const canCreate = hasPermission(currentUser?.role || '', 'hostels:create')
+  const canUpdate = hasPermission(currentUser?.role || '', 'hostels:update')
+  const canDelete = hasPermission(currentUser?.role || '', 'hostels:delete')
   const [properties, setProperties] = useState<Property[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [users, setUsers] = useState<UserItem[]>([])
@@ -112,9 +116,9 @@ export function HostelsPage() {
     setLoading(true)
     try {
       const [propsRes, assignRes, usersRes] = await Promise.all([
-        fetch('/api/properties'),
-        fetch('/api/hostel-assignments'),
-        fetch('/api/users'),
+        fetch('/api/properties?' + buildAuthQuery()),
+        fetch('/api/hostel-assignments?' + buildAuthQuery()),
+        fetch('/api/users?' + buildAuthQuery()),
       ])
       if (propsRes.ok) {
         const propsData = await propsRes.json()
@@ -151,7 +155,7 @@ export function HostelsPage() {
       const res = await fetch('/api/hostels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           hostelName: newHostel.name,
           hostelType: newHostel.type,
           address: newHostel.address,
@@ -166,7 +170,7 @@ export function HostelsPage() {
           ownerEmail: newHostel.ownerEmail,
           ownerPhone: newHostel.ownerPhone,
           ownerPassword: newHostel.ownerPassword || undefined,
-        }),
+        })),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -204,7 +208,7 @@ export function HostelsPage() {
       const res = await fetch('/api/hostel-assignments', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(assignForm),
+        body: JSON.stringify(buildAuthBody(assignForm)),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -225,7 +229,7 @@ export function HostelsPage() {
       await fetch('/api/hostel-assignments', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: assignmentId }),
+        body: JSON.stringify(buildAuthBody({ id: assignmentId })),
       })
       toast({ title: 'Assignment Removed', description: 'User has been removed from the hostel' })
       fetchData()
@@ -239,7 +243,7 @@ export function HostelsPage() {
       const res = await fetch('/api/properties', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(buildAuthBody(editForm)),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -259,7 +263,7 @@ export function HostelsPage() {
       await fetch('/api/properties', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: propertyId }),
+        body: JSON.stringify(buildAuthBody({ id: propertyId })),
       })
       toast({ title: 'Hostel Deleted', description: 'Hostel has been deleted' })
       fetchData()
@@ -306,14 +310,18 @@ export function HostelsPage() {
           <p className="text-slate-500 mt-1">Create hostels with owner details and assign managers & staff</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setShowAssignUser(true)} variant="outline" className="gap-2">
-            <UserPlus className="w-4 h-4" />
-            Assign User
-          </Button>
-          <Button onClick={() => setShowCreateHostel(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
-            <Plus className="w-4 h-4" />
-            Create Hostel
-          </Button>
+          {canCreate && (
+            <Button onClick={() => setShowAssignUser(true)} variant="outline" className="gap-2">
+              <UserPlus className="w-4 h-4" />
+              Assign User
+            </Button>
+          )}
+          {canCreate && (
+            <Button onClick={() => setShowCreateHostel(true)} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
+              <Plus className="w-4 h-4" />
+              Create Hostel
+            </Button>
+          )}
         </div>
       </div>
 
@@ -437,42 +445,46 @@ export function HostelsPage() {
                         <ArrowRightLeft className="w-3.5 h-3.5" />
                         Switch
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setEditForm({
-                            id: property.id, name: property.name, type: property.type,
-                            address: property.address, city: property.city, state: property.state || '',
-                            pincode: property.pincode || '', contactPhone: '', contactEmail: '',
-                            ownerId: property.ownerId,
-                          })
-                          setShowEditHostel(true)
-                        }}
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete {property.name}?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete the hostel and all its data. This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDeleteHostel(property.id)} className="bg-red-600 hover:bg-red-700">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {canUpdate && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditForm({
+                              id: property.id, name: property.name, type: property.type,
+                              address: property.address, city: property.city, state: property.state || '',
+                              pincode: property.pincode || '', contactPhone: '', contactEmail: '',
+                              ownerId: property.ownerId,
+                            })
+                            setShowEditHostel(true)
+                          }}
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700">
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete {property.name}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This will permanently delete the hostel and all its data. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteHostel(property.id)} className="bg-red-600 hover:bg-red-700">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

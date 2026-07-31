@@ -1,22 +1,38 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess, buildTenantWhere } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
     const status = searchParams.get('status')
     const month = searchParams.get('month')
     const year = searchParams.get('year')
     const propertyId = searchParams.get('propertyId')
     const tenantId = searchParams.get('tenantId')
 
-    const where: Record<string, unknown> = {}
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'payments', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: Record<string, unknown> = { ...access.whereClause }
 
     if (status) where.status = status
     if (month) where.month = parseInt(month)
     if (year) where.year = parseInt(year)
-    if (propertyId) where.propertyId = propertyId
     if (tenantId) where.tenantId = tenantId
+
+    // Tenants can only see their own payments
+    if (role === 'tenant') {
+      where.tenantId = userId
+    }
 
     const payments = await db.payment.findMany({
       where,
@@ -69,7 +85,18 @@ export async function POST(request: Request) {
       notes,
       month,
       year,
+      userId,
+      role,
     } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'payments', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (!tenantId || !propertyId || !amount || !month || !year) {
       return NextResponse.json(
@@ -122,7 +149,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, status, paidDate, receiptNumber, utrNumber, notes } = body
+    const { id, status, paidDate, receiptNumber, utrNumber, notes, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Payment id is required' }, { status: 400 })
@@ -131,6 +162,16 @@ export async function PATCH(request: Request) {
     const existingPayment = await db.payment.findUnique({ where: { id } })
     if (!existingPayment) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'payments', 'update', existingPayment.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    // Tenants can only update their own payments
+    if (role === 'tenant' && existingPayment.tenantId !== userId) {
+      return NextResponse.json({ error: 'You can only update your own payments' }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -165,7 +206,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Payment id is required' }, { status: 400 })
@@ -174,6 +219,11 @@ export async function DELETE(request: Request) {
     const existingPayment = await db.payment.findUnique({ where: { id } })
     if (!existingPayment) {
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'payments', 'delete', existingPayment.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     await db.payment.delete({ where: { id } })

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -459,7 +460,7 @@ export function RoomsPage() {
   const fetchRooms = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/rooms' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      const res = await fetch('/api/rooms?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setRooms(data)
@@ -473,7 +474,7 @@ export function RoomsPage() {
 
   async function fetchProperties() {
     try {
-      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      const res = await fetch('/api/properties?' + buildAuthQuery())
       if (res.ok) {
         setProperties(await res.json())
       }
@@ -557,11 +558,11 @@ export function RoomsPage() {
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           ...formData,
           amenities: formData.amenities.length > 0 ? JSON.stringify(formData.amenities) : null,
           status: 'available',
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -629,7 +630,7 @@ export function RoomsPage() {
       const res = await fetch('/api/rooms', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedRoom.id,
           name: editFormData.name.trim(),
           number: editFormData.number.trim(),
@@ -640,7 +641,7 @@ export function RoomsPage() {
           deposit: editFormData.deposit,
           status: editFormData.status,
           amenities: editFormData.amenities.length > 0 ? JSON.stringify(editFormData.amenities) : undefined,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -676,7 +677,7 @@ export function RoomsPage() {
       const res = await fetch('/api/rooms', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deleteTarget.id }),
+        body: JSON.stringify(buildAuthBody({ id: deleteTarget.id })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })

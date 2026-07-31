@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -746,8 +747,8 @@ export function TenantsPage() {
       setLoading(true)
       try {
         const [tenantsRes, propsRes] = await Promise.all([
-          fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/tenants?' + buildAuthQuery()),
+          fetch('/api/properties?' + buildAuthQuery()),
         ])
         if (tenantsRes.ok) {
           const data = await tenantsRes.json()
@@ -775,7 +776,7 @@ export function TenantsPage() {
     }
     async function fetchRooms() {
       try {
-        const res = await fetch(`/api/rooms?propertyId=${form.propertyId}`)
+        const res = await fetch('/api/rooms?' + buildAuthQuery({ propertyId: form.propertyId }))
         if (res.ok) {
           const data = await res.json()
           const roomList = Array.isArray(data) ? data : data.rooms || []
@@ -796,7 +797,7 @@ export function TenantsPage() {
     }
     async function fetchBeds() {
       try {
-        const res = await fetch(`/api/rooms?propertyId=${form.propertyId}`)
+        const res = await fetch('/api/rooms?' + buildAuthQuery({ propertyId: form.propertyId }))
         if (res.ok) {
           const data = await res.json()
           const roomList = Array.isArray(data) ? data : data.rooms || []
@@ -884,7 +885,7 @@ export function TenantsPage() {
       const res = await fetch('/api/tenants', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           name: form.name,
           email: form.email || undefined,
           phone: form.phone,
@@ -907,7 +908,7 @@ export function TenantsPage() {
           agreementStart: form.agreementStart || undefined,
           agreementEnd: form.agreementEnd || undefined,
           userId: currentUser?.id,
-        }),
+        })),
       })
       if (res.ok) {
         const newTenant = await res.json()
@@ -949,7 +950,7 @@ export function TenantsPage() {
       const res = await fetch('/api/tenants', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: tenantId, status: 'inactive' }),
+        body: JSON.stringify(buildAuthBody({ id: tenantId, status: 'inactive' })),
       })
       if (res.ok) {
         setTenants((prev) =>
@@ -989,14 +990,14 @@ export function TenantsPage() {
       const res = await fetch('/api/tenants', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedTenant.id,
           name: editFormData.name.trim(),
           email: editFormData.email.trim() || undefined,
           phone: editFormData.phone.trim(),
           emergencyContact: editFormData.emergencyContact.trim() || undefined,
           status: editFormData.status,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Tenant updated successfully' })
@@ -1004,7 +1005,7 @@ export function TenantsPage() {
         setSelectedTenant(null)
         // Refresh data
         try {
-          const tenantsRes = await fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+          const tenantsRes = await fetch('/api/tenants?' + buildAuthQuery())
           if (tenantsRes.ok) {
             const data = await tenantsRes.json()
             setTenants(Array.isArray(data) ? data : data.tenants || [])
@@ -1033,7 +1034,7 @@ export function TenantsPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/tenants/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/tenants/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
         setTenants((prev) => prev.filter((t) => t.id !== deleteTarget.id))

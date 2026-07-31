@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -1050,7 +1051,7 @@ export function InventoryPage() {
       if (lowStockFilter) params.set('lowStock', 'true')
       if (searchQuery.trim()) params.set('search', searchQuery.trim())
 
-      const res = await fetch(`/api/inventory?${params.toString()}`)
+      const res = await fetch('/api/inventory?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setItems(data.items || [])
@@ -1065,7 +1066,7 @@ export function InventoryPage() {
   const fetchTransactions = useCallback(async (itemId: string) => {
     setTxLoading(true)
     try {
-      const res = await fetch(`/api/inventory?transactions=${itemId}` + (currentHostelId ? `&propertyId=${currentHostelId}` : ''))
+      const res = await fetch('/api/inventory?' + buildAuthQuery({ transactions: itemId }))
       if (res.ok) {
         const data = await res.json()
         setTransactions(data.transactions || [])
@@ -1158,7 +1159,7 @@ export function InventoryPage() {
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           name: formData.name,
           sku: formData.sku || null,
           categoryId: formData.categoryId,
@@ -1174,7 +1175,7 @@ export function InventoryPage() {
           storeLocation: formData.storeLocation || null,
           gstRate: parseFloat(formData.gstRate) || 0,
           hsnCode: formData.hsnCode || null,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -1204,14 +1205,14 @@ export function InventoryPage() {
       const res = await fetch('/api/inventory', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           action: 'adjust',
           itemId: selectedItem.id,
           type: formData.type,
           quantity: effectiveQty,
           notes: formData.notes,
           userId: currentUser?.id,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -1238,11 +1239,11 @@ export function InventoryPage() {
       const res = await fetch('/api/inventory', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           action: 'update',
           itemId: selectedItem.id,
           ...formData,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -1670,7 +1671,7 @@ export function InventoryPage() {
                   const res = await fetch('/api/inventory', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: deleteTarget.id }),
+                    body: JSON.stringify(buildAuthBody({ id: deleteTarget.id })),
                   })
                   if (res.ok) {
                     toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })

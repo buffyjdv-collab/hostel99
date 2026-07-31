@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -753,11 +754,10 @@ export function ComplaintsPage() {
 
   const fetchComplaints = useCallback(async () => {
     try {
-      const params = new URLSearchParams()
-      if (statusFilter !== 'all') params.set('status', statusFilter)
-      if (categoryFilter !== 'all') params.set('category', categoryFilter)
-      if (currentHostelId) params.set('propertyId', currentHostelId)
-      const res = await fetch(`/api/complaints?${params.toString()}`)
+      const extraParams: Record<string, string> = {}
+      if (statusFilter !== 'all') extraParams.status = statusFilter
+      if (categoryFilter !== 'all') extraParams.category = categoryFilter
+      const res = await fetch('/api/complaints?' + buildAuthQuery(extraParams))
       if (res.ok) {
         const data = await res.json()
         setComplaints(data)
@@ -775,9 +775,9 @@ export function ComplaintsPage() {
     async function fetchSupport() {
       try {
         const [propRes, tenantRes, staffRes] = await Promise.all([
-          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-          fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
-          fetch('/api/staff' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/properties?' + buildAuthQuery()),
+          fetch('/api/tenants?' + buildAuthQuery()),
+          fetch('/api/staff?' + buildAuthQuery()),
         ])
         if (propRes.ok) setProperties(await propRes.json())
         if (tenantRes.ok) {
@@ -876,7 +876,7 @@ export function ComplaintsPage() {
       const res = await fetch('/api/complaints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           title: formData.title,
           description: formData.description,
           category: formData.category,
@@ -884,7 +884,7 @@ export function ComplaintsPage() {
           tenantId: formData.tenantId,
           propertyId: formData.propertyId,
           createdById: currentUser?.id || 'system',
-        }),
+        })),
       })
       if (res.ok) {
         setShowRaiseDialog(false)
@@ -907,7 +907,7 @@ export function ComplaintsPage() {
       const res = await fetch('/api/complaints', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify(buildAuthBody(body)),
       })
       if (res.ok) {
         setSelectedCom(null)
@@ -927,7 +927,7 @@ export function ComplaintsPage() {
       const res = await fetch('/api/complaints', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, assignedToId: staffId, status: 'assigned' }),
+        body: JSON.stringify(buildAuthBody({ id, assignedToId: staffId, status: 'assigned' })),
       })
       if (res.ok) {
         await fetchComplaints()
@@ -948,7 +948,7 @@ export function ComplaintsPage() {
       const res = await fetch('/api/complaints', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status: 'resolved', resolution, rating }),
+        body: JSON.stringify(buildAuthBody({ id, status: 'resolved', resolution, rating })),
       })
       if (res.ok) {
         setSelectedComplaint(null)
@@ -985,14 +985,14 @@ export function ComplaintsPage() {
       const res = await fetch('/api/complaints', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedComplaint.id,
           title: editFormData.title.trim(),
           description: editFormData.description.trim(),
           category: editFormData.category,
           priority: editFormData.priority,
           status: editFormData.status,
-        }),
+        })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Complaint updated successfully' })
@@ -1022,7 +1022,7 @@ export function ComplaintsPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/complaints/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/complaints/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `Complaint has been deleted` })
         setComplaints((prev) => prev.filter((c) => c.id !== deleteTarget.id))

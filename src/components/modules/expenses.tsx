@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -600,15 +601,13 @@ export function ExpensesPage() {
 
   const fetchExpenses = async () => {
     try {
-      const params = new URLSearchParams()
-      if (categoryFilter !== 'all') params.set('category', categoryFilter)
-      if (propertyFilter !== 'all') params.set('propertyId', propertyFilter)
-      if (dateFrom) params.set('startDate', dateFrom)
-      if (dateTo) params.set('endDate', dateTo)
+      const extraParams: Record<string, string> = {}
+      if (categoryFilter !== 'all') extraParams.category = categoryFilter
+      if (propertyFilter !== 'all') extraParams.propertyId = propertyFilter
+      if (dateFrom) extraParams.startDate = dateFrom
+      if (dateTo) extraParams.endDate = dateTo
 
-      if (currentHostelId && !params.has('propertyId')) params.set('propertyId', currentHostelId)
-
-      const res = await fetch(`/api/expenses?${params.toString()}`)
+      const res = await fetch('/api/expenses?' + buildAuthQuery(extraParams))
       if (res.ok) {
         const data = await res.json()
         setExpenses(data)
@@ -620,7 +619,7 @@ export function ExpensesPage() {
 
   const fetchProperties = async () => {
     try {
-      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      const res = await fetch('/api/properties?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setProperties(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
@@ -790,7 +789,7 @@ export function ExpensesPage() {
       const res = await fetch('/api/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           category: formData.category,
           description: formData.description,
           amount: formData.amount,
@@ -800,7 +799,7 @@ export function ExpensesPage() {
           createdById: currentUser?.id || 'system',
           receipt: formData.receipt || undefined,
           status: formData.status,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -846,7 +845,7 @@ export function ExpensesPage() {
       const res = await fetch('/api/expenses', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedExpense.id,
           description: editFormData.description.trim(),
           amount: editFormData.amount ? parseFloat(editFormData.amount) : undefined,
@@ -854,7 +853,7 @@ export function ExpensesPage() {
           date: editFormData.date || undefined,
           paymentMode: editFormData.paymentMode.trim() || undefined,
           status: editFormData.status,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -887,7 +886,7 @@ export function ExpensesPage() {
     if (!deleteTarget) return
     try {
       setSubmittingEdit(true)
-      const res = await fetch(`/api/expenses/${deleteTarget.id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/expenses/${deleteTarget.id}?` + buildAuthQuery(), { method: 'DELETE' })
       if (res.ok) {
         toast({ title: 'Success', description: `Expense has been deleted` })
         setExpenses((prev) => prev.filter((e) => e.id !== deleteTarget.id))

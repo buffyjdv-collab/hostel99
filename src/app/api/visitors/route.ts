@@ -1,14 +1,26 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
     const tenantId = searchParams.get('tenantId')
-
-    const where: Record<string, unknown> = {}
-    if (tenantId) where.tenantId = tenantId
     const propertyId = searchParams.get('propertyId')
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'visitors', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where: Record<string, unknown> = { ...access.whereClause }
+    if (tenantId) where.tenantId = tenantId
     if (propertyId) where.propertyId = propertyId
 
     const visitors = await db.visitor.findMany({
@@ -42,13 +54,30 @@ export async function POST(request: Request) {
       status,
       action,
       visitorId,
+      userId,
+      role,
     } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     // Handle visitor checkout
     if (action === 'checkout' && visitorId) {
+      const access = await validateAccess(userId, role, 'visitors', 'update')
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const existingVisitor = await db.visitor.findUnique({ where: { id: visitorId } })
       if (!existingVisitor) {
         return NextResponse.json({ error: 'Visitor not found' }, { status: 404 })
+      }
+
+      // Verify access to the visitor's property
+      const checkoutAccess = await validateAccess(userId, role, 'visitors', 'update', existingVisitor.propertyId)
+      if (!checkoutAccess.allowed) {
+        return NextResponse.json({ error: checkoutAccess.error }, { status: 403 })
       }
 
       const visitor = await db.visitor.update({
@@ -68,6 +97,11 @@ export async function POST(request: Request) {
     }
 
     // Create new visitor
+    const access = await validateAccess(userId, role, 'visitors', 'create', propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     if (!name || !purpose || !propertyId) {
       return NextResponse.json(
         { error: 'Name, purpose, and propertyId are required' },
@@ -103,7 +137,11 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json()
-    const { id, name, phone, purpose, tenantId, hostId, propertyId, checkIn, checkOut, status } = body
+    const { id, name, phone, purpose, tenantId, hostId, propertyId, checkIn, checkOut, status, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Visitor id is required' }, { status: 400 })
@@ -112,6 +150,11 @@ export async function PATCH(request: Request) {
     const existingVisitor = await db.visitor.findUnique({ where: { id } })
     if (!existingVisitor) {
       return NextResponse.json({ error: 'Visitor not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'visitors', 'update', existingVisitor.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     const updateData: Record<string, unknown> = {}
@@ -145,7 +188,11 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const body = await request.json()
-    const { id } = body
+    const { id, userId, role } = body
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
     if (!id) {
       return NextResponse.json({ error: 'Visitor id is required' }, { status: 400 })
@@ -154,6 +201,11 @@ export async function DELETE(request: Request) {
     const existingVisitor = await db.visitor.findUnique({ where: { id } })
     if (!existingVisitor) {
       return NextResponse.json({ error: 'Visitor not found' }, { status: 404 })
+    }
+
+    const access = await validateAccess(userId, role, 'visitors', 'delete', existingVisitor.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
     }
 
     await db.visitor.delete({ where: { id } })

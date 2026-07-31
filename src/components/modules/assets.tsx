@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -454,7 +455,7 @@ export function AssetsPage() {
     try {
       const params = new URLSearchParams({ type: 'assets' })
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/assets?${params}`)
+      const res = await fetch('/api/assets?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setAssets(data.assets || [])
@@ -472,7 +473,7 @@ export function AssetsPage() {
     try {
       const params = new URLSearchParams({ type: 'laundry' })
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/assets?${params}`)
+      const res = await fetch('/api/assets?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setLaundry(data.laundry || [])
@@ -490,7 +491,7 @@ export function AssetsPage() {
     try {
       const params = new URLSearchParams({ type: 'housekeeping' })
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/assets?${params}`)
+      const res = await fetch('/api/assets?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setHousekeeping(data.housekeeping || [])
@@ -506,7 +507,7 @@ export function AssetsPage() {
   const fetchRooms = useCallback(async () => {
     setRoomsLoading(true)
     try {
-      const res = await fetch('/api/rooms' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      const res = await fetch('/api/rooms?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         const roomList: RoomInfo[] = data.map((r: any) => ({
@@ -650,7 +651,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Asset added successfully' })
@@ -692,7 +693,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Asset updated successfully' })
@@ -784,7 +785,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Laundry item added successfully' })
@@ -823,7 +824,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Laundry item updated successfully' })
@@ -860,7 +861,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${item.name} sent to laundry` })
@@ -893,7 +894,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${item.name} returned from laundry` })
@@ -928,7 +929,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${item.name} marked as damaged` })
@@ -995,7 +996,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Housekeeping item added successfully' })
@@ -1031,7 +1032,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${restockForm.name} restocked successfully. New stock: ${newStock}` })
@@ -1072,7 +1073,7 @@ export function AssetsPage() {
       const res = await fetch('/api/assets', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildAuthBody(payload)),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been removed` })

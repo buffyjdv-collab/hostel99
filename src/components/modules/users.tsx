@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -73,7 +74,7 @@ export function UsersPage() {
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/users')
+      const res = await fetch('/api/users?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setUsers(data.users || [])
@@ -106,7 +107,7 @@ export function UsersPage() {
         const res = await fetch('/api/users', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingUser.id, ...form }),
+          body: JSON.stringify(buildAuthBody({ id: editingUser.id, ...form })),
         })
         if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to update') }
         toast({ title: 'User Updated', description: `${form.name} has been updated.` })
@@ -114,7 +115,7 @@ export function UsersPage() {
         const res = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(buildAuthBody(form)),
         })
         if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to create') }
         toast({ title: 'User Created', description: `${form.name} has been created.` })
@@ -134,7 +135,7 @@ export function UsersPage() {
       const res = await fetch('/api/users', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: user.id }),
+        body: JSON.stringify(buildAuthBody({ id: user.id })),
       })
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Failed to delete') }
       toast({ title: 'User Deleted', description: `${user.name} has been removed.` })

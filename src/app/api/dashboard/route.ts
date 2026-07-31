@@ -1,13 +1,21 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
+import { buildUserContext, buildScopedWhere, buildPropertyWhere, checkPermission } from '@/lib/auth-helpers'
 
-// GET /api/dashboard?propertyId=xxx - Dashboard stats
+// GET /api/dashboard?userId=xxx&role=xxx&propertyId=xxx - Dashboard stats
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const propertyId = searchParams.get('propertyId')
+    const userId = searchParams.get('userId') || ''
+    const role = searchParams.get('role') || ''
+    const requestedPropertyId = searchParams.get('propertyId') || undefined
 
-    const propertyFilter = propertyId ? { propertyId } : {}
+    // Build user context for data isolation
+    const userCtx = await buildUserContext(userId, role)
+    
+    // Property model uses `id`, other models use `propertyId`
+    const propertyWhere = buildPropertyWhere(userCtx, requestedPropertyId)
+    const dataWhere = buildScopedWhere(userCtx, requestedPropertyId)
 
     const [
       totalProperties,
@@ -23,35 +31,33 @@ export async function GET(request: Request) {
       recentLeads,
       propertyOccupancy,
     ] = await Promise.all([
-      // Total properties
-      propertyId
-        ? db.property.count({ where: { id: propertyId } })
-        : db.property.count(),
+      // Total properties (uses Property model - filter by id)
+      db.property.count({ where: propertyWhere }),
 
-      // Total rooms
-      db.room.count({ where: propertyFilter }),
+      // Total rooms (uses propertyId)
+      db.room.count({ where: dataWhere }),
 
       // Total active tenants
-      db.tenant.count({ where: { ...propertyFilter, status: 'active' } }),
+      db.tenant.count({ where: { ...dataWhere, status: 'active' } }),
 
       // Total active staff
-      db.staff.count({ where: { ...propertyFilter, status: 'active' } }),
+      db.staff.count({ where: { ...dataWhere, status: 'active' } }),
 
       // Total leads
-      db.lead.count({ where: propertyFilter }),
+      db.lead.count({ where: dataWhere }),
 
       // Total open complaints
-      db.complaint.count({ where: { ...propertyFilter, status: { in: ['open', 'assigned', 'in_progress'] } } }),
+      db.complaint.count({ where: { ...dataWhere, status: { in: ['open', 'assigned', 'in_progress'] } } }),
 
       // Total payments
-      db.payment.count({ where: propertyFilter }),
+      db.payment.count({ where: dataWhere }),
 
       // Total expenses
-      db.expense.count({ where: propertyFilter }),
+      db.expense.count({ where: dataWhere }),
 
       // Recent payments
       db.payment.findMany({
-        where: propertyFilter,
+        where: dataWhere,
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -61,7 +67,7 @@ export async function GET(request: Request) {
 
       // Recent complaints
       db.complaint.findMany({
-        where: propertyFilter,
+        where: dataWhere,
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -71,18 +77,19 @@ export async function GET(request: Request) {
 
       // Recent leads
       db.lead.findMany({
-        where: propertyFilter,
+        where: dataWhere,
         take: 5,
         orderBy: { createdAt: 'desc' },
       }),
 
       // Property occupancy stats
-      propertyId
+      requestedPropertyId
         ? db.property.findUnique({
-            where: { id: propertyId },
+            where: { id: requestedPropertyId },
             select: { totalRooms: true, totalBeds: true, occupancy: true, name: true },
           })
         : db.property.findMany({
+            where: propertyWhere,
             select: { id: true, name: true, totalRooms: true, totalBeds: true, occupancy: true },
           }),
     ])
@@ -93,19 +100,19 @@ export async function GET(request: Request) {
 
     const [paidPayments, pendingPayments, overduePayments, totalExpenseAmount] = await Promise.all([
       db.payment.aggregate({
-        where: { ...propertyFilter, month: currentMonth, year: currentYear, status: 'paid' },
+        where: { ...dataWhere, month: currentMonth, year: currentYear, status: 'paid' },
         _sum: { amount: true },
       }),
       db.payment.aggregate({
-        where: { ...propertyFilter, month: currentMonth, year: currentYear, status: 'pending' },
+        where: { ...dataWhere, month: currentMonth, year: currentYear, status: 'pending' },
         _sum: { amount: true },
       }),
       db.payment.aggregate({
-        where: { ...propertyFilter, status: 'overdue' },
+        where: { ...dataWhere, status: 'overdue' },
         _sum: { amount: true },
       }),
       db.expense.aggregate({
-        where: propertyFilter,
+        where: dataWhere,
         _sum: { amount: true },
       }),
     ])

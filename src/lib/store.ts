@@ -119,8 +119,32 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   ],
 }
 
+// In-memory reference to the latest DB-loaded permissions so hasPermission()
+// can check them even when called outside a React component.
+let _dbPermissions: Record<string, Permission[]> | null = null
+
+export function loadPermissionsFromDB(): Promise<Record<string, Permission[]>> {
+  return fetch('/api/role-permissions')
+    .then((res) => {
+      if (!res.ok) throw new Error(`Failed to load permissions: ${res.status}`)
+      return res.json()
+    })
+    .then((data: Record<string, Permission[]>) => {
+      // Merge fetched permissions into the in-memory ROLE_PERMISSIONS
+      Object.assign(ROLE_PERMISSIONS, data)
+      _dbPermissions = data
+      return data
+    })
+    .catch((err) => {
+      console.error('[loadPermissionsFromDB]', err)
+      return ROLE_PERMISSIONS // fall back to static defaults
+    })
+}
+
 export function hasPermission(role: string, permission: Permission): boolean {
-  const perms = ROLE_PERMISSIONS[role] || []
+  // Prefer DB-loaded permissions when available
+  const source = _dbPermissions || ROLE_PERMISSIONS
+  const perms = source[role] || []
   return perms.includes(permission)
 }
 
@@ -199,6 +223,9 @@ interface AppState {
   setCurrentHostelId: (id: string | null) => void
   // Get list of property IDs the user has access to
   getUserPropertyIds: () => string[]
+  // DB-loaded role permissions
+  dbPermissions: Record<string, Permission[]> | null
+  loadDbPermissions: () => Promise<void>
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -215,21 +242,26 @@ export const useAppStore = create<AppState>((set, get) => ({
         currentUser: user,
         currentHostelId: existingHostelId || firstHostel,
       })
+      // Load DB permissions after setting the user
+      get().loadDbPermissions()
     } else {
       localStorage.removeItem('hostelpro_user')
       localStorage.removeItem('hostelpro_currentHostelId')
-      set({ currentUser: null, currentHostelId: null })
+      set({ currentUser: null, currentHostelId: null, dbPermissions: null })
+      _dbPermissions = null
     }
   },
   logout: () => {
     localStorage.removeItem('hostelpro_user')
     localStorage.removeItem('hostelpro_currentHostelId')
+    _dbPermissions = null
     set({
       currentUser: null,
       currentPage: 'dashboard',
       selectedPropertyId: null,
       sidebarCollapsed: false,
       currentHostelId: null,
+      dbPermissions: null,
     })
   },
   switchRole: (newRole: UserRole) => {
@@ -288,5 +320,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     // Fallback: if a currentHostelId is set, return just that
     if (currentHostelId) return [currentHostelId]
     return []
+  },
+  dbPermissions: null,
+  loadDbPermissions: async () => {
+    try {
+      const data = await loadPermissionsFromDB()
+      _dbPermissions = data
+      set({ dbPermissions: data })
+    } catch {
+      // loadPermissionsFromDB already logs; just keep existing state
+    }
   },
 }))

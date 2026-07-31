@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -307,9 +308,11 @@ export function PropertiesPage() {
     try {
       setLoading(true)
       // For non-super_admin, scope to user's assigned properties
-      let url = '/api/properties'
+      let url = '/api/properties?'
       if (currentUser?.role !== 'super_admin' && currentUser?.id) {
-        url += `?assignedUserId=${currentUser.id}`
+        url += buildAuthQuery({ assignedUserId: currentUser.id })
+      } else {
+        url += buildAuthQuery()
       }
       const res = await fetch(url)
       if (res.ok) {
@@ -376,11 +379,11 @@ export function PropertiesPage() {
       const res = await fetch('/api/properties', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           ...formData,
           ownerId: ownerId || 'default-owner',
           amenities: formData.amenities.length > 0 ? JSON.stringify(formData.amenities) : null,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -450,7 +453,7 @@ export function PropertiesPage() {
       const res = await fetch('/api/properties', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildAuthBody({
           id: selectedProperty.id,
           name: editFormData.name.trim(),
           address: editFormData.address.trim(),
@@ -459,7 +462,7 @@ export function PropertiesPage() {
           contactPhone: editFormData.contactPhone.trim() || undefined,
           contactEmail: editFormData.contactEmail.trim() || undefined,
           description: editFormData.description.trim() || undefined,
-        }),
+        })),
       })
 
       if (res.ok) {
@@ -488,7 +491,7 @@ export function PropertiesPage() {
       const res = await fetch('/api/properties', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deleteTarget.id }),
+        body: JSON.stringify(buildAuthBody({ id: deleteTarget.id })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })

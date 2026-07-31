@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore, hasPermission } from '@/lib/store'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -206,7 +207,7 @@ export function VendorsPage() {
     try {
       const params = new URLSearchParams()
       if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
-      const res = await fetch(`/api/vendors?${params}`)
+      const res = await fetch('/api/vendors?' + buildAuthQuery())
       if (res.ok) {
         const data = await res.json()
         setVendors(data.vendors || [])
@@ -261,7 +262,7 @@ export function VendorsPage() {
       const res = await fetch('/api/vendors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, propertyId: selectedPropertyId }),
+        body: JSON.stringify(buildAuthBody({ ...form, propertyId: selectedPropertyId })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Vendor added successfully' })
@@ -285,7 +286,7 @@ export function VendorsPage() {
       const res = await fetch('/api/vendors', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedVendor.id, ...editForm }),
+        body: JSON.stringify(buildAuthBody({ id: selectedVendor.id, ...editForm })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: 'Vendor updated successfully' })
@@ -306,7 +307,7 @@ export function VendorsPage() {
       const res = await fetch('/api/vendors', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: vendor.id, status: newStatus }),
+        body: JSON.stringify(buildAuthBody({ id: vendor.id, status: newStatus })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `Vendor ${newStatus === 'active' ? 'activated' : newStatus === 'blacklisted' ? 'blacklisted' : 'deactivated'}` })
@@ -356,7 +357,7 @@ export function VendorsPage() {
       const res = await fetch('/api/vendors', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deleteTarget.id }),
+        body: JSON.stringify(buildAuthBody({ id: deleteTarget.id })),
       })
       if (res.ok) {
         toast({ title: 'Success', description: `${deleteTarget.name} has been deleted` })
