@@ -1,134 +1,139 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
+// GET /api/dashboard?propertyId=xxx - Dashboard stats
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const propertyId = searchParams.get('propertyId')
 
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
-
-    // Build property filter
     const propertyFilter = propertyId ? { propertyId } : {}
 
-    // Basic counts
-    const [totalProperties, totalRooms, totalBeds, occupiedBeds] = await Promise.all([
-      db.property.count({ where: { isActive: true, ...propertyFilter } }),
-      db.room.count({ where: propertyFilter }),
-      db.bed.count({ where: propertyFilter ? { room: { property: { id: propertyId } } } : {} }),
-      db.bed.count({ where: { status: 'occupied', ...(propertyFilter ? { room: { property: { id: propertyId } } } : {}) } }),
-    ])
-
-    const vacantBeds = totalBeds - occupiedBeds
-    const occupancyPercentage = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
-
-    // Monthly income (sum of paid payments for current month)
-    const paidPayments = await db.payment.findMany({
-      where: {
-        status: 'paid',
-        month: currentMonth,
-        year: currentYear,
-        ...propertyFilter,
-      },
-      select: { amount: true },
-    })
-    const monthlyIncome = paidPayments.reduce((sum, p) => sum + p.amount, 0)
-
-    // Pending dues (sum of pending/overdue payments)
-    const pendingPayments = await db.payment.findMany({
-      where: {
-        status: { in: ['pending', 'overdue'] },
-        ...propertyFilter,
-      },
-      select: { amount: true },
-    })
-    const pendingDues = pendingPayments.reduce((sum, p) => sum + p.amount, 0)
-
-    // Lead conversion rate
-    const [totalLeads, convertedLeads] = await Promise.all([
-      db.lead.count({ where: propertyFilter }),
-      db.lead.count({ where: { status: { in: ['booking', 'move_in'] }, ...propertyFilter } }),
-    ])
-    const leadConversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0
-
-    // Recent activity (last 10 activity logs)
-    const recentActivity = await db.activityLog.findMany({
-      take: 10,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: { select: { id: true, name: true, email: true } },
-      },
-    })
-
-    // Monthly income trend (last 6 months)
-    const monthlyIncomeTrend = []
-    for (let i = 5; i >= 0; i--) {
-      let month = currentMonth - i
-      let year = currentYear
-      if (month <= 0) {
-        month += 12
-        year -= 1
-      }
-      const payments = await db.payment.findMany({
-        where: { status: 'paid', month, year, ...propertyFilter },
-        select: { amount: true },
-      })
-      const total = payments.reduce((sum, p) => sum + p.amount, 0)
-      monthlyIncomeTrend.push({ month, year, income: total })
-    }
-
-    // Payment status breakdown
-    const paymentStatusBreakdown = await db.payment.groupBy({
-      by: ['status'],
-      where: propertyFilter,
-      _count: { status: true },
-      _sum: { amount: true },
-    })
-
-    // Complaint status breakdown
-    const complaintStatusBreakdown = await db.complaint.groupBy({
-      by: ['status'],
-      where: propertyFilter,
-      _count: { status: true },
-    })
-
-    // Lead source breakdown
-    const leadSourceBreakdown = await db.lead.groupBy({
-      by: ['source'],
-      where: propertyFilter,
-      _count: { source: true },
-    })
-
-    return NextResponse.json({
+    const [
       totalProperties,
       totalRooms,
-      totalBeds,
-      occupiedBeds,
-      vacantBeds,
-      monthlyIncome,
-      pendingDues,
-      leadConversionRate,
-      occupancyPercentage,
-      recentActivity,
-      monthlyIncomeTrend,
-      paymentStatusBreakdown: paymentStatusBreakdown.map((p) => ({
-        status: p.status,
-        count: p._count.status,
-        totalAmount: p._sum.amount ?? 0,
-      })),
-      complaintStatusBreakdown: complaintStatusBreakdown.map((c) => ({
-        status: c.status,
-        count: c._count.status,
-      })),
-      leadSourceBreakdown: leadSourceBreakdown.map((l) => ({
-        source: l.source,
-        count: l._count.source,
-      })),
+      totalTenants,
+      totalStaff,
+      totalLeads,
+      totalComplaints,
+      totalPayments,
+      totalExpenses,
+      recentPayments,
+      recentComplaints,
+      recentLeads,
+      propertyOccupancy,
+    ] = await Promise.all([
+      // Total properties
+      propertyId
+        ? db.property.count({ where: { id: propertyId } })
+        : db.property.count(),
+
+      // Total rooms
+      db.room.count({ where: propertyFilter }),
+
+      // Total active tenants
+      db.tenant.count({ where: { ...propertyFilter, status: 'active' } }),
+
+      // Total active staff
+      db.staff.count({ where: { ...propertyFilter, status: 'active' } }),
+
+      // Total leads
+      db.lead.count({ where: propertyFilter }),
+
+      // Total open complaints
+      db.complaint.count({ where: { ...propertyFilter, status: { in: ['open', 'assigned', 'in_progress'] } } }),
+
+      // Total payments
+      db.payment.count({ where: propertyFilter }),
+
+      // Total expenses
+      db.expense.count({ where: propertyFilter }),
+
+      // Recent payments
+      db.payment.findMany({
+        where: propertyFilter,
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          tenant: { select: { name: true } },
+        },
+      }),
+
+      // Recent complaints
+      db.complaint.findMany({
+        where: propertyFilter,
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          tenant: { select: { name: true } },
+        },
+      }),
+
+      // Recent leads
+      db.lead.findMany({
+        where: propertyFilter,
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+      }),
+
+      // Property occupancy stats
+      propertyId
+        ? db.property.findUnique({
+            where: { id: propertyId },
+            select: { totalRooms: true, totalBeds: true, occupancy: true, name: true },
+          })
+        : db.property.findMany({
+            select: { id: true, name: true, totalRooms: true, totalBeds: true, occupancy: true },
+          }),
+    ])
+
+    // Revenue stats
+    const currentMonth = new Date().getMonth() + 1
+    const currentYear = new Date().getFullYear()
+
+    const [paidPayments, pendingPayments, overduePayments, totalExpenseAmount] = await Promise.all([
+      db.payment.aggregate({
+        where: { ...propertyFilter, month: currentMonth, year: currentYear, status: 'paid' },
+        _sum: { amount: true },
+      }),
+      db.payment.aggregate({
+        where: { ...propertyFilter, month: currentMonth, year: currentYear, status: 'pending' },
+        _sum: { amount: true },
+      }),
+      db.payment.aggregate({
+        where: { ...propertyFilter, status: 'overdue' },
+        _sum: { amount: true },
+      }),
+      db.expense.aggregate({
+        where: propertyFilter,
+        _sum: { amount: true },
+      }),
+    ])
+
+    return NextResponse.json({
+      stats: {
+        totalProperties,
+        totalRooms,
+        totalTenants,
+        totalStaff,
+        totalLeads,
+        totalComplaints,
+        totalPayments,
+        totalExpenses,
+      },
+      revenue: {
+        collected: paidPayments._sum.amount || 0,
+        pending: pendingPayments._sum.amount || 0,
+        overdue: overduePayments._sum.amount || 0,
+        expenses: totalExpenseAmount._sum.amount || 0,
+      },
+      recentPayments,
+      recentComplaints,
+      recentLeads,
+      propertyOccupancy,
     })
   } catch (error) {
-    console.error('Dashboard stats error:', error)
-    return NextResponse.json({ error: 'Failed to fetch dashboard stats' }, { status: 500 })
+    console.error('Dashboard GET error:', error)
+    return NextResponse.json({ error: 'Failed to fetch dashboard data' }, { status: 500 })
   }
 }

@@ -923,7 +923,12 @@ export function StaffPage() {
 
   const fetchProperties = async () => {
     try {
-      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      // For non-super_admin, scope to user's assigned properties
+      let url = '/api/properties'
+      if (currentHostelId) {
+        url += `?assignedUserId=${currentUser?.id}`
+      }
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         setProperties(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))
@@ -975,12 +980,15 @@ export function StaffPage() {
           name: formData.name,
           phone: formData.phone,
           role: formData.role,
-          propertyId: formData.propertyId,
+          propertyId: formData.propertyId || currentHostelId || undefined,
           salary: formData.salary,
           joinDate: formData.joinDate || undefined,
           aadhaarNumber: formData.aadhaarNumber || undefined,
           address: formData.address || undefined,
           status: 'active',
+          // Create user account + hostel assignment automatically
+          createUser: !!formData.email,
+          email: formData.email || undefined,
         }),
       })
 

@@ -306,7 +306,12 @@ export function PropertiesPage() {
   const fetchProperties = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
+      // For non-super_admin, scope to user's assigned properties
+      let url = '/api/properties'
+      if (currentUser?.role !== 'super_admin' && currentUser?.id) {
+        url += `?assignedUserId=${currentUser.id}`
+      }
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         setProperties(data)
@@ -316,7 +321,7 @@ export function PropertiesPage() {
     } finally {
       setLoading(false)
     }
-  }, [currentHostelId])
+  }, [currentUser?.role, currentUser?.id])
 
   // ── Computed Values ──────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -366,12 +371,14 @@ export function PropertiesPage() {
 
     try {
       setSubmitting(true)
+      // For owner, use their own ID. For super_admin, use the selected ownerId
+      const ownerId = currentUser?.role === 'super_admin' ? (formData as any).ownerId || currentUser?.id : currentUser?.id
       const res = await fetch('/api/properties', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          ownerId: currentUser?.id || 'default-owner',
+          ownerId: ownerId || 'default-owner',
           amenities: formData.amenities.length > 0 ? JSON.stringify(formData.amenities) : null,
         }),
       })

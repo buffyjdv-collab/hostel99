@@ -8,30 +8,17 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { toast } from '@/hooks/use-toast'
 import {
-  Building2,
-  Plus,
-  Users,
-  UserPlus,
-  MapPin,
-  Phone,
-  Mail,
-  Trash2,
-  Edit,
-  Shield,
-  Crown,
-  UserCog,
-  Wrench,
-  User,
-  MoreVertical,
-  Search,
-  Home,
-  ArrowRightLeft,
+  Building2, Plus, Users, UserPlus, MapPin, Phone, Mail,
+  Trash2, Edit, Shield, Crown, UserCog, Wrench, User,
+  Search, Home, ArrowRightLeft, Loader2, CheckCircle2,
+  KeyRound, Eye, EyeOff,
 } from 'lucide-react'
 
 interface Property {
@@ -47,7 +34,7 @@ interface Property {
   occupancy: number
   isActive: boolean
   ownerId: string
-  owner?: { id: string; name: string; email: string }
+  owner?: { id: string; name: string; email: string; phone?: string }
   createdAt: string
   _count?: { buildings: number; rooms: number }
 }
@@ -98,13 +85,17 @@ export function HostelsPage() {
   const [showAssignUser, setShowAssignUser] = useState(false)
   const [showEditHostel, setShowEditHostel] = useState(false)
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [creating, setCreating] = useState(false)
 
-  // Create hostel form
+  // Create hostel form - includes owner details
   const [newHostel, setNewHostel] = useState({
+    // Hostel details
     name: '', type: 'pg', address: '', city: '', state: '', pincode: '',
-    contactPhone: '', contactEmail: '', totalRooms: 0, totalBeds: 0,
-    ownerId: '',
+    landmark: '', description: '', totalRooms: 0, totalBeds: 0,
+    // Owner details (inline)
+    ownerName: '', ownerEmail: '', ownerPhone: '', ownerPassword: '',
   })
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false)
 
   // Assign user form
   const [assignForm, setAssignForm] = useState({
@@ -147,36 +138,60 @@ export function HostelsPage() {
   useEffect(() => { fetchData() }, [fetchData])
 
   const handleCreateHostel = async () => {
-    if (!newHostel.name || !newHostel.address || !newHostel.city || !newHostel.ownerId) {
-      toast({ title: 'Validation Error', description: 'Name, address, city, and owner are required', variant: 'destructive' })
+    if (!newHostel.name || !newHostel.address || !newHostel.city) {
+      toast({ title: 'Validation Error', description: 'Hostel name, address, and city are required', variant: 'destructive' })
       return
     }
+    if (!newHostel.ownerName || !newHostel.ownerEmail || !newHostel.ownerPhone) {
+      toast({ title: 'Validation Error', description: 'Owner name, email, and phone are required', variant: 'destructive' })
+      return
+    }
+    setCreating(true)
     try {
-      const res = await fetch('/api/properties', {
+      const res = await fetch('/api/hostels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newHostel),
+        body: JSON.stringify({
+          hostelName: newHostel.name,
+          hostelType: newHostel.type,
+          address: newHostel.address,
+          city: newHostel.city,
+          state: newHostel.state,
+          pincode: newHostel.pincode,
+          landmark: newHostel.landmark,
+          description: newHostel.description,
+          totalRooms: newHostel.totalRooms,
+          totalBeds: newHostel.totalBeds,
+          ownerName: newHostel.ownerName,
+          ownerEmail: newHostel.ownerEmail,
+          ownerPhone: newHostel.ownerPhone,
+          ownerPassword: newHostel.ownerPassword || undefined,
+        }),
       })
       if (!res.ok) {
         const data = await res.json()
         toast({ title: 'Error', description: data.error, variant: 'destructive' })
         return
       }
-      const property = await res.json()
-
-      // Auto-assign the owner to this hostel
-      await fetch('/api/hostel-assignments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: newHostel.ownerId, propertyId: property.id, role: 'owner' }),
+      const result = await res.json()
+      const ownerInfo = result.owner?.isNew
+        ? `Owner ${result.owner.name} created with email ${result.owner.email}`
+        : `Existing owner ${result.owner.name} assigned`
+      toast({
+        title: 'Hostel Created!',
+        description: `${newHostel.name} created. ${ownerInfo}. Login: ${newHostel.ownerEmail} / ${newHostel.ownerPassword || newHostel.ownerName.toLowerCase().replace(/\s+/g, '') + '123'}`,
       })
-
-      toast({ title: 'Hostel Created', description: `${newHostel.name} has been created successfully` })
       setShowCreateHostel(false)
-      setNewHostel({ name: '', type: 'pg', address: '', city: '', state: '', pincode: '', contactPhone: '', contactEmail: '', totalRooms: 0, totalBeds: 0, ownerId: '' })
+      setNewHostel({
+        name: '', type: 'pg', address: '', city: '', state: '', pincode: '',
+        landmark: '', description: '', totalRooms: 0, totalBeds: 0,
+        ownerName: '', ownerEmail: '', ownerPhone: '', ownerPassword: '',
+      })
       fetchData()
     } catch {
       toast({ title: 'Error', description: 'Failed to create hostel', variant: 'destructive' })
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -246,7 +261,7 @@ export function HostelsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: propertyId }),
       })
-      toast({ title: 'Hostel Deleted', description: 'Hostel has been deactivated' })
+      toast({ title: 'Hostel Deleted', description: 'Hostel has been deleted' })
       fetchData()
     } catch {
       toast({ title: 'Error', description: 'Failed to delete hostel', variant: 'destructive' })
@@ -288,7 +303,7 @@ export function HostelsPage() {
             <Building2 className="w-7 h-7 text-indigo-600" />
             Hostel Management
           </h1>
-          <p className="text-slate-500 mt-1">Create hostels and assign owners, managers, and staff</p>
+          <p className="text-slate-500 mt-1">Create hostels with owner details and assign managers & staff</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={() => setShowAssignUser(true)} variant="outline" className="gap-2">
@@ -447,7 +462,7 @@ export function HostelsPage() {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete {property.name}?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will deactivate the hostel. All assignments will remain but the hostel will be hidden.
+                              This will permanently delete the hostel and all its data. This action cannot be undone.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -478,6 +493,30 @@ export function HostelsPage() {
                       <p className="text-xs text-slate-500">Occupancy</p>
                     </div>
                   </div>
+
+                  {/* Owner Info */}
+                  {property.owner && (
+                    <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Crown className="w-4 h-4 text-purple-600" />
+                        <span className="text-sm font-semibold text-purple-800">Owner</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="w-8 h-8">
+                          <AvatarFallback className="bg-purple-200 text-purple-800 text-xs font-medium">
+                            {property.owner.name.split(' ').map(n => n[0]).join('')}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium text-slate-900">{property.owner.name}</p>
+                          <div className="flex items-center gap-3 text-xs text-slate-500">
+                            <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{property.owner.email}</span>
+                            {property.owner.phone && <span className="flex items-center gap-1"><Phone className="w-3 h-3" />{property.owner.phone}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Assigned Users */}
                   <div>
@@ -545,89 +584,156 @@ export function HostelsPage() {
         </div>
       )}
 
-      {/* ─── Create Hostel Dialog ──────────────────────────────── */}
+      {/* ─── Create Hostel Dialog (with Owner Details) ──────────────────── */}
       <Dialog open={showCreateHostel} onOpenChange={setShowCreateHostel}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="w-5 h-5 text-indigo-600" />
-              Create New Hostel
+              Create New Hostel & Assign Owner
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Hostel Name *</Label>
-              <Input placeholder="e.g. Sunrise PG" value={newHostel.name} onChange={(e) => setNewHostel({ ...newHostel, name: e.target.value })} />
+          <div className="space-y-6 py-2">
+            {/* ─── Hostel Details Section ───────────────────── */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <Building2 className="w-4 h-4 text-indigo-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Hostel Details</h3>
+              </div>
+              <div className="space-y-2">
+                <Label>Hostel Name *</Label>
+                <Input placeholder="e.g. Sunrise PG" value={newHostel.name} onChange={(e) => setNewHostel({ ...newHostel, name: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={newHostel.type} onValueChange={(v) => setNewHostel({ ...newHostel, type: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pg">PG</SelectItem>
+                      <SelectItem value="hostel">Hostel</SelectItem>
+                      <SelectItem value="co_living">Co-Living</SelectItem>
+                      <SelectItem value="apartment">Apartment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Total Rooms</Label>
+                  <Input type="number" placeholder="0" value={newHostel.totalRooms || ''} onChange={(e) => setNewHostel({ ...newHostel, totalRooms: parseInt(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Address *</Label>
+                <Input placeholder="Full address" value={newHostel.address} onChange={(e) => setNewHostel({ ...newHostel, address: e.target.value })} />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>City *</Label>
+                  <Input placeholder="City" value={newHostel.city} onChange={(e) => setNewHostel({ ...newHostel, city: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>State</Label>
+                  <Input placeholder="State" value={newHostel.state} onChange={(e) => setNewHostel({ ...newHostel, state: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Pincode</Label>
+                  <Input placeholder="Pincode" value={newHostel.pincode} onChange={(e) => setNewHostel({ ...newHostel, pincode: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Landmark</Label>
+                  <Input placeholder="Nearby landmark" value={newHostel.landmark} onChange={(e) => setNewHostel({ ...newHostel, landmark: e.target.value })} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Total Beds</Label>
+                  <Input type="number" placeholder="0" value={newHostel.totalBeds || ''} onChange={(e) => setNewHostel({ ...newHostel, totalBeds: parseInt(e.target.value) || 0 })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea placeholder="Brief description of the hostel..." value={newHostel.description} onChange={(e) => setNewHostel({ ...newHostel, description: e.target.value })} rows={2} />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select value={newHostel.type} onValueChange={(v) => setNewHostel({ ...newHostel, type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pg">PG</SelectItem>
-                    <SelectItem value="hostel">Hostel</SelectItem>
-                    <SelectItem value="co_living">Co-Living</SelectItem>
-                    <SelectItem value="apartment">Apartment</SelectItem>
-                  </SelectContent>
-                </Select>
+
+            {/* ─── Owner Details Section ────────────────────── */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                <Crown className="w-4 h-4 text-purple-600" />
+                <h3 className="text-sm font-semibold text-slate-800">Owner Details</h3>
+                <Badge variant="outline" className="text-xs text-purple-600 border-purple-300">Will be auto-assigned to this hostel</Badge>
               </div>
               <div className="space-y-2">
-                <Label>Assign Owner *</Label>
-                <Select value={newHostel.ownerId} onValueChange={(v) => setNewHostel({ ...newHostel, ownerId: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select owner" /></SelectTrigger>
-                  <SelectContent>
-                    {owners.map(u => (
-                      <SelectItem key={u.id} value={u.id}>{u.name} ({u.role})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Owner Full Name *</Label>
+                <Input placeholder="e.g. Rajesh Kumar" value={newHostel.ownerName} onChange={(e) => setNewHostel({ ...newHostel, ownerName: e.target.value })} />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Address *</Label>
-              <Input placeholder="Full address" value={newHostel.address} onChange={(e) => setNewHostel({ ...newHostel, address: e.target.value })} />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>City *</Label>
-                <Input placeholder="City" value={newHostel.city} onChange={(e) => setNewHostel({ ...newHostel, city: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>State</Label>
-                <Input placeholder="State" value={newHostel.state} onChange={(e) => setNewHostel({ ...newHostel, state: e.target.value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Owner Email *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input placeholder="owner@example.com" value={newHostel.ownerEmail} onChange={(e) => setNewHostel({ ...newHostel, ownerEmail: e.target.value })} className="pl-10" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Owner Phone *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Input placeholder="9876543210" value={newHostel.ownerPhone} onChange={(e) => setNewHostel({ ...newHostel, ownerPhone: e.target.value })} className="pl-10" />
+                  </div>
+                </div>
               </div>
               <div className="space-y-2">
-                <Label>Pincode</Label>
-                <Input placeholder="Pincode" value={newHostel.pincode} onChange={(e) => setNewHostel({ ...newHostel, pincode: e.target.value })} />
+                <Label>Login Password</Label>
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    type={showOwnerPassword ? 'text' : 'password'}
+                    placeholder="Leave blank to auto-generate"
+                    value={newHostel.ownerPassword}
+                    onChange={(e) => setNewHostel({ ...newHostel, ownerPassword: e.target.value })}
+                    className="pl-10 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnerPassword(!showOwnerPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showOwnerPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400">If left blank, password will be auto-generated as: ownername123</p>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Contact Phone</Label>
-                <Input placeholder="Phone" value={newHostel.contactPhone} onChange={(e) => setNewHostel({ ...newHostel, contactPhone: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Contact Email</Label>
-                <Input placeholder="Email" value={newHostel.contactEmail} onChange={(e) => setNewHostel({ ...newHostel, contactEmail: e.target.value })} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Total Rooms</Label>
-                <Input type="number" value={newHostel.totalRooms} onChange={(e) => setNewHostel({ ...newHostel, totalRooms: parseInt(e.target.value) || 0 })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Total Beds</Label>
-                <Input type="number" value={newHostel.totalBeds} onChange={(e) => setNewHostel({ ...newHostel, totalBeds: parseInt(e.target.value) || 0 })} />
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="text-xs text-amber-800">
+                    <p className="font-medium">What happens when you create:</p>
+                    <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                      <li>A new owner user account is created with the details above</li>
+                      <li>The hostel (property) is created and linked to this owner</li>
+                      <li>The owner is automatically assigned to this hostel</li>
+                      <li>Owner can login and create managers, staff, and manage their hostel</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateHostel(false)}>Cancel</Button>
-            <Button onClick={handleCreateHostel} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
-              <Building2 className="w-4 h-4" />
-              Create Hostel
+            <Button onClick={handleCreateHostel} disabled={creating} className="bg-indigo-600 hover:bg-indigo-700 gap-2">
+              {creating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Building2 className="w-4 h-4" />
+                  Create Hostel & Owner
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

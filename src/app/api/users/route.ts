@@ -1,14 +1,26 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-// GET /api/users - List all users
+// GET /api/users - List users
+// Query params: role, propertyId (for scoping), assignedUserId
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
+    const propertyId = searchParams.get('propertyId')
 
     const where: any = {}
     if (role) where.role = role
+
+    // If propertyId is provided, get users assigned to that property
+    if (propertyId) {
+      const assignments = await db.hostelAssignment.findMany({
+        where: { propertyId, isActive: true },
+        select: { userId: true },
+      })
+      const userIds = assignments.map(a => a.userId)
+      where.id = { in: userIds }
+    }
 
     const users = await db.user.findMany({
       where,
@@ -20,9 +32,16 @@ export async function GET(request: Request) {
         role: true,
         isActive: true,
         avatar: true,
-        lastLogin: true,
         createdAt: true,
-        password: false,
+        hostelAssignments: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            propertyId: true,
+            role: true,
+            property: { select: { id: true, name: true, type: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -34,157 +53,70 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/users - Create new user
+// POST /api/users - Create user with optional hostel assignment
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { name, email, phone, password, role, isActive } = body
+    const { name, email, phone, password, role, propertyId, assignRole } = body
 
-    if (!name || !email || !password) {
-      return NextResponse.json({ error: 'Name, email, and password are required' }, { status: 400 })
-    }
-
-    const validRoles = ['super_admin', 'owner', 'manager', 'staff', 'tenant']
-    if (!validRoles.includes(role)) {
-      return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+    if (!name || !email) {
+      return NextResponse.json(
+        { error: 'Name and email are required' },
+        { status: 400 }
+      )
     }
 
     // Check if email already exists
     const existing = await db.user.findUnique({ where: { email } })
     if (existing) {
-      return NextResponse.json({ error: 'Email already exists' }, { status: 409 })
+      return NextResponse.json(
+        { error: 'A user with this email already exists' },
+        { status: 409 }
+      )
     }
 
     const user = await db.user.create({
       data: {
-        name,
         email,
-        phone: phone || null,
-        password,
-        role,
-        isActive: isActive !== false,
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
+        name,
+        phone: phone || '',
+        password: password || `${name.toLowerCase().replace(/\s+/g, '')}123`,
+        role: role || 'staff',
         isActive: true,
-        avatar: true,
-        lastLogin: true,
-        createdAt: true,
       },
     })
 
-    return NextResponse.json({ user, message: 'User created successfully' })
-  } catch (error) {
-    console.error('Users POST error:', error)
-    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
-  }
-}
-
-// PATCH /api/users - Update user
-export async function PATCH(request: Request) {
-  try {
-    const body = await request.json()
-    const { id, name, email, phone, role, isActive, currentPassword, newPassword } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
-
-    const user = await db.user.findUnique({ where: { id } })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Password change requires current password verification
-    if (currentPassword && newPassword) {
-      if (user.password !== currentPassword) {
-        return NextResponse.json({ error: 'Current password is incorrect' }, { status: 401 })
-      }
-      await db.user.update({
-        where: { id },
-        data: { password: newPassword },
+    // If propertyId is provided, create hostel assignment
+    if (propertyId && assignRole) {
+      await db.hostelAssignment.create({
+        data: {
+          userId: user.id,
+          propertyId,
+          role: assignRole,
+          isActive: true,
+        },
       })
-      return NextResponse.json({ message: 'Password changed successfully' })
     }
 
-    // Regular update
-    const updateData: any = {}
-    if (name !== undefined) updateData.name = name
-    if (email !== undefined) updateData.email = email
-    if (phone !== undefined) updateData.phone = phone
-    if (role !== undefined) {
-      const validRoles = ['super_admin', 'owner', 'manager', 'staff', 'tenant']
-      if (!validRoles.includes(role)) {
-        return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
-      }
-      updateData.role = role
-    }
-    if (isActive !== undefined) updateData.isActive = isActive
-
-    const updated = await db.user.update({
-      where: { id },
-      data: updateData,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        phone: true,
-        role: true,
-        isActive: true,
-        avatar: true,
-        lastLogin: true,
-        createdAt: true,
+    // Return user with assignments
+    const userWithAssignments = await db.user.findUnique({
+      where: { id: user.id },
+      include: {
+        hostelAssignments: {
+          where: { isActive: true },
+          include: {
+            property: { select: { id: true, name: true, type: true } },
+          },
+        },
       },
     })
 
-    return NextResponse.json({ user: updated, message: 'User updated successfully' })
-  } catch (error) {
-    console.error('Users PATCH error:', error)
-    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
-  }
-}
-
-// DELETE /api/users - Delete user
-export async function DELETE(request: Request) {
-  try {
-    const body = await request.json()
-    const { id } = body
-
-    if (!id) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    return NextResponse.json({ user: userWithAssignments }, { status: 201 })
+  } catch (error: any) {
+    console.error('Users POST error:', error)
+    if (error.code === 'P2002') {
+      return NextResponse.json({ error: 'A user with this email already exists' }, { status: 409 })
     }
-
-    // Check if user exists
-    const user = await db.user.findUnique({ where: { id } })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    // Delete related records first (cascade)
-    // Staff profile
-    await db.staff.deleteMany({ where: { userId: id } })
-    // Tenant profile
-    await db.tenant.deleteMany({ where: { userId: id } })
-    // Activity logs
-    await db.activityLog.deleteMany({ where: { userId: id } })
-    // Attendance
-    await db.attendance.deleteMany({ where: { userId: id } })
-    // Stock transactions
-    await db.stockTransaction.deleteMany({ where: { performedById: id } })
-    // Complaints (reassign)
-    await db.complaint.updateMany({ where: { createdById: id }, data: { createdById: 'system' } })
-    await db.complaint.updateMany({ where: { assignedToId: id }, data: { assignedToId: null } })
-
-    // Finally delete the user
-    await db.user.delete({ where: { id } })
-
-    return NextResponse.json({ message: 'User deleted successfully' })
-  } catch (error) {
-    console.error('Users DELETE error:', error)
-    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to create user' }, { status: 500 })
   }
 }

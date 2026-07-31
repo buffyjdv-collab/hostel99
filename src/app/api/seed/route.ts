@@ -3,28 +3,118 @@ import { NextResponse } from 'next/server'
 
 export async function POST() {
   try {
-    // Clear existing data first
-    await db.activityLog.deleteMany()
-    await db.salaryPayment.deleteMany()
-    await db.attendance.deleteMany()
-    await db.document.deleteMany()
-    await db.visitor.deleteMany()
-    await db.communication.deleteMany()
-    await db.notice.deleteMany()
-    await db.expense.deleteMany()
-    await db.complaint.deleteMany()
-    await db.payment.deleteMany()
-    await db.booking.deleteMany()
-    await db.lead.deleteMany()
-    await db.bed.deleteMany()
-    await db.tenant.deleteMany()
-    await db.room.deleteMany()
-    await db.floor.deleteMany()
-    await db.building.deleteMany()
-    await db.property.deleteMany()
-    await db.subscription.deleteMany()
-    await db.staff.deleteMany()
-    await db.user.deleteMany()
+    // Clear existing data first - use individual deleteMany in correct order
+    try {
+      await db.hostelAssignment.deleteMany()
+    } catch {}
+    try {
+      await db.activityLog.deleteMany()
+    } catch {}
+    try {
+      await db.salaryPayment.deleteMany()
+    } catch {}
+    try {
+      await db.attendance.deleteMany()
+    } catch {}
+    try {
+      await db.document.deleteMany()
+    } catch {}
+    try {
+      await db.visitor.deleteMany()
+    } catch {}
+    try {
+      await db.communication.deleteMany()
+    } catch {}
+    try {
+      await db.notice.deleteMany()
+    } catch {}
+    try {
+      await db.expense.deleteMany()
+    } catch {}
+    try {
+      await db.complaint.deleteMany()
+    } catch {}
+    try {
+      await db.payment.deleteMany()
+    } catch {}
+    try {
+      await db.booking.deleteMany()
+    } catch {}
+    try {
+      await db.lead.deleteMany()
+    } catch {}
+    try {
+      await db.bed.deleteMany()
+    } catch {}
+    try {
+      await db.tenant.deleteMany()
+    } catch {}
+    try {
+      await db.staff.deleteMany()
+    } catch {}
+    try {
+      await db.room.deleteMany()
+    } catch {}
+    try {
+      await db.floor.deleteMany()
+    } catch {}
+    try {
+      await db.building.deleteMany()
+    } catch {}
+    try {
+      await db.inventoryCategory.deleteMany()
+    } catch {}
+    try {
+      await db.inventoryItem.deleteMany()
+    } catch {}
+    try {
+      await db.vendor.deleteMany()
+    } catch {}
+    try {
+      await db.purchaseRequisition.deleteMany()
+    } catch {}
+    try {
+      await db.purchaseOrder.deleteMany()
+    } catch {}
+    try {
+      await db.goodsReceivedNote.deleteMany()
+    } catch {}
+    try {
+      await db.kitchenMenu.deleteMany()
+    } catch {}
+    try {
+      await db.kitchenMeal.deleteMany()
+    } catch {}
+    try {
+      await db.messMenu.deleteMany()
+    } catch {}
+    try {
+      await db.messMeal.deleteMany()
+    } catch {}
+    try {
+      await db.asset.deleteMany()
+    } catch {}
+    try {
+      await db.housekeepingItem.deleteMany()
+    } catch {}
+    try {
+      await db.housekeepingTask.deleteMany()
+    } catch {}
+    try {
+      await db.wasteRecord.deleteMany()
+    } catch {}
+    try {
+      await db.rolePermission.deleteMany()
+    } catch {}
+    try {
+      await db.property.deleteMany()
+    } catch {}
+    try {
+      await db.subscription.deleteMany()
+    } catch {}
+    try {
+      await db.user.deleteMany()
+    } catch {}
 
     // Create Super Admin
     const superAdmin = await db.user.create({
@@ -102,6 +192,8 @@ export async function POST() {
         amenities: JSON.stringify(['WiFi', 'AC', 'Laundry', 'Meals', 'Parking', 'CCTV', 'Power Backup']),
         images: JSON.stringify([]),
         ownerId: owner.id,
+        contactPhone: owner.phone,
+        contactEmail: owner.email,
       },
     })
 
@@ -121,6 +213,8 @@ export async function POST() {
         amenities: JSON.stringify(['WiFi', 'Study Room', 'Mess', 'Gym', 'Sports', 'CCTV']),
         images: JSON.stringify([]),
         ownerId: owner.id,
+        contactPhone: owner.phone,
+        contactEmail: owner.email,
       },
     })
 
@@ -140,8 +234,26 @@ export async function POST() {
         amenities: JSON.stringify(['WiFi', 'AC', 'Co-working Space', 'Lounge', 'Kitchen', 'Events']),
         images: JSON.stringify([]),
         ownerId: owner.id,
+        contactPhone: owner.phone,
+        contactEmail: owner.email,
       },
     })
+
+    // ─── Hostel Assignments (Multi-Tenancy) ──────────────────
+    // Owner is assigned to all 3 properties
+    await db.hostelAssignment.create({ data: { userId: owner.id, propertyId: property1.id, role: 'owner' } })
+    await db.hostelAssignment.create({ data: { userId: owner.id, propertyId: property2.id, role: 'owner' } })
+    await db.hostelAssignment.create({ data: { userId: owner.id, propertyId: property3.id, role: 'owner' } })
+
+    // Manager is assigned to property1 and property2
+    await db.hostelAssignment.create({ data: { userId: manager.id, propertyId: property1.id, role: 'manager' } })
+    await db.hostelAssignment.create({ data: { userId: manager.id, propertyId: property2.id, role: 'manager' } })
+
+    // Staff1 is assigned to property1
+    await db.hostelAssignment.create({ data: { userId: staffUser1.id, propertyId: property1.id, role: 'staff' } })
+
+    // Staff2 is assigned to property2
+    await db.hostelAssignment.create({ data: { userId: staffUser2.id, propertyId: property2.id, role: 'staff' } })
 
     // ─── Buildings ───────────────────────────────────────────
     const building1 = await db.building.create({
@@ -235,19 +347,24 @@ export async function POST() {
           isActive: true,
         },
       })
+      const assignedPropertyId = i < 3 ? property1.id : property2.id
       const staff = await db.staff.create({
         data: {
           userId: staffUser.id,
           name: staffUser.name,
           phone: staffUser.phone,
           role: staffRoles[i],
-          propertyId: i < 3 ? property1.id : property2.id,
+          propertyId: assignedPropertyId,
           salary: [12000, 10000, 13000, 11000, 14000][i],
           joinDate: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
           status: 'active',
           aadhaarNumber: `${Math.floor(Math.random() * 9000 + 1000)} ${Math.floor(Math.random() * 9000 + 1000)} ${Math.floor(Math.random() * 9000 + 1000)}`,
           address: 'Bangalore, Karnataka',
         },
+      })
+      // Assign staff to hostel
+      await db.hostelAssignment.create({
+        data: { userId: staffUser.id, propertyId: assignedPropertyId, role: 'staff' },
       })
       staffMembers.push(staff)
     }
@@ -268,7 +385,7 @@ export async function POST() {
     const tenants = []
     const availableBeds = await db.bed.findMany({ where: { status: 'occupied' } })
 
-    for (let i = 0; i < Math.min(45, availableBeds.length); i++) {
+    for (let i = 0; i < Math.min(10, availableBeds.length); i++) {
       const bed = availableBeds[i]
       const room = allRooms.find(r => r.id === bed.roomId)
       if (!room) continue
@@ -318,6 +435,11 @@ export async function POST() {
       })
       tenants.push(tenant)
 
+      // Assign tenant to their hostel
+      await db.hostelAssignment.create({
+        data: { userId: tenantUser.id, propertyId: room.propertyId, role: 'tenant' },
+      })
+
       // Update bed status
       await db.bed.update({ where: { id: bed.id }, data: { tenantId: tenant.id, status: 'occupied' } })
     }
@@ -332,7 +454,7 @@ export async function POST() {
       'Swati Bhat', 'Arvind Kumar', 'Sakshi Sharma', 'Ramesh Yadav', 'Kavita Joshi',
     ]
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 10; i++) {
       const status = leadStatuses[Math.floor(Math.random() * leadStatuses.length)]
       const stage = leadStatuses.indexOf(status) + 1
       await db.lead.create({
@@ -359,7 +481,7 @@ export async function POST() {
     // ─── Payments ────────────────────────────────────────────
     const paymentMethods = ['upi', 'bank_transfer', 'card', 'wallet', 'cash']
     for (const tenant of tenants) {
-      for (let m = 0; m < 6; m++) {
+      for (let m = 0; m < 2; m++) {
         const month = 2 + m
         const year = 2025
         const isPaid = Math.random() > 0.2
@@ -408,7 +530,7 @@ export async function POST() {
       'Parking space issue', 'Security concern', 'Mosquito problem',
     ]
 
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 8; i++) {
       const tenant = tenants[i % tenants.length]
       if (!tenant) continue
       const status = ['open', 'assigned', 'in_progress', 'resolved', 'closed'][Math.floor(Math.random() * 5)]
@@ -438,7 +560,7 @@ export async function POST() {
       'CCTV maintenance', 'Fire safety equipment', 'Garden maintenance',
     ]
 
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 10; i++) {
       await db.expense.create({
         data: {
           category: expenseCategories[i % expenseCategories.length],
@@ -496,7 +618,7 @@ export async function POST() {
 
     // ─── Attendance ──────────────────────────────────────────
     for (const staff of staffMembers) {
-      for (let d = 1; d <= 30; d++) {
+      for (let d = 1; d <= 7; d++) {
         if (d % 7 === 0) continue // Skip Sundays
         await db.attendance.create({
           data: {
@@ -525,7 +647,7 @@ export async function POST() {
 
     return NextResponse.json({
       success: true,
-      message: 'Database seeded successfully with comprehensive sample data',
+      message: 'Database seeded successfully with hostel assignments for multi-tenancy',
       stats: {
         properties: 3,
         buildings: 3,
@@ -538,6 +660,7 @@ export async function POST() {
         expenses: 20,
         notices: 5,
         visitors: 10,
+        hostelAssignments: 'Created for all users',
       },
     })
   } catch (error: unknown) {
