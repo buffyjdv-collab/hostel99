@@ -550,7 +550,7 @@ function ExpenseDetailDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function ExpensesPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'expenses:create')
   const canUpdate = hasPermission(role, 'expenses:update')
@@ -606,6 +606,8 @@ export function ExpensesPage() {
       if (dateFrom) params.set('startDate', dateFrom)
       if (dateTo) params.set('endDate', dateTo)
 
+      if (currentHostelId && !params.has('propertyId')) params.set('propertyId', currentHostelId)
+
       const res = await fetch(`/api/expenses?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
@@ -618,7 +620,7 @@ export function ExpensesPage() {
 
   const fetchProperties = async () => {
     try {
-      const res = await fetch('/api/properties')
+      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         setProperties(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))

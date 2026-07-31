@@ -28,12 +28,13 @@ import { LoginPage } from '@/components/modules/login'
 import { UsersPage } from '@/components/modules/users'
 import { MyProfilePage } from '@/components/modules/my-profile'
 import { RoleManagementPage } from '@/components/modules/role-management'
+import { HostelsPage } from '@/components/modules/hostels'
 import { useRef, useEffect, useState } from 'react'
 import { Toaster } from '@/components/ui/toaster'
 import { useIsMobile } from '@/hooks/use-mobile'
 
 export default function Home() {
-  const { currentPage, currentUser, setCurrentUser } = useAppStore()
+  const { currentPage, currentUser, setCurrentUser, setCurrentHostelId } = useAppStore()
   const initialized = useRef(false)
   const isMobile = useIsMobile()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -49,7 +50,12 @@ export default function Home() {
         localStorage.removeItem('hostelpro_user')
       }
     }
-  }, [setCurrentUser])
+    // Restore currentHostelId from localStorage
+    const savedHostelId = localStorage.getItem('hostelpro_currentHostelId')
+    if (savedHostelId) {
+      setCurrentHostelId(savedHostelId)
+    }
+  }, [setCurrentUser, setCurrentHostelId])
 
   if (!currentUser) {
     return (
@@ -84,6 +90,7 @@ export default function Home() {
       case 'users': return <UsersPage />
       case 'my-profile': return <MyProfilePage />
       case 'role-management': return <RoleManagementPage />
+      case 'hostels': return <HostelsPage />
       default: return <DashboardPage />
     }
   }

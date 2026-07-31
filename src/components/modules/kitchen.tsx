@@ -219,7 +219,7 @@ function MealTypeIcon({ mealType, className }: { mealType: string; className?: s
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function KitchenPage() {
-  const { selectedPropertyId, currentUser } = useAppStore()
+  const { selectedPropertyId, currentHostelId, currentUser } = useAppStore()
   const { toast } = useToast()
 
   const role = currentUser?.role || ''
@@ -315,7 +315,7 @@ export function KitchenPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       params.set('type', 'all')
 
       const res = await fetch(`/api/kitchen?${params.toString()}`)
@@ -329,12 +329,12 @@ export function KitchenPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPropertyId, toast])
+  }, [selectedPropertyId, currentHostelId, toast])
 
   const fetchInventory = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/inventory?${params.toString()}`)
       if (res.ok) {
         const json = await res.json()
@@ -343,7 +343,7 @@ export function KitchenPage() {
     } catch (error) {
       console.error('Failed to fetch inventory:', error)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   useEffect(() => {
     fetchData()

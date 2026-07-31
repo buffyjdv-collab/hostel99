@@ -230,7 +230,7 @@ function getDisposalLabel(method: string) {
 
 // ─── Component ─────────────────────────────────────────────────
 export function MessPage() {
-  const { selectedPropertyId, currentUser } = useAppStore()
+  const { selectedPropertyId, currentHostelId, currentUser } = useAppStore()
   const { toast } = useToast()
 
   const role = currentUser?.role || ''
@@ -330,7 +330,7 @@ export function MessPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       params.set('type', type)
       if (type === 'all' || type === 'attendance') {
         params.set('date', format(attendanceDate, 'yyyy-MM-dd'))
@@ -352,12 +352,12 @@ export function MessPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPropertyId, attendanceDate, consumptionDays, wasteDays, toast])
+  }, [selectedPropertyId, currentHostelId, attendanceDate, consumptionDays, wasteDays, toast])
 
   const fetchTenants = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/tenants?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch tenants')
       const data = await res.json()
@@ -381,7 +381,7 @@ export function MessPage() {
   const fetchInventoryItems = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/inventory?${params.toString()}`)
       if (!res.ok) throw new Error('Failed to fetch inventory')
       const data = await res.json()
@@ -389,7 +389,7 @@ export function MessPage() {
     } catch (error) {
       console.error('Error fetching inventory:', error)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   // ─── Effects ───────────────────────────────────────────────
   useEffect(() => {

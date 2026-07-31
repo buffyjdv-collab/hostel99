@@ -341,7 +341,7 @@ function ChartSkeleton() {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function DashboardPage() {
-  const { setCurrentPage, currentUser } = useAppStore()
+  const { setCurrentPage, currentUser, currentHostelId } = useAppStore()
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -359,17 +359,17 @@ export function DashboardPage() {
       try {
         if (currentUser?.role === 'tenant') {
           // Step 1: Fetch tenant profile by userId
-          const tenantRes = await fetch('/api/tenants?userId=' + currentUser.id)
+          const tenantRes = await fetch('/api/tenants?userId=' + currentUser.id + (currentHostelId ? `&propertyId=${currentHostelId}` : ''))
           const tenantList = tenantRes.ok ? await tenantRes.json() : []
           const tenant = Array.isArray(tenantList) && tenantList.length > 0 ? tenantList[0] : null
 
           // Step 2: Fetch tenant-specific data using tenantId
           const tenantId = tenant?.id || currentUser.id
           const [payRes, compRes, noticeRes, visitorRes] = await Promise.all([
-            fetch('/api/payments?tenantId=' + tenantId),
-            fetch('/api/complaints?tenantId=' + tenantId),
-            fetch('/api/notices'),
-            fetch('/api/visitors?tenantId=' + tenantId),
+            fetch('/api/payments?tenantId=' + tenantId + (currentHostelId ? `&propertyId=${currentHostelId}` : '')),
+            fetch('/api/complaints?tenantId=' + tenantId + (currentHostelId ? `&propertyId=${currentHostelId}` : '')),
+            fetch('/api/notices' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+            fetch('/api/visitors?tenantId=' + tenantId + (currentHostelId ? `&propertyId=${currentHostelId}` : '')),
           ])
           const payData = payRes.ok ? await payRes.json() : []
           const compData = compRes.ok ? await compRes.json() : []
@@ -383,7 +383,7 @@ export function DashboardPage() {
             visitors: Array.isArray(visitorData) ? visitorData : [],
           })
         } else {
-          const res = await fetch('/api/dashboard')
+          const res = await fetch('/api/dashboard' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
           if (res.ok) {
             const json = await res.json()
             setData(json)

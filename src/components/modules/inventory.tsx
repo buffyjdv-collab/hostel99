@@ -1007,7 +1007,7 @@ function EditItemDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function InventoryPage() {
-  const { selectedPropertyId, currentUser } = useAppStore()
+  const { selectedPropertyId, currentHostelId, currentUser } = useAppStore()
   const { toast } = useToast()
 
   const role = currentUser?.role || ''
@@ -1045,7 +1045,7 @@ export function InventoryPage() {
   const fetchInventory = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       if (categoryFilter !== 'all') params.set('categoryId', categoryFilter)
       if (lowStockFilter) params.set('lowStock', 'true')
       if (searchQuery.trim()) params.set('search', searchQuery.trim())
@@ -1060,12 +1060,12 @@ export function InventoryPage() {
     } catch (err) {
       console.error('Failed to fetch inventory:', err)
     }
-  }, [selectedPropertyId, categoryFilter, lowStockFilter, searchQuery])
+  }, [selectedPropertyId, currentHostelId, categoryFilter, lowStockFilter, searchQuery])
 
   const fetchTransactions = useCallback(async (itemId: string) => {
     setTxLoading(true)
     try {
-      const res = await fetch(`/api/inventory?transactions=${itemId}`)
+      const res = await fetch(`/api/inventory?transactions=${itemId}` + (currentHostelId ? `&propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         setTransactions(data.transactions || [])

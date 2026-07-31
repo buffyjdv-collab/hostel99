@@ -1,9 +1,16 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const propertyId = searchParams.get('propertyId')
+
+    const where: Record<string, unknown> = {}
+    if (propertyId) where.propertyId = propertyId
+
     const rooms = await db.room.findMany({
+      where,
       include: {
         floor: { select: { id: true, name: true, number: true } },
         building: { select: { id: true, name: true } },

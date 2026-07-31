@@ -1,18 +1,24 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const propertyId = searchParams.get('propertyId')
+
     const now = new Date()
     const currentMonth = now.getMonth() + 1
     const currentYear = now.getFullYear()
 
+    // Build property filter
+    const propertyFilter = propertyId ? { propertyId } : {}
+
     // Basic counts
     const [totalProperties, totalRooms, totalBeds, occupiedBeds] = await Promise.all([
-      db.property.count({ where: { isActive: true } }),
-      db.room.count(),
-      db.bed.count(),
-      db.bed.count({ where: { status: 'occupied' } }),
+      db.property.count({ where: { isActive: true, ...propertyFilter } }),
+      db.room.count({ where: propertyFilter }),
+      db.bed.count({ where: propertyFilter ? { room: { property: { id: propertyId } } } : {} }),
+      db.bed.count({ where: { status: 'occupied', ...(propertyFilter ? { room: { property: { id: propertyId } } } : {}) } }),
     ])
 
     const vacantBeds = totalBeds - occupiedBeds
@@ -24,6 +30,7 @@ export async function GET() {
         status: 'paid',
         month: currentMonth,
         year: currentYear,
+        ...propertyFilter,
       },
       select: { amount: true },
     })
@@ -33,6 +40,7 @@ export async function GET() {
     const pendingPayments = await db.payment.findMany({
       where: {
         status: { in: ['pending', 'overdue'] },
+        ...propertyFilter,
       },
       select: { amount: true },
     })
@@ -40,8 +48,8 @@ export async function GET() {
 
     // Lead conversion rate
     const [totalLeads, convertedLeads] = await Promise.all([
-      db.lead.count(),
-      db.lead.count({ where: { status: { in: ['booking', 'move_in'] } } }),
+      db.lead.count({ where: propertyFilter }),
+      db.lead.count({ where: { status: { in: ['booking', 'move_in'] }, ...propertyFilter } }),
     ])
     const leadConversionRate = totalLeads > 0 ? Math.round((convertedLeads / totalLeads) * 100) : 0
 
@@ -64,7 +72,7 @@ export async function GET() {
         year -= 1
       }
       const payments = await db.payment.findMany({
-        where: { status: 'paid', month, year },
+        where: { status: 'paid', month, year, ...propertyFilter },
         select: { amount: true },
       })
       const total = payments.reduce((sum, p) => sum + p.amount, 0)
@@ -74,6 +82,7 @@ export async function GET() {
     // Payment status breakdown
     const paymentStatusBreakdown = await db.payment.groupBy({
       by: ['status'],
+      where: propertyFilter,
       _count: { status: true },
       _sum: { amount: true },
     })
@@ -81,12 +90,14 @@ export async function GET() {
     // Complaint status breakdown
     const complaintStatusBreakdown = await db.complaint.groupBy({
       by: ['status'],
+      where: propertyFilter,
       _count: { status: true },
     })
 
     // Lead source breakdown
     const leadSourceBreakdown = await db.lead.groupBy({
       by: ['source'],
+      where: propertyFilter,
       _count: { source: true },
     })
 

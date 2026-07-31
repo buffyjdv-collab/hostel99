@@ -707,7 +707,7 @@ function RaiseComplaintDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function ComplaintsPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'complaints:create')
   const canUpdate = hasPermission(role, 'complaints:update')
@@ -756,6 +756,7 @@ export function ComplaintsPage() {
       const params = new URLSearchParams()
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (categoryFilter !== 'all') params.set('category', categoryFilter)
+      if (currentHostelId) params.set('propertyId', currentHostelId)
       const res = await fetch(`/api/complaints?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
@@ -764,7 +765,7 @@ export function ComplaintsPage() {
     } catch (err) {
       console.error('Failed to fetch complaints:', err)
     }
-  }, [statusFilter, categoryFilter])
+  }, [statusFilter, categoryFilter, currentHostelId])
 
   useEffect(() => {
     fetchComplaints().finally(() => setLoading(false))
@@ -774,9 +775,9 @@ export function ComplaintsPage() {
     async function fetchSupport() {
       try {
         const [propRes, tenantRes, staffRes] = await Promise.all([
-          fetch('/api/properties'),
-          fetch('/api/tenants'),
-          fetch('/api/staff'),
+          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/staff' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
         ])
         if (propRes.ok) setProperties(await propRes.json())
         if (tenantRes.ok) {

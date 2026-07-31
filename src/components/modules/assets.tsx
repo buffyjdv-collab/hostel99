@@ -334,7 +334,7 @@ function getSubCategoryLabel(sub: string): string {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function AssetsPage() {
-  const { selectedPropertyId, currentUser } = useAppStore()
+  const { selectedPropertyId, currentHostelId, currentUser } = useAppStore()
   const { toast } = useToast()
 
   const role = currentUser?.role || ''
@@ -453,7 +453,7 @@ export function AssetsPage() {
     setAssetsLoading(true)
     try {
       const params = new URLSearchParams({ type: 'assets' })
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/assets?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -465,13 +465,13 @@ export function AssetsPage() {
     } finally {
       setAssetsLoading(false)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   const fetchLaundry = useCallback(async () => {
     setLaundryLoading(true)
     try {
       const params = new URLSearchParams({ type: 'laundry' })
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/assets?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -483,13 +483,13 @@ export function AssetsPage() {
     } finally {
       setLaundryLoading(false)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   const fetchHousekeeping = useCallback(async () => {
     setHousekeepingLoading(true)
     try {
       const params = new URLSearchParams({ type: 'housekeeping' })
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/assets?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -501,12 +501,12 @@ export function AssetsPage() {
     } finally {
       setHousekeepingLoading(false)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   const fetchRooms = useCallback(async () => {
     setRoomsLoading(true)
     try {
-      const res = await fetch('/api/rooms')
+      const res = await fetch('/api/rooms' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         const roomList: RoomInfo[] = data.map((r: any) => ({
@@ -521,7 +521,7 @@ export function AssetsPage() {
     } finally {
       setRoomsLoading(false)
     }
-  }, [])
+  }, [currentHostelId])
 
   useEffect(() => {
     fetchAssets()

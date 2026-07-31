@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   Eye,
   ChevronRight,
+  Hotel,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -49,6 +50,7 @@ import { useState } from 'react'
 
 const navItems: { page: Page; label: string; icon: React.ElementType; badge?: string; section?: string }[] = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
+  { page: 'hostels', label: 'Hostels', icon: Hotel, section: 'main' },
   { page: 'properties', label: 'Properties', icon: Building2, section: 'main' },
   { page: 'rooms', label: 'Rooms & Beds', icon: DoorOpen, section: 'main' },
   { page: 'leads', label: 'Lead CRM', icon: Users, section: 'main' },

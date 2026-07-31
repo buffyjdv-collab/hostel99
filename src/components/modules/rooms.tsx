@@ -367,7 +367,7 @@ function VacancyMap({ rooms }: { rooms: RoomData[] }) {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function RoomsPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const { toast } = useToast()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'rooms:create')
@@ -459,7 +459,7 @@ export function RoomsPage() {
   const fetchRooms = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/rooms')
+      const res = await fetch('/api/rooms' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         setRooms(data)
@@ -469,11 +469,11 @@ export function RoomsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentHostelId])
 
   async function fetchProperties() {
     try {
-      const res = await fetch('/api/properties')
+      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         setProperties(await res.json())
       }

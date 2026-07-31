@@ -252,7 +252,7 @@ function StatCardSkeleton() {
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function PropertiesPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const { toast } = useToast()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'properties:create')
@@ -306,7 +306,7 @@ export function PropertiesPage() {
   const fetchProperties = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch('/api/properties')
+      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         setProperties(data)
@@ -316,7 +316,7 @@ export function PropertiesPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [currentHostelId])
 
   // ── Computed Values ──────────────────────────────────────────────────────
   const stats = useMemo(() => {

@@ -864,7 +864,7 @@ function MarkAttendanceDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function StaffPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'staff:create')
   const canUpdate = hasPermission(role, 'staff:update')
@@ -911,7 +911,7 @@ export function StaffPage() {
 
   const fetchStaff = async () => {
     try {
-      const res = await fetch('/api/staff')
+      const res = await fetch('/api/staff' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         setStaff(data)
@@ -923,7 +923,7 @@ export function StaffPage() {
 
   const fetchProperties = async () => {
     try {
-      const res = await fetch('/api/properties')
+      const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
       if (res.ok) {
         const data = await res.json()
         setProperties(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })))

@@ -1,9 +1,16 @@
 import { db } from '@/lib/db'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const propertyId = searchParams.get('propertyId')
+
+    const where: Record<string, unknown> = {}
+    if (propertyId) where.propertyId = propertyId
+
     const staff = await db.staff.findMany({
+      where,
       include: {
         property: { select: { id: true, name: true, address: true } },
         user: { select: { id: true, name: true, email: true, phone: true, avatar: true } },

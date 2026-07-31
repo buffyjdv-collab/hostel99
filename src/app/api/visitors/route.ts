@@ -8,6 +8,8 @@ export async function GET(request: Request) {
 
     const where: Record<string, unknown> = {}
     if (tenantId) where.tenantId = tenantId
+    const propertyId = searchParams.get('propertyId')
+    if (propertyId) where.propertyId = propertyId
 
     const visitors = await db.visitor.findMany({
       where,

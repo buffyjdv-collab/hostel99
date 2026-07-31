@@ -26,6 +26,15 @@ export async function POST(request: Request) {
             bed: { select: { id: true, name: true } },
           },
         },
+        hostelAssignments: {
+          where: { isActive: true },
+          include: {
+            property: {
+              select: { id: true, name: true, type: true, address: true, city: true },
+            },
+          },
+          orderBy: { assignedAt: 'desc' },
+        },
       },
     })
 
@@ -55,8 +64,31 @@ export async function POST(request: Request) {
     // Return user data without password
     const { password: _, ...userWithoutPassword } = user
 
+    // Build hostel assignments summary for the frontend
+    const hostelAssignments = user.hostelAssignments.map(a => ({
+      id: a.id,
+      propertyId: a.property.id,
+      propertyName: a.property.name,
+      propertyType: a.property.type,
+      propertyAddress: a.property.address,
+      propertyCity: a.property.city,
+      role: a.role,
+      isActive: a.isActive,
+    }))
+
+    // Determine the default/current hostel
+    // For super_admin, they can see all hostels (no specific assignment needed)
+    // For others, their first assignment is the default
+    const defaultHostelId = user.role === 'super_admin'
+      ? null // super_admin sees all, no specific hostel
+      : hostelAssignments.length > 0
+        ? hostelAssignments[0].propertyId
+        : null
+
     return NextResponse.json({
       user: userWithoutPassword,
+      hostelAssignments,
+      defaultHostelId,
       message: 'Login successful',
     })
   } catch (error) {

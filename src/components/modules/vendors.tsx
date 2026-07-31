@@ -154,7 +154,7 @@ function renderStars(rating: number) {
 // ── Component ────────────────────────────────────────────────────
 
 export function VendorsPage() {
-  const { selectedPropertyId, currentUser } = useAppStore()
+  const { selectedPropertyId, currentHostelId, currentUser } = useAppStore()
   const { toast } = useToast()
 
   const role = currentUser?.role || ''
@@ -205,7 +205,7 @@ export function VendorsPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/vendors?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -217,7 +217,7 @@ export function VendorsPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   useEffect(() => { fetchVendors() }, [fetchVendors])
 

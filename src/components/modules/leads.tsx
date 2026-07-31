@@ -508,7 +508,7 @@ function LeadDetailDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function LeadsPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'leads:create')
   const canUpdate = hasPermission(role, 'leads:update')
@@ -576,9 +576,9 @@ export function LeadsPage() {
       setLoading(true)
       try {
         const [leadsRes, propsRes, staffRes] = await Promise.all([
-          fetch('/api/leads'),
-          fetch('/api/properties'),
-          fetch('/api/staff'),
+          fetch('/api/leads' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/staff' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
         ])
         if (leadsRes.ok) {
           const data = await leadsRes.json()
@@ -599,7 +599,7 @@ export function LeadsPage() {
       }
     }
     fetchData()
-  }, [])
+  }, [currentHostelId])
 
   // ── Computed Values ────────────────────────────────────────────────────────
 
@@ -814,7 +814,7 @@ export function LeadsPage() {
         setSelectedLead(null)
         // Refresh data
         try {
-          const leadsRes = await fetch('/api/leads')
+          const leadsRes = await fetch('/api/leads' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
           if (leadsRes.ok) {
             const data = await leadsRes.json()
             setLeads(data.leads || data || [])

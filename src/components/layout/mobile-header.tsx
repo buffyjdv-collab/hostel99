@@ -34,6 +34,7 @@ const pageLabels: Record<Page, string> = {
   users: 'User Management',
   'my-profile': 'My Profile',
   'role-management': 'Role & Access',
+  hostels: 'Hostels',
 }
 
 interface MobileHeaderProps {

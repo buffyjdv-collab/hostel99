@@ -737,7 +737,7 @@ function RecordPaymentDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function PaymentsPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'payments:create')
   const canUpdate = hasPermission(role, 'payments:update')
@@ -773,6 +773,7 @@ export function PaymentsPage() {
       if (monthFilter !== 'all') params.set('month', monthFilter)
       if (yearFilter !== 'all') params.set('year', yearFilter)
       if (propertyFilter !== 'all') params.set('propertyId', propertyFilter)
+      if (currentHostelId && !params.has('propertyId')) params.set('propertyId', currentHostelId)
       const res = await fetch(`/api/payments?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
@@ -781,7 +782,7 @@ export function PaymentsPage() {
     } catch (err) {
       console.error('Failed to fetch payments:', err)
     }
-  }, [statusFilter, monthFilter, yearFilter, propertyFilter])
+  }, [statusFilter, monthFilter, yearFilter, propertyFilter, currentHostelId])
 
   useEffect(() => {
     fetchPayments().finally(() => setLoading(false))
@@ -791,8 +792,8 @@ export function PaymentsPage() {
     async function fetchSupport() {
       try {
         const [propRes, tenantRes] = await Promise.all([
-          fetch('/api/properties'),
-          fetch('/api/tenants'),
+          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
         ])
         if (propRes.ok) setProperties(await propRes.json())
         if (tenantRes.ok) {

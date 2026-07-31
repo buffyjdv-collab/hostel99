@@ -668,7 +668,7 @@ function TenantDetailDialog({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function TenantsPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'tenants:create')
   const canUpdate = hasPermission(role, 'tenants:update')
@@ -746,8 +746,8 @@ export function TenantsPage() {
       setLoading(true)
       try {
         const [tenantsRes, propsRes] = await Promise.all([
-          fetch('/api/tenants'),
-          fetch('/api/properties'),
+          fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+          fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
         ])
         if (tenantsRes.ok) {
           const data = await tenantsRes.json()
@@ -764,7 +764,7 @@ export function TenantsPage() {
       }
     }
     fetchData()
-  }, [])
+  }, [currentHostelId])
 
   // Fetch rooms when property changes in form
   useEffect(() => {
@@ -1004,7 +1004,7 @@ export function TenantsPage() {
         setSelectedTenant(null)
         // Refresh data
         try {
-          const tenantsRes = await fetch('/api/tenants')
+          const tenantsRes = await fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
           if (tenantsRes.ok) {
             const data = await tenantsRes.json()
             setTenants(Array.isArray(data) ? data : data.tenants || [])

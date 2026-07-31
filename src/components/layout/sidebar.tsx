@@ -32,6 +32,7 @@ import {
   ShieldCheck,
   AlertTriangle,
   Eye,
+  Hotel,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -69,6 +70,7 @@ import { useState } from 'react'
 
 const navItems: { page: Page; label: string; icon: React.ElementType; badge?: string; section?: string }[] = [
   { page: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, section: 'main' },
+  { page: 'hostels', label: 'Hostels', icon: Hotel, section: 'main' },
   { page: 'properties', label: 'Properties', icon: Building2, section: 'main' },
   { page: 'rooms', label: 'Rooms & Beds', icon: DoorOpen, section: 'main' },
   { page: 'leads', label: 'Lead CRM', icon: Users, section: 'main' },
@@ -111,9 +113,13 @@ const roleColors: Record<UserRole, string> = {
 }
 
 export function Sidebar() {
-  const { currentPage, setCurrentPage, currentUser, sidebarCollapsed, setSidebarCollapsed, logout, switchRole, restoreOriginalRole } = useAppStore()
+  const { currentPage, setCurrentPage, currentUser, sidebarCollapsed, setSidebarCollapsed, logout, switchRole, restoreOriginalRole, currentHostelId, setCurrentHostelId } = useAppStore()
   const role = currentUser?.role || 'manager'
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+
+  // Hostel context
+  const hostelAssignments = currentUser?.hostelAssignments || []
+  const currentHostel = hostelAssignments.find(h => h.propertyId === currentHostelId)
 
   // Filter nav items based on RBAC permissions
   const filteredItems = navItems.filter(item => canAccessPage(role, item.page))
@@ -182,6 +188,52 @@ export function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* Hostel Context Switcher */}
+        {hostelAssignments.length > 0 && !sidebarCollapsed && (
+          <div className="mx-2 mt-2 p-2 rounded-lg bg-slate-800/80 border border-slate-700/50">
+            <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mb-1 px-1">Current Hostel</p>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 w-full p-2 rounded-md hover:bg-slate-700 transition-colors text-left">
+                  <Building2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-white truncate">
+                      {currentHostel?.propertyName || 'All Hostels'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 truncate">
+                      {currentHostel?.propertyCity || (role === 'super_admin' ? 'Super Admin View' : 'Select hostel')}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="bottom" align="start" className="w-56 bg-slate-800 border-slate-700 text-white">
+                {role === 'super_admin' && (
+                  <DropdownMenuItem
+                    onClick={() => setCurrentHostelId(null)}
+                    className="cursor-pointer hover:bg-slate-700 focus:bg-slate-700"
+                  >
+                    <Building2 className="w-4 h-4 mr-2 text-indigo-400" />
+                    All Hostels (Super Admin)
+                  </DropdownMenuItem>
+                )}
+                {hostelAssignments.map(h => (
+                  <DropdownMenuItem
+                    key={h.propertyId}
+                    onClick={() => setCurrentHostelId(h.propertyId)}
+                    className={cn('cursor-pointer hover:bg-slate-700 focus:bg-slate-700', currentHostelId === h.propertyId && 'bg-slate-700')}
+                  >
+                    <Building2 className="w-4 h-4 mr-2 text-emerald-400" />
+                    <div>
+                      <p className="text-sm">{h.propertyName}</p>
+                      <p className="text-[10px] text-slate-400">{h.role} - {h.propertyCity}</p>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
 
         {/* Impersonation Banner */}
         {currentUser?.isImpersonating && !sidebarCollapsed && (

@@ -112,9 +112,13 @@ export function LoginPage() {
         email: data.user.email,
         role: data.user.role,
         avatar: data.user.avatar,
+        hostelAssignments: data.hostelAssignments || [],
       }
 
       localStorage.setItem('hostelpro_user', JSON.stringify(user))
+      if (data.defaultHostelId) {
+        localStorage.setItem('hostelpro_currentHostelId', data.defaultHostelId)
+      }
       setCurrentUser(user)
     } catch {
       toast({
@@ -148,9 +152,13 @@ export function LoginPage() {
         email: data.user.email,
         role: data.user.role,
         avatar: data.user.avatar,
+        hostelAssignments: data.hostelAssignments || [],
       }
 
       localStorage.setItem('hostelpro_user', JSON.stringify(user))
+      if (data.defaultHostelId) {
+        localStorage.setItem('hostelpro_currentHostelId', data.defaultHostelId)
+      }
       setCurrentUser(user)
     } catch {
       toast({ title: 'Connection Error', variant: 'destructive' })

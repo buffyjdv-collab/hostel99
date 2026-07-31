@@ -642,7 +642,7 @@ function ExpiryReport({ selectedPropertyId }: { selectedPropertyId: string }) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ReportsPage() {
-  const { currentUser, selectedPropertyId } = useAppStore()
+  const { currentUser, selectedPropertyId, currentHostelId } = useAppStore()
   const [properties, setProperties] = useState<Property[]>([])
   const [loading, setLoading] = useState(true)
   const [reportData, setReportData] = useState<Record<string, unknown> | null>(null)
@@ -660,7 +660,7 @@ export function ReportsPage() {
   useEffect(() => {
     async function fetchProperties() {
       try {
-        const res = await fetch('/api/properties')
+        const res = await fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
         if (res.ok) {
           const data = await res.json()
           setProperties(Array.isArray(data) ? data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })) : [])
@@ -675,7 +675,7 @@ export function ReportsPage() {
     if (selectedReport === 'tenant_ledger') {
       async function fetchTenants() {
         try {
-          const res = await fetch('/api/tenants')
+          const res = await fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : ''))
           if (res.ok) {
             const data = await res.json()
             setTenants(Array.isArray(data) ? data.map((t: { id: string; name: string }) => ({ id: t.id, name: t.name })) : [])
@@ -697,6 +697,7 @@ export function ReportsPage() {
         ...(filterYear && { year: filterYear }),
         ...(selectedReport === 'tenant_ledger' && filterTenantId && { tenantId: filterTenantId }),
       })
+      if (currentHostelId && !params.has('propertyId')) params.set('propertyId', currentHostelId)
       const res = await fetch(`/api/reports?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -1477,13 +1478,13 @@ export function ReportsPage() {
       case 'occupancy': return renderOccupancyReport()
       case 'tenant_ledger': return renderTenantLedger()
       case 'payment_report': return renderPaymentReport()
-      case 'stock_report': return <StockReport selectedPropertyId={selectedPropertyId} />
-      case 'consumption_report': return <ConsumptionReport selectedPropertyId={selectedPropertyId} />
-      case 'waste_report': return <WasteReport selectedPropertyId={selectedPropertyId} />
-      case 'kitchen_cost': return <KitchenCostReport selectedPropertyId={selectedPropertyId} />
-      case 'asset_report': return <AssetReport selectedPropertyId={selectedPropertyId} />
-      case 'low_stock': return <LowStockReport selectedPropertyId={selectedPropertyId} />
-      case 'expiry_report': return <ExpiryReport selectedPropertyId={selectedPropertyId} />
+      case 'stock_report': return <StockReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
+      case 'consumption_report': return <ConsumptionReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
+      case 'waste_report': return <WasteReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
+      case 'kitchen_cost': return <KitchenCostReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
+      case 'asset_report': return <AssetReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
+      case 'low_stock': return <LowStockReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
+      case 'expiry_report': return <ExpiryReport selectedPropertyId={selectedPropertyId || currentHostelId || ''} />
       default: return null
     }
   }

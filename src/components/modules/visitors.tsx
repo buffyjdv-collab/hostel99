@@ -159,7 +159,7 @@ function isToday(date: string | Date) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function VisitorsPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'visitors:create')
   const canUpdate = hasPermission(role, 'visitors:update')
@@ -212,9 +212,9 @@ export function VisitorsPage() {
     setLoading(true)
     try {
       const [visitorsRes, propsRes, tenantsRes] = await Promise.all([
-        fetch('/api/visitors'),
-        fetch('/api/properties'),
-        fetch('/api/tenants'),
+        fetch('/api/visitors' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+        fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+        fetch('/api/tenants' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
       ])
       if (visitorsRes.ok) {
         const data = await visitorsRes.json()
@@ -230,7 +230,7 @@ export function VisitorsPage() {
       }
     } catch { /* ignore */ }
     setLoading(false)
-  }, [])
+  }, [currentHostelId])
 
   // Fetch on mount
   const [hasFetched, setHasFetched] = useState(false)

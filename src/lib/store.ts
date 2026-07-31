@@ -2,7 +2,7 @@
 
 import { create } from 'zustand'
 
-export type Page = 'dashboard' | 'properties' | 'rooms' | 'leads' | 'tenants' | 'payments' | 'complaints' | 'staff' | 'expenses' | 'reports' | 'notices' | 'visitors' | 'settings' | 'inventory' | 'vendors' | 'purchases' | 'kitchen' | 'mess' | 'assets' | 'users' | 'my-profile' | 'role-management'
+export type Page = 'dashboard' | 'properties' | 'rooms' | 'leads' | 'tenants' | 'payments' | 'complaints' | 'staff' | 'expenses' | 'reports' | 'notices' | 'visitors' | 'settings' | 'inventory' | 'vendors' | 'purchases' | 'kitchen' | 'mess' | 'assets' | 'users' | 'my-profile' | 'role-management' | 'hostels'
 
 // ─── RBAC Permission System ───────────────────────────────────────────
 export type Permission =
@@ -27,6 +27,7 @@ export type Permission =
   | 'settings:read' | 'settings:update'
   | 'users:create' | 'users:read' | 'users:update' | 'users:delete'
   | 'role-management:read' | 'role-management:update'
+  | 'hostels:create' | 'hostels:read' | 'hostels:update' | 'hostels:delete'
 
 export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   super_admin: [
@@ -51,6 +52,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'settings:read', 'settings:update',
     'users:create', 'users:read', 'users:update', 'users:delete',
     'role-management:read', 'role-management:update',
+    'hostels:create', 'hostels:read', 'hostels:update', 'hostels:delete',
   ],
   owner: [
     'dashboard:view',
@@ -74,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'settings:read', 'settings:update',
     'users:read',
     'role-management:read',
+    'hostels:read',
   ],
   manager: [
     'dashboard:view',
@@ -146,6 +149,7 @@ export function canAccessPage(role: string, page: Page): boolean {
     assets: 'assets:read',
     users: 'users:read',
     'role-management': 'role-management:read',
+    hostels: 'hostels:read',
   }
 
   const requiredPerm = pagePermissionMap[page]
@@ -155,6 +159,18 @@ export function canAccessPage(role: string, page: Page): boolean {
 
 export type UserRole = 'super_admin' | 'owner' | 'manager' | 'staff' | 'tenant'
 
+// ─── Hostel Assignment ───────────────────────────────────────────
+export interface HostelAssignment {
+  id: string
+  propertyId: string
+  propertyName: string
+  propertyType: string
+  propertyAddress?: string
+  propertyCity?: string
+  role: string // role within this hostel
+  isActive: boolean
+}
+
 interface CurrentUser {
   id: string
   name: string
@@ -163,6 +179,7 @@ interface CurrentUser {
   avatar?: string
   originalRole?: UserRole  // For role switching - stores the original role
   isImpersonating?: boolean // Whether the user is impersonating another role
+  hostelAssignments?: HostelAssignment[] // User's assigned hostels
 }
 
 interface AppState {
@@ -177,6 +194,11 @@ interface AppState {
   setSelectedPropertyId: (id: string | null) => void
   sidebarCollapsed: boolean
   setSidebarCollapsed: (collapsed: boolean) => void
+  // Multi-tenancy: current hostel context
+  currentHostelId: string | null
+  setCurrentHostelId: (id: string | null) => void
+  // Get list of property IDs the user has access to
+  getUserPropertyIds: () => string[]
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
@@ -186,18 +208,28 @@ export const useAppStore = create<AppState>((set, get) => ({
   setCurrentUser: (user) => {
     if (user) {
       localStorage.setItem('hostelpro_user', JSON.stringify(user))
+      // Auto-set currentHostelId from user's first assignment
+      const firstHostel = user.hostelAssignments?.[0]?.propertyId || null
+      const existingHostelId = localStorage.getItem('hostelpro_currentHostelId')
+      set({
+        currentUser: user,
+        currentHostelId: existingHostelId || firstHostel,
+      })
     } else {
       localStorage.removeItem('hostelpro_user')
+      localStorage.removeItem('hostelpro_currentHostelId')
+      set({ currentUser: null, currentHostelId: null })
     }
-    set({ currentUser: user })
   },
   logout: () => {
     localStorage.removeItem('hostelpro_user')
+    localStorage.removeItem('hostelpro_currentHostelId')
     set({
       currentUser: null,
       currentPage: 'dashboard',
       selectedPropertyId: null,
       sidebarCollapsed: false,
+      currentHostelId: null,
     })
   },
   switchRole: (newRole: UserRole) => {
@@ -236,4 +268,25 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedPropertyId: (id) => set({ selectedPropertyId: id }),
   sidebarCollapsed: false,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+  currentHostelId: null,
+  setCurrentHostelId: (id) => {
+    if (id) {
+      localStorage.setItem('hostelpro_currentHostelId', id)
+    } else {
+      localStorage.removeItem('hostelpro_currentHostelId')
+    }
+    set({ currentHostelId: id })
+  },
+  getUserPropertyIds: () => {
+    const { currentUser, currentHostelId } = get()
+    // Super admin can see all properties
+    if (currentUser?.role === 'super_admin') return []
+    // If user has specific assignments, return those property IDs
+    if (currentUser?.hostelAssignments && currentUser.hostelAssignments.length > 0) {
+      return currentUser.hostelAssignments.map(a => a.propertyId)
+    }
+    // Fallback: if a currentHostelId is set, return just that
+    if (currentHostelId) return [currentHostelId]
+    return []
+  },
 }))

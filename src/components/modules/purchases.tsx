@@ -324,7 +324,7 @@ function StatusBadge({ config }: { config: { label: string; bgClass: string; tex
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export function PurchasesPage() {
-  const { selectedPropertyId, currentUser } = useAppStore()
+  const { selectedPropertyId, currentHostelId, currentUser } = useAppStore()
   const { toast } = useToast()
 
   const role = currentUser?.role || ''
@@ -415,7 +415,7 @@ export function PurchasesPage() {
   const fetchOrders = useCallback(async () => {
     try {
       const params = new URLSearchParams({ type: 'orders' })
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/purchases?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -425,12 +425,12 @@ export function PurchasesPage() {
     } catch (err) {
       console.error('Failed to fetch orders:', err)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   const fetchRequisitions = useCallback(async () => {
     try {
       const params = new URLSearchParams({ type: 'requisitions' })
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/purchases?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -439,12 +439,12 @@ export function PurchasesPage() {
     } catch (err) {
       console.error('Failed to fetch requisitions:', err)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   const fetchGrns = useCallback(async () => {
     try {
       const params = new URLSearchParams({ type: 'grns' })
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/purchases?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -453,12 +453,12 @@ export function PurchasesPage() {
     } catch (err) {
       console.error('Failed to fetch GRNs:', err)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   const fetchVendors = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/vendors?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -472,7 +472,7 @@ export function PurchasesPage() {
   const fetchInventory = useCallback(async () => {
     try {
       const params = new URLSearchParams()
-      if (selectedPropertyId) params.set('propertyId', selectedPropertyId)
+      if (selectedPropertyId || currentHostelId) params.set('propertyId', selectedPropertyId || currentHostelId!)
       const res = await fetch(`/api/inventory?${params}`)
       if (res.ok) {
         const data = await res.json()
@@ -481,7 +481,7 @@ export function PurchasesPage() {
     } catch (err) {
       console.error('Failed to fetch inventory:', err)
     }
-  }, [selectedPropertyId])
+  }, [selectedPropertyId, currentHostelId])
 
   // ── Initial load ───────────────────────────────────────────────────────────
 

@@ -147,7 +147,7 @@ function isExpired(expiryDate: string | null) {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function NoticesPage() {
-  const { currentUser } = useAppStore()
+  const { currentUser, currentHostelId } = useAppStore()
   const role = currentUser?.role || ''
   const canCreate = hasPermission(role, 'notices:create')
   const canUpdate = hasPermission(role, 'notices:update')
@@ -210,8 +210,8 @@ export function NoticesPage() {
     setLoading(true)
     try {
       const [noticesRes, propsRes] = await Promise.all([
-        fetch('/api/notices'),
-        fetch('/api/properties'),
+        fetch('/api/notices' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
+        fetch('/api/properties' + (currentHostelId ? `?propertyId=${currentHostelId}` : '')),
       ])
       if (noticesRes.ok) {
         const noticesData = await noticesRes.json()
@@ -223,7 +223,7 @@ export function NoticesPage() {
       }
     } catch { /* ignore */ }
     setLoading(false)
-  }, [])
+  }, [currentHostelId])
 
   // Fetch on mount
   const [hasFetched, setHasFetched] = useState(false)
