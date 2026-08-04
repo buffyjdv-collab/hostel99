@@ -1,11 +1,15 @@
 import { db } from '@/lib/db'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { checkPermission, buildUserContext } from '@/lib/auth-helpers'
 
 // POST /api/hostels - Create hostel + owner user + assignment in one step
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const {
+      // Auth
+      userId,
+      role,
       // Hostel details
       hostelName,
       hostelType,
@@ -24,6 +28,17 @@ export async function POST(request: Request) {
       ownerPhone,
       ownerPassword,
     } = body
+
+    // Require userId and role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    // Only super_admin and owner can create hostels
+    const canCreate = await checkPermission(role, 'hostels:create')
+    if (!canCreate) {
+      return NextResponse.json({ error: 'You do not have permission to create hostels' }, { status: 403 })
+    }
 
     // Validate required fields
     if (!hostelName || !address || !city) {

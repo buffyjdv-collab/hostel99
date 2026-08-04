@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/mess - Mess attendance, consumption, waste
 export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    const role = req.nextUrl.searchParams.get('role')
     const propertyId = req.nextUrl.searchParams.get('propertyId')
     const type = req.nextUrl.searchParams.get('type') || 'all'
     const date = req.nextUrl.searchParams.get('date')
 
-    const where: any = {}
-    if (propertyId) where.propertyId = propertyId
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
 
+    const access = await validateAccess(userId, role, 'mess', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const scopedWhere = propertyId ? { propertyId } : access.whereClause
     const result: any = {}
 
     if (type === 'all' || type === 'attendance') {
@@ -21,7 +31,7 @@ export async function GET(req: NextRequest) {
 
       const attendance = await db.messAttendance.findMany({
         where: {
-          ...where,
+          ...scopedWhere,
           date: { gte: today, lt: tomorrow },
         },
         include: {
@@ -53,7 +63,7 @@ export async function GET(req: NextRequest) {
       startDate.setHours(0, 0, 0, 0)
 
       result.consumption = await db.consumptionLog.findMany({
-        where: { ...where, date: { gte: startDate } },
+        where: { ...scopedWhere, date: { gte: startDate } },
         include: { item: { select: { name: true, unit: true } } },
         orderBy: { date: 'desc' },
         take: 100,
@@ -67,7 +77,7 @@ export async function GET(req: NextRequest) {
       startDate.setHours(0, 0, 0, 0)
 
       result.waste = await db.wasteRecord.findMany({
-        where: { ...where, date: { gte: startDate } },
+        where: { ...scopedWhere, date: { gte: startDate } },
         include: { item: { select: { name: true } } },
         orderBy: { date: 'desc' },
         take: 50,
@@ -92,6 +102,16 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+    const access = await validateAccess(userId, role, 'mess', 'create', data.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (data.type === 'attendance') {
       // Bulk mark attendance for a meal
@@ -196,9 +216,20 @@ export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
     if (data.type === 'attendance') {
       const existing = await db.messAttendance.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'mess', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       const updateData: Record<string, unknown> = {}
       if (data.present !== undefined) updateData.present = data.present
@@ -220,6 +251,11 @@ export async function PATCH(req: NextRequest) {
       const existing = await db.consumptionLog.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Consumption log not found' }, { status: 404 })
 
+      const access = await validateAccess(userId, role, 'mess', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const updateData: Record<string, unknown> = {}
       if (data.issuedQty !== undefined) updateData.issuedQty = data.issuedQty
       if (data.consumedQty !== undefined) updateData.consumedQty = data.consumedQty
@@ -240,6 +276,11 @@ export async function PATCH(req: NextRequest) {
     if (data.type === 'waste') {
       const existing = await db.wasteRecord.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Waste record not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'mess', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       const updateData: Record<string, unknown> = {}
       if (data.category !== undefined) updateData.category = data.category
@@ -271,9 +312,20 @@ export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
     if (data.type === 'attendance') {
       const existing = await db.messAttendance.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Attendance record not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'mess', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       await db.messAttendance.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Attendance record deleted successfully', id: data.id })
@@ -283,6 +335,11 @@ export async function DELETE(req: NextRequest) {
       const existing = await db.consumptionLog.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Consumption log not found' }, { status: 404 })
 
+      const access = await validateAccess(userId, role, 'mess', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       await db.consumptionLog.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Consumption log deleted successfully', id: data.id })
     }
@@ -290,6 +347,11 @@ export async function DELETE(req: NextRequest) {
     if (data.type === 'waste') {
       const existing = await db.wasteRecord.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Waste record not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'mess', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       await db.wasteRecord.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Waste record deleted successfully', id: data.id })

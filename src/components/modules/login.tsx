@@ -113,6 +113,7 @@ export function LoginPage() {
         role: data.user.role,
         avatar: data.user.avatar,
         hostelAssignments: data.hostelAssignments || [],
+        permissionOverrides: data.permissionOverrides || [],
       }
 
       localStorage.setItem('hostelpro_user', JSON.stringify(user))
@@ -153,6 +154,7 @@ export function LoginPage() {
         role: data.user.role,
         avatar: data.user.avatar,
         hostelAssignments: data.hostelAssignments || [],
+        permissionOverrides: data.permissionOverrides || [],
       }
 
       localStorage.setItem('hostelpro_user', JSON.stringify(user))

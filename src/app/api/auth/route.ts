@@ -76,6 +76,12 @@ export async function POST(request: Request) {
       isActive: a.isActive,
     }))
 
+    // Fetch user-specific permission overrides for micro RBAC
+    const permissionOverrides = await db.userPermissionOverride.findMany({
+      where: { userId: user.id },
+      select: { permission: true, granted: true },
+    })
+
     // Determine the default/current hostel
     // For super_admin, they can see all hostels (no specific assignment needed)
     // For others, their first assignment is the default
@@ -89,6 +95,7 @@ export async function POST(request: Request) {
       user: userWithoutPassword,
       hostelAssignments,
       defaultHostelId,
+      permissionOverrides,
       message: 'Login successful',
     })
   } catch (error) {

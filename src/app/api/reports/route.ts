@@ -1,18 +1,30 @@
 import { db } from '@/lib/db'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { validateAccess } from '@/lib/auth-helpers'
 
-export async function GET(request: Request) {
+export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
+    const { searchParams } = new URL(req.url)
     const type = searchParams.get('type') || 'income'
     const propertyId = searchParams.get('propertyId')
     const month = searchParams.get('month')
     const year = searchParams.get('year')
+    const userId = searchParams.get('userId')
+    const role = searchParams.get('role')
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'reports', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     const yearNum = year ? parseInt(year) : new Date().getFullYear()
     const monthNum = month ? parseInt(month) : new Date().getMonth() + 1
 
-    const propertyFilter = propertyId ? { propertyId } : {}
+    const propertyFilter = propertyId ? { propertyId } : access.whereClause
 
     switch (type) {
       case 'income': {
@@ -169,7 +181,7 @@ export async function GET(request: Request) {
         const occupancyRate = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0
 
         const propertyWise = await db.property.findMany({
-          where: propertyId ? { id: propertyId } : { isActive: true },
+          where: propertyId ? { id: propertyId } : access.userCtx.isSuperAdmin ? { isActive: true } : { id: { in: access.userCtx.propertyIds } },
           select: {
             id: true,
             name: true,

@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAccess } from '@/lib/auth-helpers'
 
 // GET /api/purchases - Purchase orders, requisitions, GRNs
 export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    const role = req.nextUrl.searchParams.get('role')
     const propertyId = req.nextUrl.searchParams.get('propertyId')
     const type = req.nextUrl.searchParams.get('type') || 'orders'
-    const where: any = {}
-    if (propertyId) where.propertyId = propertyId
+
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'purchases', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const where = propertyId ? { propertyId } : access.whereClause
 
     if (type === 'requisitions') {
       const requisitions = await db.purchaseRequisition.findMany({
@@ -69,6 +81,16 @@ export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+    const access = await validateAccess(userId, role, 'purchases', 'create', data.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     if (data.type === 'requisition') {
       const prCount = await db.purchaseRequisition.count()
       const pr = await db.purchaseRequisition.create({
@@ -105,6 +127,11 @@ export async function POST(req: NextRequest) {
         include: { items: true },
       })
       if (!po) return NextResponse.json({ error: 'PO not found' }, { status: 404 })
+
+      // Verify access to the PO's property
+      if (!access.userCtx.isSuperAdmin && !access.userCtx.propertyIds.includes(po.propertyId)) {
+        return NextResponse.json({ error: 'You do not have access to this property' }, { status: 403 })
+      }
 
       const grn = await db.goodsReceivedNote.create({
         data: {
@@ -234,7 +261,21 @@ export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
     if (data.type === 'requisition') {
+      const existing = await db.purchaseRequisition.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'Requisition not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'purchases', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const pr = await db.purchaseRequisition.update({
         where: { id: data.id },
         data: {
@@ -247,6 +288,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (data.type === 'grn') {
+      const existing = await db.goodsReceivedNote.findUnique({ where: { id: data.id } })
+      if (!existing) return NextResponse.json({ error: 'GRN not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'purchases', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
+
       const grn = await db.goodsReceivedNote.update({
         where: { id: data.id },
         data: { status: data.status },
@@ -255,6 +304,14 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Default: update PO
+    const existing = await db.purchaseOrder.findUnique({ where: { id: data.id } })
+    if (!existing) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
+
+    const access = await validateAccess(userId, role, 'purchases', 'update', existing.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
     const po = await db.purchaseOrder.update({
       where: { id: data.id },
       data: {
@@ -276,9 +333,20 @@ export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
     if (data.type === 'requisition') {
       const existing = await db.purchaseRequisition.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Purchase requisition not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'purchases', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       // Only allow deletion of draft or cancelled requisitions
       if (!['draft', 'cancelled', 'rejected'].includes(existing.status)) {
@@ -296,6 +364,11 @@ export async function DELETE(req: NextRequest) {
     if (data.type === 'grn') {
       const existing = await db.goodsReceivedNote.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'GRN not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'purchases', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       // Only allow deletion of pending inspection or rejected GRNs
       if (!['pending_inspection', 'rejected'].includes(existing.status)) {
@@ -316,6 +389,11 @@ export async function DELETE(req: NextRequest) {
       include: { goodsReceivedNotes: true },
     })
     if (!existing) return NextResponse.json({ error: 'Purchase order not found' }, { status: 404 })
+
+    const access = await validateAccess(userId, role, 'purchases', 'delete', existing.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     // Only allow deletion of draft or cancelled POs
     if (!['draft', 'cancelled'].includes(existing.status)) {

@@ -21,8 +21,12 @@ import {
   Loader2,
   Eye,
   Lock,
+  Users,
+  UserCog,
+  ChevronDown,
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { buildAuthQuery, buildAuthBody } from '@/lib/api'
 
 const roleLabels: Record<UserRole, string> = {
   super_admin: 'Super Admin',
@@ -223,6 +227,15 @@ const permissionGroups: { label: string; permissions: { key: Permission; label: 
     ],
   },
   {
+    label: 'Hostels',
+    permissions: [
+      { key: 'hostels:create', label: 'Create' },
+      { key: 'hostels:read', label: 'Read' },
+      { key: 'hostels:update', label: 'Update' },
+      { key: 'hostels:delete', label: 'Delete' },
+    ],
+  },
+  {
     label: 'Role Management',
     permissions: [
       { key: 'role-management:read', label: 'Read' },
@@ -238,6 +251,11 @@ export function RoleManagementPage() {
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
   const [selectedRole, setSelectedRole] = useState<UserRole>('manager')
+  const [activeTab, setActiveTab] = useState<'roles' | 'users'>('roles')
+  const [usersList, setUsersList] = useState<any[]>([])
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [userOverrides, setUserOverrides] = useState<any[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
 
   const canManage = currentUser && hasPermission(currentUser.role, 'role-management:update')
   const canView = currentUser && hasPermission(currentUser.role, 'role-management:read')
@@ -276,6 +294,97 @@ export function RoleManagementPage() {
     }
     loadPermissions().finally(() => setLoading(false))
   }, [])
+
+  // Load users for per-user permission overrides
+  useEffect(() => {
+    if (activeTab !== 'users' || !canManage) return
+    const fetchUsers = async () => {
+      setUsersLoading(true)
+      try {
+        const res = await fetch(`/api/user-permissions?${buildAuthQuery()}`)
+        if (res.ok) {
+          const data = await res.json()
+          setUsersList(data.users || [])
+        }
+      } catch (e) { console.error(e) }
+      finally { setUsersLoading(false) }
+    }
+    fetchUsers()
+  }, [activeTab, canManage])
+
+  // Load user overrides when a user is selected
+  useEffect(() => {
+    if (!selectedUserId || !canManage) return
+    const fetchOverrides = async () => {
+      try {
+        const res = await fetch(`/api/user-permissions?${buildAuthQuery({ targetUserId: selectedUserId })}`)
+        if (res.ok) {
+          const data = await res.json()
+          setUserOverrides(data.overrides || [])
+        }
+      } catch (e) { console.error(e) }
+    }
+    fetchOverrides()
+  }, [selectedUserId, canManage])
+
+  const toggleUserOverride = async (permission: string, currentlyGranted: boolean | undefined) => {
+    if (!canManage || !selectedUserId || !currentUser) return
+    try {
+      if (currentlyGranted === undefined) {
+        // No override exists - create one (toggle on means grant)
+        const res = await fetch('/api/user-permissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildAuthBody({
+            targetUserId: selectedUserId,
+            permission,
+            granted: true,
+          })),
+        })
+        if (res.ok) {
+          const override = await res.json()
+          setUserOverrides(prev => [...prev, override])
+        }
+      } else if (currentlyGranted) {
+        // Currently granted - switch to denied
+        const res = await fetch('/api/user-permissions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildAuthBody({
+            targetUserId: selectedUserId,
+            permission,
+            granted: false,
+          })),
+        })
+        if (res.ok) {
+          const override = await res.json()
+          setUserOverrides(prev => prev.map(o => o.permission === permission ? override : o))
+        }
+      } else {
+        // Currently denied - remove override (revert to role default)
+        const existing = userOverrides.find(o => o.permission === permission)
+        if (existing) {
+          const res = await fetch('/api/user-permissions', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(buildAuthBody({ overrideId: existing.id })),
+          })
+          if (res.ok) {
+            setUserOverrides(prev => prev.filter(o => o.permission !== permission))
+          }
+        }
+      }
+      toast({ title: 'Permission Updated', description: `Override for ${permission} has been updated.` })
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' })
+    }
+  }
+
+  const getUserOverrideState = (permission: string): { hasOverride: boolean; granted: boolean } => {
+    const override = userOverrides.find(o => o.permission === permission)
+    if (override) return { hasOverride: true, granted: override.granted }
+    return { hasOverride: false, granted: false }
+  }
 
   const togglePermission = (role: UserRole, permission: Permission) => {
     if (!canManage) return
@@ -444,7 +553,128 @@ export function RoleManagementPage() {
         )}
       </div>
 
+      {/* Tab Switcher */}
+      <div className="flex items-center gap-2 border-b pb-2">
+        <button
+          onClick={() => setActiveTab('roles')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'roles' ? 'bg-emerald-500/15 text-emerald-600' : 'text-slate-600 hover:bg-slate-100'}`}
+        >
+          <Shield className="w-4 h-4" />
+          Role Permissions
+        </button>
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeTab === 'users' ? 'bg-emerald-500/15 text-emerald-600' : 'text-slate-600 hover:bg-slate-100'}`}
+        >
+          <UserCog className="w-4 h-4" />
+          Per-User Overrides
+        </button>
+      </div>
+
+      {/* Per-User Overrides Tab */}
+      {activeTab === 'users' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UserCog className="w-5 h-5" />
+                User Permission Overrides
+              </CardTitle>
+              <CardDescription>
+                Override individual user permissions beyond their role defaults. Grant or deny specific actions per user.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-4 gap-6">
+                {/* User List */}
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Users</p>
+                  {usersLoading ? (
+                    <div className="flex items-center justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>
+                  ) : (
+                    <div className="space-y-1 max-h-[600px] overflow-y-auto">
+                      {usersList.map((u: any) => (
+                        <button
+                          key={u.id}
+                          onClick={() => setSelectedUserId(u.id)}
+                          className={`w-full text-left p-2.5 rounded-lg transition-all text-sm ${selectedUserId === u.id ? 'bg-emerald-500/15 text-emerald-600 font-medium' : 'hover:bg-slate-50'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Shield className={`w-3.5 h-3.5 ${u.role === 'owner' ? 'text-purple-400' : u.role === 'manager' ? 'text-blue-400' : u.role === 'staff' ? 'text-amber-400' : 'text-emerald-400'}`} />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">{u.name}</p>
+                              <p className="text-[10px] text-slate-400 truncate">{u.email}</p>
+                            </div>
+                            {u._count?.permissionOverrides > 0 && (
+                              <Badge variant="secondary" className="text-[9px] px-1 py-0 bg-amber-100 text-amber-700 border-0">
+                                {u._count.permissionOverrides}
+                              </Badge>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Permission Overrides Grid */}
+                <div className="col-span-3">
+                  {selectedUserId ? (
+                    <div className="space-y-4">
+                      {permissionGroups.map((group) => (
+                        <div key={group.label} className="border rounded-lg p-3">
+                          <p className="text-sm font-semibold mb-2 text-slate-700">{group.label}</p>
+                          <div className="flex flex-wrap gap-3">
+                            {group.permissions.map((perm) => {
+                              const override = getUserOverrideState(perm.key)
+                              const roleDefault = hasPerm(
+                                (usersList.find((u: any) => u.id === selectedUserId)?.role || 'staff') as UserRole,
+                                perm.key
+                              )
+                              return (
+                                <div key={perm.key} className="flex items-center gap-2 p-2 rounded-md bg-slate-50 min-w-[180px]">
+                                  <Switch
+                                    checked={override.hasOverride ? override.granted : roleDefault}
+                                    onCheckedChange={() => toggleUserOverride(perm.key, override.hasOverride ? override.granted : undefined)}
+                                    className={`data-[state=checked]:bg-emerald-500 ${override.hasOverride && !override.granted ? 'data-[state=checked]:bg-red-500' : ''}`}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-xs font-medium">{perm.label}</p>
+                                    <p className="text-[10px] text-slate-400">
+                                      {override.hasOverride
+                                        ? override.granted ? '✓ Granted (override)' : '✗ Denied (override)'
+                                        : roleDefault ? 'From role' : 'Not in role'}
+                                    </p>
+                                  </div>
+                                  {override.hasOverride && (
+                                    <Badge variant="secondary" className="text-[9px] px-1 py-0 border-0 bg-amber-100 text-amber-700">
+                                      override
+                                    </Badge>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 text-slate-400">
+                      <div className="text-center">
+                        <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">Select a user to manage their individual permissions</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Role Overview Cards */}
+      {activeTab === 'roles' && (<>
       <div className="grid grid-cols-5 gap-4">
         {(Object.keys(roleLabels) as UserRole[]).map((role) => {
           const counts = getPermissionCount(role)
@@ -620,6 +850,8 @@ export function RoleManagementPage() {
           </div>
         </CardContent>
       </Card>
+      )}
+      </>)}
     </div>
   )
 }

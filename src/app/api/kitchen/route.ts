@@ -1,19 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { validateAccess, buildUserContext, buildScopedWhere } from '@/lib/auth-helpers'
 
 // GET /api/kitchen - Kitchen issues, menu plans, recipes
 export async function GET(req: NextRequest) {
   try {
+    const userId = req.nextUrl.searchParams.get('userId')
+    const role = req.nextUrl.searchParams.get('role')
     const propertyId = req.nextUrl.searchParams.get('propertyId')
     const type = req.nextUrl.searchParams.get('type') || 'all'
-    const where: any = {}
-    if (propertyId) where.propertyId = propertyId
 
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
+    const access = await validateAccess(userId, role, 'kitchen', 'read', propertyId || undefined)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
+
+    const scopedWhere = propertyId ? { propertyId } : access.whereClause
     const result: any = {}
 
     if (type === 'all' || type === 'issues') {
       result.issues = await db.kitchenIssue.findMany({
-        where: propertyId ? { propertyId } : {},
+        where: scopedWhere,
         include: {
           item: { select: { name: true, unit: true } },
           property: { select: { name: true } },
@@ -28,7 +39,7 @@ export async function GET(req: NextRequest) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
       result.menus = await db.menuPlan.findMany({
-        where: propertyId ? { propertyId, date: { gte: today } } : { date: { gte: today } },
+        where: { ...scopedWhere, date: { gte: today } },
         include: {
           property: { select: { name: true } },
           items: { include: { recipe: { include: { ingredients: { include: { item: true } } } } } },
@@ -40,7 +51,7 @@ export async function GET(req: NextRequest) {
 
     if (type === 'all' || type === 'recipes') {
       result.recipes = await db.recipe.findMany({
-        where: propertyId ? { propertyId, isActive: true } : { isActive: true },
+        where: { ...scopedWhere, isActive: true },
         include: {
           ingredients: { include: { item: { select: { name: true, unit: true, currentStock: true } } } },
           property: { select: { name: true } },
@@ -57,7 +68,7 @@ export async function GET(req: NextRequest) {
       tomorrow.setDate(tomorrow.getDate() + 1)
 
       const todayIssues = await db.kitchenIssue.findMany({
-        where: { propertyId: propertyId || undefined, createdAt: { gte: today, lt: tomorrow } },
+        where: { ...scopedWhere, createdAt: { gte: today, lt: tomorrow } },
       })
 
       result.stats = {
@@ -79,6 +90,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+
+    // Validate access for create
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+    const access = await validateAccess(userId, role, 'kitchen', 'create', data.propertyId)
+    if (!access.allowed) {
+      return NextResponse.json({ error: access.error }, { status: 403 })
+    }
 
     if (data.type === 'issue') {
       // Issue items to kitchen - deduct stock
@@ -186,6 +208,11 @@ export async function POST(req: NextRequest) {
       })
       if (!menuPlan) return NextResponse.json({ error: 'Menu not found' }, { status: 404 })
 
+      // Verify access to this menu's property
+      if (!access.userCtx.isSuperAdmin && !access.userCtx.propertyIds.includes(menuPlan.propertyId)) {
+        return NextResponse.json({ error: 'You do not have access to this property' }, { status: 403 })
+      }
+
       const scaleFactor = data.headCount ? data.headCount / 100 : 1 // default base servings
       const deductions: any[] = []
 
@@ -241,9 +268,20 @@ export async function PATCH(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
     if (data.type === 'issue') {
       const existing = await db.kitchenIssue.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Kitchen issue not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'kitchen', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       const updateData: Record<string, unknown> = {}
       if (data.quantity !== undefined) updateData.quantity = data.quantity
@@ -266,6 +304,11 @@ export async function PATCH(req: NextRequest) {
     if (data.type === 'recipe') {
       const existing = await db.recipe.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'kitchen', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       const updateData: Record<string, unknown> = {}
       if (data.name !== undefined) updateData.name = data.name
@@ -300,6 +343,11 @@ export async function PATCH(req: NextRequest) {
     if (data.type === 'menu') {
       const existing = await db.menuPlan.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Menu plan not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'kitchen', 'update', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       const updateData: Record<string, unknown> = {}
       if (data.date !== undefined) updateData.date = new Date(data.date)
@@ -342,9 +390,20 @@ export async function DELETE(req: NextRequest) {
   try {
     const data = await req.json()
 
+    const userId = data.userId
+    const role = data.role
+    if (!userId || !role) {
+      return NextResponse.json({ error: 'userId and role are required' }, { status: 400 })
+    }
+
     if (data.type === 'issue') {
       const existing = await db.kitchenIssue.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Kitchen issue not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'kitchen', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       await db.kitchenIssue.delete({ where: { id: data.id } })
       return NextResponse.json({ message: 'Kitchen issue deleted successfully', id: data.id })
@@ -353,6 +412,11 @@ export async function DELETE(req: NextRequest) {
     if (data.type === 'recipe') {
       const existing = await db.recipe.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Recipe not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'kitchen', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       // Delete related menu plan items referencing this recipe, then ingredients, then recipe
       await db.menuPlanItem.deleteMany({ where: { recipeId: data.id } })
@@ -364,6 +428,11 @@ export async function DELETE(req: NextRequest) {
     if (data.type === 'menu') {
       const existing = await db.menuPlan.findUnique({ where: { id: data.id } })
       if (!existing) return NextResponse.json({ error: 'Menu plan not found' }, { status: 404 })
+
+      const access = await validateAccess(userId, role, 'kitchen', 'delete', existing.propertyId)
+      if (!access.allowed) {
+        return NextResponse.json({ error: access.error }, { status: 403 })
+      }
 
       // Delete menu items first (cascade), then the menu plan
       await db.menuPlanItem.deleteMany({ where: { menuPlanId: data.id } })

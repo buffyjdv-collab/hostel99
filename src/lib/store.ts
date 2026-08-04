@@ -123,28 +123,63 @@ export const ROLE_PERMISSIONS: Record<string, Permission[]> = {
 // can check them even when called outside a React component.
 let _dbPermissions: Record<string, Permission[]> | null = null
 
+// In-memory user permission overrides (loaded at login)
+let _userOverrides: PermissionOverride[] | null = null
+
+export function setUserOverrides(overrides: PermissionOverride[]) {
+  _userOverrides = overrides
+}
+
 export function loadPermissionsFromDB(): Promise<Record<string, Permission[]>> {
   return fetch('/api/role-permissions')
     .then((res) => {
       if (!res.ok) throw new Error(`Failed to load permissions: ${res.status}`)
       return res.json()
     })
-    .then((data: Record<string, Permission[]>) => {
-      // Merge fetched permissions into the in-memory ROLE_PERMISSIONS
-      Object.assign(ROLE_PERMISSIONS, data)
-      _dbPermissions = data
-      return data
+    .then((rawData) => {
+      // API returns array format: [{role, permissions}] — convert to Record<string, Permission[]>
+      let permsMap: Record<string, Permission[]>
+      if (Array.isArray(rawData)) {
+        permsMap = {}
+        for (const item of rawData) {
+          if (item.role && Array.isArray(item.permissions)) {
+            permsMap[item.role] = item.permissions
+          }
+        }
+      } else if (typeof rawData === 'object' && rawData !== null) {
+        permsMap = rawData as Record<string, Permission[]>
+      } else {
+        permsMap = {}
+      }
+
+      // Only merge roles that actually came from DB; keep static defaults for the rest
+      for (const role of Object.keys(permsMap)) {
+        ROLE_PERMISSIONS[role] = permsMap[role]
+      }
+      _dbPermissions = permsMap
+      return permsMap
     })
     .catch((err) => {
       console.error('[loadPermissionsFromDB]', err)
+      _dbPermissions = null  // ensure fallback to static defaults
       return ROLE_PERMISSIONS // fall back to static defaults
     })
 }
 
 export function hasPermission(role: string, permission: Permission): boolean {
-  // Prefer DB-loaded permissions when available
-  const source = _dbPermissions || ROLE_PERMISSIONS
-  const perms = source[role] || []
+  // Step 1: Check user-specific overrides first (highest priority)
+  if (_userOverrides) {
+    const override = _userOverrides.find(o => o.permission === permission)
+    if (override) return override.granted
+  }
+
+  // Step 2: If DB permissions are loaded, check DB; otherwise fall back to static defaults
+  if (_dbPermissions && _dbPermissions[role]) {
+    return _dbPermissions[role].includes(permission)
+  }
+
+  // Step 3: Fall back to static defaults for roles not overridden by DB
+  const perms = ROLE_PERMISSIONS[role] || []
   return perms.includes(permission)
 }
 
@@ -204,6 +239,12 @@ interface CurrentUser {
   originalRole?: UserRole  // For role switching - stores the original role
   isImpersonating?: boolean // Whether the user is impersonating another role
   hostelAssignments?: HostelAssignment[] // User's assigned hostels
+  permissionOverrides?: PermissionOverride[] // Per-user permission overrides
+}
+
+export interface PermissionOverride {
+  permission: string
+  granted: boolean
 }
 
 interface AppState {
@@ -238,6 +279,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Auto-set currentHostelId from user's first assignment
       const firstHostel = user.hostelAssignments?.[0]?.propertyId || null
       const existingHostelId = localStorage.getItem('hostelpro_currentHostelId')
+      // Set user-specific permission overrides for micro RBAC
+      if (user.permissionOverrides) {
+        setUserOverrides(user.permissionOverrides)
+      }
       set({
         currentUser: user,
         currentHostelId: existingHostelId || firstHostel,
@@ -249,6 +294,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       localStorage.removeItem('hostelpro_currentHostelId')
       set({ currentUser: null, currentHostelId: null, dbPermissions: null })
       _dbPermissions = null
+      _userOverrides = null
     }
   },
   logout: () => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import { useAppStore } from '@/lib/store'
+import { buildAuthQuery } from '@/lib/api'
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -174,7 +175,7 @@ function StockReport({ selectedPropertyId }: { selectedPropertyId: string }) {
     const fetchInventory = async () => {
       try {
         const pid = selectedPropertyId || ''
-        const res = await fetch(`/api/inventory?propertyId=${pid}`)
+        const res = await fetch(`/api/inventory?propertyId=${pid}&${buildAuthQuery()}`)
         const data = await res.json()
         setInvData(data)
       } catch (e) { console.error(e) }
@@ -255,7 +256,7 @@ function ConsumptionReport({ selectedPropertyId }: { selectedPropertyId: string 
     const fetchMess = async () => {
       try {
         const pid = selectedPropertyId || ''
-        const res = await fetch(`/api/mess?propertyId=${pid}&type=consumption&days=30`)
+        const res = await fetch(`/api/mess?propertyId=${pid}&type=consumption&days=30&${buildAuthQuery()}`)
         const data = await res.json()
         setMessData(data)
       } catch (e) { console.error(e) }
@@ -317,7 +318,7 @@ function WasteReport({ selectedPropertyId }: { selectedPropertyId: string }) {
     const fetchMess = async () => {
       try {
         const pid = selectedPropertyId || ''
-        const res = await fetch(`/api/mess?propertyId=${pid}&type=waste&days=30`)
+        const res = await fetch(`/api/mess?propertyId=${pid}&type=waste&days=30&${buildAuthQuery()}`)
         const data = await res.json()
         setMessData(data)
       } catch (e) { console.error(e) }
@@ -398,8 +399,8 @@ function KitchenCostReport({ selectedPropertyId }: { selectedPropertyId: string 
       try {
         const pid = selectedPropertyId || ''
         const [invRes, kitchenRes] = await Promise.all([
-          fetch(`/api/inventory?propertyId=${pid}`),
-          fetch(`/api/kitchen?propertyId=${pid}&type=issues`),
+          fetch(`/api/inventory?propertyId=${pid}&${buildAuthQuery()}`),
+          fetch(`/api/kitchen?propertyId=${pid}&type=issues&${buildAuthQuery()}`),
         ])
         setInvData(await invRes.json())
         setKitchenData(await kitchenRes.json())
@@ -459,7 +460,7 @@ function AssetReport({ selectedPropertyId }: { selectedPropertyId: string }) {
     const fetchAssets = async () => {
       try {
         const pid = selectedPropertyId || ''
-        const res = await fetch(`/api/assets?propertyId=${pid}&type=assets`)
+        const res = await fetch(`/api/assets?propertyId=${pid}&type=assets&${buildAuthQuery()}`)
         const data = await res.json()
         setAssetData(data)
       } catch (e) { console.error(e) }
@@ -534,7 +535,7 @@ function LowStockReport({ selectedPropertyId }: { selectedPropertyId: string }) 
     const fetchInventory = async () => {
       try {
         const pid = selectedPropertyId || ''
-        const res = await fetch(`/api/inventory?propertyId=${pid}&lowStock=true`)
+        const res = await fetch(`/api/inventory?propertyId=${pid}&lowStock=true&${buildAuthQuery()}`)
         const data = await res.json()
         setInvData(data)
       } catch (e) { console.error(e) }
@@ -592,7 +593,7 @@ function ExpiryReport({ selectedPropertyId }: { selectedPropertyId: string }) {
     const fetchInventory = async () => {
       try {
         const pid = selectedPropertyId || ''
-        const res = await fetch(`/api/inventory?propertyId=${pid}`)
+        const res = await fetch(`/api/inventory?propertyId=${pid}&${buildAuthQuery()}`)
         const data = await res.json()
         setInvData(data)
       } catch (e) { console.error(e) }
@@ -698,7 +699,8 @@ export function ReportsPage() {
         ...(selectedReport === 'tenant_ledger' && filterTenantId && { tenantId: filterTenantId }),
       })
       if (currentHostelId && !params.has('propertyId')) params.set('propertyId', currentHostelId)
-      const res = await fetch(`/api/reports?${params}`)
+      const authQs = buildAuthQuery()
+      const res = await fetch(`/api/reports?${params}&${authQs}`)
       if (res.ok) {
         const data = await res.json()
         setReportData(data)
